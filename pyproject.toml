@@ -1,7 +1,7 @@
 [project]
 name = "career-os"
 version = "0.1.0"
-description = "Add your description here"
+description = "CareerOS backend API service"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -30,7 +30,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["career_os"]
+known-first-party = ["career_os_api"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -39,7 +39,7 @@ indent-style = "space"
 [tool.pyrefly]
 python-version = "3.14"
 python-interpreter-path = ".venv/bin/python"
-project-includes = ["career_os", "main.py"]
+project-includes = ["career_os_api", "main.py"]
 project-excludes = ["**/.[!/.]*", "**/tests", "**/__pycache__", "**/.venv/**"]
 
 [tool.pytest.ini_options]
