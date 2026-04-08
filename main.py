@@ -1,10 +1,14 @@
 from contextlib import asynccontextmanager
+from typing import Annotated
 
-from fastapi import APIRouter, FastAPI, Request, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, FastAPI, Query, Request, status
+from fastapi.responses import JSONResponse, Response
 
 from career_os_api.config import settings
 from career_os_api.database.connection import create_postgres_pool
+from career_os_api.service.job_posting.extractor import extract_job_posting
+from career_os_api.service.job_posting.fetch import fetch_url_content
+from career_os_api.service.job_posting.schema import JobPostingExtracted
 
 
 @asynccontextmanager
@@ -33,6 +37,22 @@ def main() -> JSONResponse:
         content={"message": "Hello, World!"},
         status_code=status.HTTP_200_OK,
     )
+
+
+@v1_router.get("/fetch")
+async def fetch_page(
+    url: Annotated[str, Query(description="The URL to fetch")],
+) -> Response:
+    content, content_type = await fetch_url_content(url)
+    return Response(content=content, media_type=content_type)
+
+
+@v1_router.get("/parse")
+async def parse_job_posting(
+    url: Annotated[str, Query(description="Job posting URL to fetch and parse")],
+) -> JobPostingExtracted:
+    content, _ = await fetch_url_content(url)
+    return await extract_job_posting(html_content=content, source_url=url)
 
 
 @v1_router.get("/health/db")
