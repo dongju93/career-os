@@ -181,7 +181,7 @@ async def extract_job_posting(
     message = result.choices[0].message
     if message.refusal:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Model refused to process the content: {message.refusal}",
         )
 
