@@ -14,6 +14,7 @@ async def test_fetch_url_content_delegates_saramin_urls(
 ) -> None:
     fetch_saramin_job_posting = AsyncMock(return_value=b"<html>saramin</html>")
 
+    monkeypatch.setattr(fetch_module, "detect_platform", lambda url: None)
     monkeypatch.setattr(fetch_module, "is_saramin_url", lambda url: True)
     monkeypatch.setattr(
         fetch_module,
@@ -28,6 +29,29 @@ async def test_fetch_url_content_delegates_saramin_urls(
     assert content == b"<html>saramin</html>"
     assert content_type == "text/html; charset=utf-8"
     fetch_saramin_job_posting.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_fetch_url_content_rejects_unsupported_domains_before_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(fetch_module, "is_saramin_url", lambda url: False)
+
+    class UnexpectedAsyncClient:
+        def __init__(self, **kwargs) -> None:
+            raise AssertionError("http client should not be constructed")
+
+    monkeypatch.setattr(
+        fetch_module.httpx,
+        "AsyncClient",
+        UnexpectedAsyncClient,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await fetch_module.fetch_url_content("https://example.com/jobs/1")
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Unsupported job board domain: example.com"
 
 
 @pytest.mark.asyncio

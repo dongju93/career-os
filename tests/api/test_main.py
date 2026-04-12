@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator, Generator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest
@@ -8,6 +9,45 @@ from fastapi.testclient import TestClient
 import main as app_module
 
 API_PREFIX = f"/{app_module.API_V1}"
+
+
+def to_api_datetime(value: datetime) -> str:
+    return value.isoformat().replace("+00:00", "Z")
+
+
+def make_stored_row(sample_job_posting, *, job_id: int = 1) -> dict:
+    timestamp = datetime(2026, 4, 13, 9, 0, tzinfo=UTC)
+    return {
+        "id": job_id,
+        **sample_job_posting.model_dump(),
+        "scraped_at": timestamp,
+        "created_at": timestamp,
+        "updated_at": timestamp,
+    }
+
+
+def make_list_row(sample_job_posting, *, job_id: int = 1) -> dict:
+    stored = make_stored_row(sample_job_posting, job_id=job_id)
+    return {
+        "id": stored["id"],
+        "platform": stored["platform"],
+        "posting_id": stored["posting_id"],
+        "posting_url": stored["posting_url"],
+        "company_name": stored["company_name"],
+        "job_title": stored["job_title"],
+        "experience_req": stored["experience_req"],
+        "deadline": stored["deadline"],
+        "location": stored["location"],
+        "employment_type": stored["employment_type"],
+        "salary": stored["salary"],
+        "tech_stack": stored["tech_stack"],
+        "tags": stored["tags"],
+        "job_category": stored["job_category"],
+        "industry": stored["industry"],
+        "scraped_at": stored["scraped_at"],
+        "created_at": stored["created_at"],
+        "updated_at": stored["updated_at"],
+    }
 
 
 class FakeResult:
@@ -59,6 +99,57 @@ def test_root_endpoint_returns_hello_world(client: TestClient) -> None:
     assert response.json() == {"message": "Hello, World!"}
 
 
+def test_list_job_postings_endpoint_returns_paginated_results(
+    client: TestClient,
+    fake_pool: FakePool,
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_posting,
+) -> None:
+    rows = [make_list_row(sample_job_posting, job_id=7)]
+    get_job_postings = AsyncMock(return_value=(rows, 1))
+
+    monkeypatch.setattr(app_module, "get_job_postings", get_job_postings)
+
+    response = client.get(
+        f"{API_PREFIX}/job-postings",
+        params={"offset": 5, "limit": 10},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "items": [
+            {
+                "id": 7,
+                "platform": "saramin",
+                "posting_id": sample_job_posting.posting_id,
+                "posting_url": sample_job_posting.posting_url,
+                "company_name": sample_job_posting.company_name,
+                "job_title": sample_job_posting.job_title,
+                "experience_req": sample_job_posting.experience_req,
+                "deadline": sample_job_posting.deadline,
+                "location": sample_job_posting.location,
+                "employment_type": sample_job_posting.employment_type,
+                "salary": sample_job_posting.salary,
+                "tech_stack": sample_job_posting.tech_stack,
+                "tags": sample_job_posting.tags,
+                "job_category": sample_job_posting.job_category,
+                "industry": sample_job_posting.industry,
+                "scraped_at": to_api_datetime(rows[0]["scraped_at"]),
+                "created_at": to_api_datetime(rows[0]["created_at"]),
+                "updated_at": to_api_datetime(rows[0]["updated_at"]),
+            }
+        ],
+        "total": 1,
+        "offset": 5,
+        "limit": 10,
+    }
+    get_job_postings.assert_awaited_once_with(
+        fake_pool.connection_obj,
+        limit=10,
+        offset=5,
+    )
+
+
 def test_job_posting_extraction_endpoint_returns_extracted_payload(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -93,6 +184,113 @@ def test_job_posting_extraction_endpoint_requires_url_query(
     response = client.get(f"{API_PREFIX}/job-postings/extraction")
 
     assert response.status_code == 422
+
+
+def test_create_job_posting_endpoint_returns_created_record(
+    client: TestClient,
+    fake_pool: FakePool,
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_posting,
+) -> None:
+    stored = make_stored_row(sample_job_posting, job_id=11)
+    upsert_job_posting = AsyncMock(
+        return_value=(
+            stored["id"],
+            stored["scraped_at"],
+            stored["created_at"],
+            stored["updated_at"],
+            True,
+        )
+    )
+    monkeypatch.setattr(app_module, "upsert_job_posting", upsert_job_posting)
+
+    response = client.post(
+        f"{API_PREFIX}/job-postings",
+        json=sample_job_posting.model_dump(mode="json"),
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "id": 11,
+        **sample_job_posting.model_dump(mode="json"),
+        "scraped_at": to_api_datetime(stored["scraped_at"]),
+        "created_at": to_api_datetime(stored["created_at"]),
+        "updated_at": to_api_datetime(stored["updated_at"]),
+    }
+    assert upsert_job_posting.await_count == 1
+    await_args = upsert_job_posting.await_args
+    assert await_args is not None
+    assert await_args.args[0] is fake_pool.connection_obj
+    assert await_args.args[1].model_dump() == sample_job_posting.model_dump()
+
+
+def test_create_job_posting_endpoint_returns_200_for_updates(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_posting,
+) -> None:
+    stored = make_stored_row(sample_job_posting, job_id=11)
+    monkeypatch.setattr(
+        app_module,
+        "upsert_job_posting",
+        AsyncMock(
+            return_value=(
+                stored["id"],
+                stored["scraped_at"],
+                stored["created_at"],
+                stored["updated_at"],
+                False,
+            )
+        ),
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/job-postings",
+        json=sample_job_posting.model_dump(mode="json"),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == 11
+
+
+def test_get_job_posting_detail_endpoint_returns_stored_record(
+    client: TestClient,
+    fake_pool: FakePool,
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_posting,
+) -> None:
+    stored = make_stored_row(sample_job_posting, job_id=19)
+    get_job_posting = AsyncMock(return_value=stored)
+
+    monkeypatch.setattr(app_module, "get_job_posting", get_job_posting)
+
+    response = client.get(f"{API_PREFIX}/job-postings/19")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": 19,
+        **sample_job_posting.model_dump(mode="json"),
+        "scraped_at": to_api_datetime(stored["scraped_at"]),
+        "created_at": to_api_datetime(stored["created_at"]),
+        "updated_at": to_api_datetime(stored["updated_at"]),
+    }
+    get_job_posting.assert_awaited_once_with(fake_pool.connection_obj, 19)
+
+
+def test_get_job_posting_detail_endpoint_returns_404_when_missing(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        app_module,
+        "get_job_posting",
+        AsyncMock(return_value=None),
+    )
+
+    response = client.get(f"{API_PREFIX}/job-postings/404")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Job posting 404 not found"}
 
 
 def test_db_health_endpoint_uses_app_pool(

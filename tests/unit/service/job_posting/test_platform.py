@@ -76,10 +76,10 @@ def test_extract_posting_id_raises_for_saramin_missing_rec_idx() -> None:
 @pytest.mark.parametrize(
     "url",
     [
-        "https://www.wanted.co.kr/company/123",   # not a /wd/ path
-        "https://www.wanted.co.kr/events/hiring", # not a /wd/ path
-        "https://www.wanted.co.kr/wd/",           # missing ID segment
-        "https://www.wanted.co.kr/",              # no path at all
+        "https://www.wanted.co.kr/company/123",  # not a /wd/ path
+        "https://www.wanted.co.kr/events/hiring",  # not a /wd/ path
+        "https://www.wanted.co.kr/wd/",  # missing ID segment
+        "https://www.wanted.co.kr/",  # no path at all
     ],
 )
 def test_extract_posting_id_raises_for_wanted_non_job_url(url: str) -> None:
