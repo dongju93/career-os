@@ -43,10 +43,29 @@ def detect_platform(url: str) -> Platform:
 
 
 def extract_posting_id(url: str, platform: Platform) -> str:
-    """Derive the platform-native posting ID from the source URL."""
+    """
+    Derive the platform-native posting ID from the source URL.
+
+    Raises HTTPException 400 if the URL does not contain a recognisable ID,
+    preventing placeholder values from collapsing unrelated records in storage.
+    """
     params = parse_qs(urlparse(url).query)
     if platform is Platform.saramin:
-        return params.get("rec_idx", ["unknown"])[0]
-    # Wanted URLs follow the pattern /wd/:id
-    path_parts = urlparse(url).path.rstrip("/").split("/")
-    return path_parts[-1] if path_parts else "unknown"
+        rec_idx = params.get("rec_idx", [None])[0]
+        if not rec_idx:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not extract posting ID: 'rec_idx' query parameter is missing",
+            )
+        return rec_idx
+    # Wanted job posting URLs follow the strict pattern /wd/{id}.
+    # Validating the /wd/ prefix prevents company pages, event pages, or other
+    # Wanted URLs from being stored as job postings.
+    path_segments = urlparse(url).path.rstrip("/").split("/")
+    # path_segments for /wd/321 → ["", "wd", "321"]
+    if len(path_segments) < 3 or path_segments[1] != "wd" or not path_segments[2]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Wanted posting URL must follow the /wd/{id} path pattern",
+        )
+    return path_segments[2]
