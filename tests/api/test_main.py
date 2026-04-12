@@ -103,4 +103,6 @@ def test_db_health_endpoint_uses_app_pool(
 
     assert response.status_code == 200
     assert response.json() == {"database": "connected", "result": 1}
-    assert fake_pool.connection_obj.executed_queries == ["SELECT 1"]
+    # init_schema also runs at startup through the same FakeConnection, so
+    # verify the health endpoint's query is present rather than exclusive.
+    assert "SELECT 1" in fake_pool.connection_obj.executed_queries

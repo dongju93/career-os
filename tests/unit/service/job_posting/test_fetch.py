@@ -44,6 +44,7 @@ async def test_fetch_url_content_returns_response_body_and_content_type(
         ]
     )
 
+    monkeypatch.setattr(fetch_module, "detect_platform", lambda url: None)
     monkeypatch.setattr(fetch_module, "is_saramin_url", lambda url: False)
     monkeypatch.setattr(fetch_module.httpx, "AsyncClient", lambda **kwargs: client)
 
@@ -62,6 +63,7 @@ async def test_fetch_url_content_maps_invalid_url_to_bad_request(
 ) -> None:
     client = SequenceAsyncClient([httpx.InvalidURL("bad url")])
 
+    monkeypatch.setattr(fetch_module, "detect_platform", lambda url: None)
     monkeypatch.setattr(fetch_module, "is_saramin_url", lambda url: False)
     monkeypatch.setattr(fetch_module.httpx, "AsyncClient", lambda **kwargs: client)
 
@@ -80,6 +82,7 @@ async def test_fetch_url_content_maps_upstream_status_code(
         [make_http_status_error("https://example.com/jobs/1", 404)]
     )
 
+    monkeypatch.setattr(fetch_module, "detect_platform", lambda url: None)
     monkeypatch.setattr(fetch_module, "is_saramin_url", lambda url: False)
     monkeypatch.setattr(fetch_module.httpx, "AsyncClient", lambda **kwargs: client)
 
@@ -103,6 +106,7 @@ async def test_fetch_url_content_maps_request_errors_to_bad_gateway(
         ]
     )
 
+    monkeypatch.setattr(fetch_module, "detect_platform", lambda url: None)
     monkeypatch.setattr(fetch_module, "is_saramin_url", lambda url: False)
     monkeypatch.setattr(fetch_module.httpx, "AsyncClient", lambda **kwargs: client)
 
