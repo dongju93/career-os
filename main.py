@@ -95,7 +95,10 @@ async def get_job_posting_extraction(
         # "model" causes FastAPI to emit a full JSON Schema $ref for this status code,
         # matching the 201 body. Without it the 200 entry has no content schema and
         # generated clients treat successful updates as empty responses.
-        200: {"model": JobPostingStored, "description": "Job posting updated (existing record)"},
+        200: {
+            "model": JobPostingStored,
+            "description": "Job posting updated (existing record)",
+        },
         201: {"description": "Job posting created"},
     },
 )
