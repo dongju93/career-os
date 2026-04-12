@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from career_os_api.config import settings
 from career_os_api.database.connection import create_postgres_pool
+from career_os_api.database.schemas import init_schema
 from career_os_api.service.job_posting.extractor import extract_job_posting
 from career_os_api.service.job_posting.fetch import fetch_url_content
 from career_os_api.service.job_posting.schema import JobPostingExtracted
@@ -14,6 +15,7 @@ from career_os_api.service.job_posting.schema import JobPostingExtracted
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with create_postgres_pool() as pool:
+        await init_schema(pool)
         app.state.pool = pool
         yield
 
