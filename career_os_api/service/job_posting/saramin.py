@@ -99,6 +99,14 @@ async def _inline_iframe_content(
     if iframe_src.startswith("/"):
         iframe_src = f"{SARAMIN_BASE_URL}{iframe_src}"
 
+    # Guard against a tampered Saramin response injecting an off-domain iframe src.
+    # Only fetch iframe content that resolves to the Saramin domain.
+    iframe_host = urlparse(iframe_src).hostname or ""
+    if not (
+        iframe_host == SARAMIN_DOMAIN or iframe_host.endswith(f".{SARAMIN_DOMAIN}")
+    ):
+        return
+
     try:
         detail_resp = await client.get(iframe_src)
         if detail_resp.status_code == 200:

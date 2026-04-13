@@ -87,12 +87,14 @@ def test_build_messages_includes_required_context_and_images() -> None:
 async def test_collect_images_as_base64_normalizes_sources_and_skips_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # Off-domain URL must be silently dropped; saramin subdomains are allowed.
     soup = BeautifulSoup(
         """
         <div>
           <img src="/static/a.png" />
-          <img src="//cdn.example.com/b.jpg" />
-          <img src="https://images.example.com/c.gif" />
+          <img src="//cdn.saramin.co.kr/b.jpg" />
+          <img src="https://img.saramin.co.kr/c.gif" />
+          <img src="https://example.com/offsite.png" />
           <img src="" />
         </div>
         """,
@@ -107,10 +109,10 @@ async def test_collect_images_as_base64_normalizes_sources_and_skips_failures(
             ),
             httpx.RequestError(
                 "boom",
-                request=httpx.Request("GET", "https://cdn.example.com/b.jpg"),
+                request=httpx.Request("GET", "https://cdn.saramin.co.kr/b.jpg"),
             ),
             make_response(
-                "https://images.example.com/c.gif",
+                "https://img.saramin.co.kr/c.gif",
                 content=b"gif-bytes",
                 headers={"content-type": "image/gif; charset=binary"},
             ),
@@ -132,9 +134,10 @@ async def test_collect_images_as_base64_normalizes_sources_and_skips_failures(
         f"data:image/png;base64,{base64.b64encode(b'png-bytes').decode()}",
         f"data:image/gif;base64,{base64.b64encode(b'gif-bytes').decode()}",
     ]
+    assert len(client.calls) == 3  # offsite.png was never fetched
     assert client.calls[0][0] == "https://www.saramin.co.kr/static/a.png"
-    assert client.calls[1][0] == "https://cdn.example.com/b.jpg"
-    assert client.calls[2][0] == "https://images.example.com/c.gif"
+    assert client.calls[1][0] == "https://cdn.saramin.co.kr/b.jpg"
+    assert client.calls[2][0] == "https://img.saramin.co.kr/c.gif"
 
 
 class FakeCompletions:

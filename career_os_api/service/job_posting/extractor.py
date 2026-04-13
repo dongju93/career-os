@@ -1,4 +1,5 @@
 import base64
+from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -35,6 +36,12 @@ async def _collect_images_as_base64(
     boards to display formatted text — passing them to the vision model ensures
     that content is not silently dropped.
     """
+    # Derive the effective root domain from domain_base (e.g. "www.saramin.co.kr"
+    # → "saramin.co.kr") so that CDN subdomains (cdn.*, img.*) are also allowed
+    # while completely off-domain URLs from tampered HTML are rejected.
+    base_host = urlparse(domain_base).hostname or ""
+    effective_domain = base_host[4:] if base_host.startswith("www.") else base_host
+
     absolute_srcs: list[str] = []
     for img in soup.find_all("img"):
         src = str(img.get("src", "")).strip()
@@ -45,6 +52,12 @@ async def _collect_images_as_base64(
         elif src.startswith("/"):
             src = f"{domain_base}{src}"
         if src.startswith("http"):
+            src_host = urlparse(src).hostname or ""
+            if not (
+                src_host == effective_domain
+                or src_host.endswith(f".{effective_domain}")
+            ):
+                continue
             absolute_srcs.append(src)
 
     data_urls: list[str] = []

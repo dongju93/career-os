@@ -49,6 +49,11 @@ async def fetch_wanted_job_posting(url: str) -> bytes:
         )
 
     posting_id = path_segments[2]
+    if not posting_id.isdigit():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Wanted posting URL must follow the /wd/{id} path pattern",
+        )
 
     headers = {
         "User-Agent": WANTED_USER_AGENT,
