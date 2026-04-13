@@ -1,8 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 
+from career_os_api.auth.dependencies import get_current_user
+from career_os_api.auth.router import router as auth_router
 from career_os_api.constants import API_V1
 from career_os_api.database.job_postings import (
     get_job_posting,
@@ -19,6 +21,7 @@ from career_os_api.service.job_posting.schema import (
 )
 
 v1_router = APIRouter(prefix=f"/{API_V1}")
+v1_router.include_router(auth_router)
 
 
 @v1_router.get("/")
@@ -123,5 +126,23 @@ async def db_health(request: Request) -> JSONResponse:
         row = await result.fetchone()
     return JSONResponse(
         content={"database": "connected", "result": row[0]},
+        status_code=status.HTTP_200_OK,
+    )
+
+
+_current_user_dep = Depends(get_current_user)
+
+
+@v1_router.get("/me")
+async def read_current_user(
+    current_user=_current_user_dep,
+) -> JSONResponse:
+    return JSONResponse(
+        content={
+            "user_id": str(current_user["id"]),
+            "email": current_user["email"],
+            "name": current_user["name"],
+            "picture": current_user["picture"],
+        },
         status_code=status.HTTP_200_OK,
     )
