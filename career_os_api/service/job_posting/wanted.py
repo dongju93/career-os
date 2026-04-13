@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 
 from career_os_api.config import settings
 from career_os_api.constants import WANTED_USER_AGENT
+from career_os_api.service.job_posting.platform import Platform, validate_posting_id
 
 WANTED_DOMAIN = "wanted.co.kr"
 WANTED_BASE_URL = "https://www.wanted.co.kr"
@@ -48,12 +49,13 @@ async def fetch_wanted_job_posting(url: str) -> bytes:
             detail="Wanted posting URL must follow the /wd/{id} path pattern",
         )
 
-    posting_id = path_segments[2]
-    if not posting_id.isdigit():
+    try:
+        posting_id = validate_posting_id(path_segments[2], Platform.wanted)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Wanted posting URL must follow the /wd/{id} path pattern",
-        )
+        ) from exc
 
     headers = {
         "User-Agent": WANTED_USER_AGENT,

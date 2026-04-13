@@ -21,6 +21,22 @@ PLATFORM_BASE_URLS: dict[Platform, str] = {
 }
 
 
+def validate_posting_id(posting_id: str, platform: Platform) -> str:
+    """
+    Normalize and validate a platform-native posting identifier.
+
+    All currently supported job boards use numeric identifiers. Reject blank
+    or malformed IDs at the schema boundary so storage never collapses
+    unrelated postings onto the same `(platform, posting_id)` key.
+    """
+    normalized = posting_id.strip()
+    if not normalized:
+        raise ValueError("posting_id must not be empty")
+    if not normalized.isdigit():
+        raise ValueError(f"{platform.value} posting_id must contain only digits")
+    return normalized
+
+
 def detect_platform(url: str) -> Platform:
     """
     Validate the URL and classify it by domain.
@@ -63,7 +79,13 @@ def extract_posting_id(url: str, platform: Platform) -> str:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Could not extract posting ID: 'rec_idx' query parameter is missing",
             )
-        return rec_idx
+        try:
+            return validate_posting_id(rec_idx, platform)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Saramin URL contains an invalid rec_idx parameter",
+            ) from exc
     # Wanted job posting URLs follow the strict pattern /wd/{id}.
     # Validating the /wd/ prefix prevents company pages, event pages, or other
     # Wanted URLs from being stored as job postings.
@@ -74,4 +96,10 @@ def extract_posting_id(url: str, platform: Platform) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Wanted posting URL must follow the /wd/{id} path pattern",
         )
-    return path_segments[2]
+    try:
+        return validate_posting_id(path_segments[2], platform)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Wanted posting URL must follow the /wd/{id} path pattern",
+        ) from exc

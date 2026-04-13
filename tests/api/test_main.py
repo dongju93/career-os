@@ -255,6 +255,24 @@ def test_create_job_posting_endpoint_returns_200_for_updates(
     assert response.json()["id"] == 11
 
 
+def test_create_job_posting_endpoint_rejects_blank_posting_id(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_posting,
+) -> None:
+    upsert_job_posting = AsyncMock()
+    monkeypatch.setattr(app_module, "upsert_job_posting", upsert_job_posting)
+
+    payload = sample_job_posting.model_dump(mode="json")
+    payload["posting_id"] = ""
+
+    response = client.post(f"{API_PREFIX}/job-postings", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "posting_id"]
+    assert upsert_job_posting.await_count == 0
+
+
 def test_get_job_posting_detail_endpoint_returns_stored_record(
     client: TestClient,
     fake_pool: FakePool,
