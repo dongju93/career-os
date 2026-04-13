@@ -115,10 +115,10 @@ def _build_posting_html(data: dict) -> bytes:
     if expire := job.get("expire_time"):
         parts.append(f"<p class='deadline'>{expire}</p>")
 
-    # Salary — both ends are optional; include if at least one is present
+    # Salary ranges need both bounds; a half-open range is too ambiguous for extraction.
     annual_from = job.get("annual_from")
     annual_to = job.get("annual_to")
-    if annual_from is not None or annual_to is not None:
+    if annual_from is not None and annual_to is not None:
         parts.append(f"<p class='salary'>{annual_from} ~ {annual_to}</p>")
 
     # --- Detail sections (raw HTML fragments preserved) ---

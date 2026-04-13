@@ -109,6 +109,44 @@ async def test_fetch_wanted_job_posting_builds_html_from_api_response(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("annual_from", "annual_to"),
+    [
+        (5000, None),
+        (None, 8000),
+    ],
+)
+async def test_fetch_wanted_job_posting_omits_salary_when_range_is_open_ended(
+    monkeypatch: pytest.MonkeyPatch,
+    annual_from: int | None,
+    annual_to: int | None,
+) -> None:
+    payload = json.loads(json.dumps(SAMPLE_API_RESPONSE))
+    payload["job"]["annual_from"] = annual_from
+    payload["job"]["annual_to"] = annual_to
+
+    client = SequenceAsyncClient(
+        [
+            make_response(
+                f"{wanted_module.WANTED_JOB_API_URL}/349998",
+                content=json.dumps(payload).encode(),
+                headers={"content-type": "application/json"},
+            ),
+        ]
+    )
+    monkeypatch.setattr(wanted_module.httpx, "AsyncClient", lambda **kwargs: client)
+
+    content = await wanted_module.fetch_wanted_job_posting(
+        "https://www.wanted.co.kr/wd/349998"
+    )
+    html = content.decode("utf-8")
+
+    assert "class='salary'" not in html
+    assert "5000 ~ None" not in html
+    assert "None ~ 8000" not in html
+
+
+@pytest.mark.asyncio
 async def test_fetch_wanted_job_posting_hits_api_with_posting_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
