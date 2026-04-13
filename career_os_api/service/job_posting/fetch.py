@@ -7,6 +7,10 @@ from career_os_api.service.job_posting.saramin import (
     fetch_saramin_job_posting,
     is_saramin_url,
 )
+from career_os_api.service.job_posting.wanted import (
+    fetch_wanted_job_posting,
+    is_wanted_url,
+)
 
 
 async def fetch_url_content(url: str) -> tuple[bytes, str]:
@@ -17,6 +21,10 @@ async def fetch_url_content(url: str) -> tuple[bytes, str]:
 
     if is_saramin_url(url):
         content = await fetch_saramin_job_posting(url)
+        return content, "text/html; charset=utf-8"
+
+    if is_wanted_url(url):
+        content = await fetch_wanted_job_posting(url)
         return content, "text/html; charset=utf-8"
 
     async with httpx.AsyncClient(

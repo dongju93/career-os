@@ -9,8 +9,9 @@ EXTRACTION_SYSTEM_PROMPT: str = (
     "Set any field to null when the value is not explicitly stated."
 )
 
-# HTTP headers — fixed user-agent string
+# HTTP headers — fixed user-agent strings
 SARAMIN_USER_AGENT: str = "Mozilla/5.0"
+WANTED_USER_AGENT: str = "Mozilla/5.0"
 
 # API versioning — fixed version identifier
 API_V1: str = "v1"

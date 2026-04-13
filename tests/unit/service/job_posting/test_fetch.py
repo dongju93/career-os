@@ -32,6 +32,30 @@ async def test_fetch_url_content_delegates_saramin_urls(
 
 
 @pytest.mark.asyncio
+async def test_fetch_url_content_delegates_wanted_urls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fetch_wanted_job_posting = AsyncMock(return_value=b"<html>wanted</html>")
+
+    monkeypatch.setattr(fetch_module, "detect_platform", lambda url: None)
+    monkeypatch.setattr(fetch_module, "is_saramin_url", lambda url: False)
+    monkeypatch.setattr(fetch_module, "is_wanted_url", lambda url: True)
+    monkeypatch.setattr(
+        fetch_module,
+        "fetch_wanted_job_posting",
+        fetch_wanted_job_posting,
+    )
+
+    content, content_type = await fetch_module.fetch_url_content(
+        "https://www.wanted.co.kr/wd/349998"
+    )
+
+    assert content == b"<html>wanted</html>"
+    assert content_type == "text/html; charset=utf-8"
+    fetch_wanted_job_posting.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_fetch_url_content_rejects_unsupported_domains_before_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
