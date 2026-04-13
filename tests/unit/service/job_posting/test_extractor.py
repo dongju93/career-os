@@ -15,6 +15,7 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 
+from career_os_api.config import settings
 from career_os_api.service.job_posting import extractor as extractor_module
 from career_os_api.service.job_posting.platform import Platform
 from career_os_api.service.job_posting.schema import JobPostingExtracted
@@ -211,7 +212,7 @@ async def test_extract_job_posting_returns_parsed_model(
     collect_images.assert_awaited_once()
     parse_kwargs = holder["client"].completions.calls[0]
     assert holder["client"].api_key == "test-openai-api-key"
-    assert parse_kwargs["model"] == extractor_module.OPENAI_MODEL
+    assert parse_kwargs["model"] == settings.openai_model
     assert parse_kwargs["response_format"] is JobPostingExtracted
     content = _require_user_content(parse_kwargs["messages"][1])
     assert "Backend Engineer" in _require_text_part(content[0])["text"]

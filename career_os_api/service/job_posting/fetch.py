@@ -1,6 +1,7 @@
 import httpx
 from fastapi import HTTPException, status
 
+from career_os_api.config import settings
 from career_os_api.service.job_posting.platform import detect_platform
 from career_os_api.service.job_posting.saramin import (
     fetch_saramin_job_posting,
@@ -18,7 +19,9 @@ async def fetch_url_content(url: str) -> tuple[bytes, str]:
         content = await fetch_saramin_job_posting(url)
         return content, "text/html; charset=utf-8"
 
-    async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
+    async with httpx.AsyncClient(
+        follow_redirects=True, timeout=settings.http_fetch_timeout
+    ) as client:
         try:
             response = await client.get(url)
             response.raise_for_status()

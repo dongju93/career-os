@@ -1,7 +1,19 @@
+from datetime import datetime
+from typing import TypedDict
+
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
 from career_os_api.service.job_posting.schema import JobPostingExtracted
+
+
+class UpsertResult(TypedDict):
+    id: int
+    scraped_at: datetime
+    created_at: datetime
+    updated_at: datetime
+    inserted: bool
+
 
 _UPSERT_SQL = """
 INSERT INTO job_postings (
@@ -74,40 +86,43 @@ WHERE id = %s
 """
 
 
-async def upsert_job_posting(conn: AsyncConnection, data: JobPostingExtracted) -> tuple:
-    cursor = await conn.execute(
-        _UPSERT_SQL,
-        (
-            str(data.platform),
-            data.posting_id,
-            data.posting_url,
-            data.company_name,
-            data.job_title,
-            data.experience_req,
-            data.deadline,
-            data.location,
-            data.employment_type,
-            data.job_description,
-            data.responsibilities,
-            data.qualifications,
-            data.preferred_points,
-            data.benefits,
-            data.hiring_process,
-            data.education_req,
-            data.salary,
-            data.tech_stack,
-            data.tags,
-            data.application_method,
-            data.application_form,
-            data.contact_person,
-            data.homepage,
-            data.job_category,
-            data.industry,
-        ),
-    )
-    row = await cursor.fetchone()
+async def upsert_job_posting(
+    conn: AsyncConnection, data: JobPostingExtracted
+) -> UpsertResult:
+    async with conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            _UPSERT_SQL,
+            (
+                str(data.platform),
+                data.posting_id,
+                data.posting_url,
+                data.company_name,
+                data.job_title,
+                data.experience_req,
+                data.deadline,
+                data.location,
+                data.employment_type,
+                data.job_description,
+                data.responsibilities,
+                data.qualifications,
+                data.preferred_points,
+                data.benefits,
+                data.hiring_process,
+                data.education_req,
+                data.salary,
+                data.tech_stack,
+                data.tags,
+                data.application_method,
+                data.application_form,
+                data.contact_person,
+                data.homepage,
+                data.job_category,
+                data.industry,
+            ),
+        )
+        row = await cur.fetchone()
     assert row is not None  # RETURNING always yields a row on successful DML
-    return row  # (id, scraped_at, created_at, updated_at)
+    return row  # type: ignore[return-value]
 
 
 async def get_job_postings(

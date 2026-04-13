@@ -4,6 +4,9 @@ import httpx
 from bs4 import BeautifulSoup
 from fastapi import HTTPException, status
 
+from career_os_api.config import settings
+from career_os_api.constants import HTML_PARSER, SARAMIN_USER_AGENT
+
 SARAMIN_DOMAIN = "saramin.co.kr"
 SARAMIN_BASE_URL = "https://www.saramin.co.kr"
 SARAMIN_JOB_AJAX_URL = f"{SARAMIN_BASE_URL}/zf_user/jobs/relay/view-ajax"
@@ -51,13 +54,13 @@ async def fetch_saramin_job_posting(url: str) -> bytes:
     rec_idx = rec_idx_list[0]
 
     headers = {
-        "User-Agent": "Mozilla/5.0",
+        "User-Agent": SARAMIN_USER_AGENT,
         "X-Requested-With": "XMLHttpRequest",
         "Referer": url,
     }
 
     async with httpx.AsyncClient(
-        follow_redirects=True, timeout=30.0, headers=headers
+        follow_redirects=True, timeout=settings.http_fetch_timeout, headers=headers
     ) as client:
         try:
             ajax_resp = await client.get(
@@ -76,7 +79,7 @@ async def fetch_saramin_job_posting(url: str) -> bytes:
                 detail="Failed to reach Saramin",
             ) from None
 
-        soup = BeautifulSoup(ajax_resp.content, "html.parser")
+        soup = BeautifulSoup(ajax_resp.content, HTML_PARSER)
         await _inline_iframe_content(client, soup)
 
     return _extract_posting_sections(soup)
@@ -99,7 +102,7 @@ async def _inline_iframe_content(
     try:
         detail_resp = await client.get(iframe_src)
         if detail_resp.status_code == 200:
-            detail_soup = BeautifulSoup(detail_resp.content, "html.parser")
+            detail_soup = BeautifulSoup(detail_resp.content, HTML_PARSER)
             user_content = detail_soup.select_one(".user_content")
             if user_content:
                 iframe.replace_with(user_content)

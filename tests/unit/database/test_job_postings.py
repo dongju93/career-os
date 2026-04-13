@@ -60,14 +60,16 @@ class FakeConnection:
 async def test_upsert_job_posting_executes_sql_with_model_fields(
     sample_job_posting,
 ) -> None:
-    returned_row = (
-        7,
-        datetime(2026, 4, 13, 9, 0, tzinfo=UTC),
-        datetime(2026, 4, 13, 9, 0, tzinfo=UTC),
-        datetime(2026, 4, 13, 9, 0, tzinfo=UTC),
-        True,
-    )
-    conn = FakeConnection(execute_row=returned_row)
+    timestamp = datetime(2026, 4, 13, 9, 0, tzinfo=UTC)
+    returned_row = {
+        "id": 7,
+        "scraped_at": timestamp,
+        "created_at": timestamp,
+        "updated_at": timestamp,
+        "inserted": True,
+    }
+    cursor = FakeCursor(fetchone_results=[returned_row])
+    conn = FakeConnection(cursor=cursor)
 
     row = await job_postings_module.upsert_job_posting(
         cast(AsyncConnection, conn),
@@ -75,7 +77,8 @@ async def test_upsert_job_posting_executes_sql_with_model_fields(
     )
 
     assert row == returned_row
-    assert conn.execute_calls == [
+    assert conn.cursor_row_factories == [dict_row]
+    assert cursor.execute_calls == [
         (
             job_postings_module._UPSERT_SQL,
             (

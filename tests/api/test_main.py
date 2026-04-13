@@ -6,9 +6,11 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi.testclient import TestClient
 
-import main as app_module
+import career_os_api.api as app_module
+import main as main_module
+from career_os_api.constants import API_V1
 
-API_PREFIX = f"/{app_module.API_V1}"
+API_PREFIX = f"/{API_V1}"
 
 
 def to_api_datetime(value: datetime) -> str:
@@ -86,9 +88,9 @@ def client(
     async def fake_create_postgres_pool() -> AsyncIterator[FakePool]:
         yield fake_pool
 
-    monkeypatch.setattr(app_module, "create_postgres_pool", fake_create_postgres_pool)
+    monkeypatch.setattr(main_module, "create_postgres_pool", fake_create_postgres_pool)
 
-    with TestClient(app_module.career_os) as test_client:
+    with TestClient(main_module.career_os) as test_client:
         yield test_client
 
 
@@ -194,13 +196,13 @@ def test_create_job_posting_endpoint_returns_created_record(
 ) -> None:
     stored = make_stored_row(sample_job_posting, job_id=11)
     upsert_job_posting = AsyncMock(
-        return_value=(
-            stored["id"],
-            stored["scraped_at"],
-            stored["created_at"],
-            stored["updated_at"],
-            True,
-        )
+        return_value={
+            "id": stored["id"],
+            "scraped_at": stored["scraped_at"],
+            "created_at": stored["created_at"],
+            "updated_at": stored["updated_at"],
+            "inserted": True,
+        }
     )
     monkeypatch.setattr(app_module, "upsert_job_posting", upsert_job_posting)
 
@@ -234,13 +236,13 @@ def test_create_job_posting_endpoint_returns_200_for_updates(
         app_module,
         "upsert_job_posting",
         AsyncMock(
-            return_value=(
-                stored["id"],
-                stored["scraped_at"],
-                stored["created_at"],
-                stored["updated_at"],
-                False,
-            )
+            return_value={
+                "id": stored["id"],
+                "scraped_at": stored["scraped_at"],
+                "created_at": stored["created_at"],
+                "updated_at": stored["updated_at"],
+                "inserted": False,
+            }
         ),
     )
 

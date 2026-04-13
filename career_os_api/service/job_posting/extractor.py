@@ -13,25 +13,14 @@ from openai.types.chat import (
 )
 
 from career_os_api.config import settings
+from career_os_api.constants import EXTRACTION_SYSTEM_PROMPT, HTML_PARSER
 from career_os_api.service.job_posting.platform import (
+    PLATFORM_BASE_URLS,
     Platform,
     detect_platform,
     extract_posting_id,
 )
 from career_os_api.service.job_posting.schema import JobPostingExtracted
-
-# Model requested by caller. Verify this ID is available in your OpenAI account.
-OPENAI_MODEL = "gpt-5.4-mini"
-
-# Maximum images forwarded per request to stay within token limits.
-MAX_IMAGES = 10
-
-EXTRACTION_SYSTEM_PROMPT = (
-    "You are a precise job posting data extractor. "
-    "Output ONLY information that is explicitly present in the provided content. "
-    "Never invent, infer, or hallucinate any field value. "
-    "Set any field to null when the value is not explicitly stated."
-)
 
 
 async def _collect_images_as_base64(
@@ -59,8 +48,10 @@ async def _collect_images_as_base64(
             absolute_srcs.append(src)
 
     data_urls: list[str] = []
-    async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
-        for src in absolute_srcs[:MAX_IMAGES]:
+    async with httpx.AsyncClient(
+        follow_redirects=True, timeout=settings.http_image_timeout
+    ) as client:
+        for src in absolute_srcs[: settings.max_images]:
             try:
                 resp = await client.get(src)
                 if resp.status_code == 200:
@@ -154,9 +145,9 @@ async def extract_job_posting(
         HTTPException 422 if the model refuses to process the content.
     """
     platform = detect_platform(source_url)
-    domain_base = f"https://www.{platform.value}.co.kr"
+    domain_base = PLATFORM_BASE_URLS[platform]
 
-    soup = BeautifulSoup(html_content, "html.parser")
+    soup = BeautifulSoup(html_content, HTML_PARSER)
     text_content = soup.get_text(separator="\n", strip=True)
     posting_id = extract_posting_id(source_url, platform)
     image_data_urls = await _collect_images_as_base64(soup, domain_base)
@@ -172,10 +163,10 @@ async def extract_job_posting(
     client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     result = await client.chat.completions.parse(
-        model=OPENAI_MODEL,
+        model=settings.openai_model,
         messages=messages,
         response_format=JobPostingExtracted,
-        temperature=0,
+        temperature=settings.openai_temperature,
     )
 
     message = result.choices[0].message

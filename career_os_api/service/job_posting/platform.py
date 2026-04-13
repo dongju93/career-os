@@ -15,6 +15,12 @@ class Platform(StrEnum):
     wanted = "wanted"
 
 
+PLATFORM_BASE_URLS: dict[Platform, str] = {
+    Platform.saramin: "https://www.saramin.co.kr",
+    Platform.wanted: "https://www.wanted.co.kr",
+}
+
+
 def detect_platform(url: str) -> Platform:
     """
     Validate the URL and classify it by domain.
