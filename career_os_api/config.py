@@ -12,6 +12,18 @@ class Settings(BaseSettings):
     database_url: str
     openai_api_key: str
 
+    # Google OAuth — required
+    google_client_id: str
+    google_client_secret: str
+    redirect_uri: str = "https://career-os.fastapicloud.dev/v1/auth/google/callback"
+
+    # JWT — required
+    secret_key: str
+
+    # JWT tunables
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
+
     # HTTP client timeouts (seconds) — tunable per environment
     http_fetch_timeout: float = 30.0
     http_image_timeout: float = 10.0

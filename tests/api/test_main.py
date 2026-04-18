@@ -2,12 +2,14 @@ from collections.abc import AsyncIterator, Generator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
 import career_os_api.api as app_module
 import main as main_module
+from career_os_api.auth.jwt import create_access_token
 from career_os_api.constants import API_V1
 
 API_PREFIX = f"/{API_V1}"
@@ -52,23 +54,55 @@ def make_list_row(sample_job_posting, *, job_id: int = 1) -> dict:
     }
 
 
+def make_current_user() -> dict:
+    return {
+        "id": uuid4(),
+        "google_id": "google-user-1",
+        "email": "user@example.com",
+        "name": "Career OS User",
+        "picture": None,
+        "is_active": True,
+    }
+
+
 class FakeResult:
     async def fetchone(self) -> tuple[int]:  # NOSONAR
         return (1,)
 
 
+class FakeCursor:
+    def __init__(self, row: dict | None) -> None:
+        self._row = row
+
+    async def execute(self, sql: str, params=None) -> None:  # NOSONAR
+        return None
+
+    async def fetchone(self):  # NOSONAR
+        return self._row
+
+    async def __aenter__(self) -> FakeCursor:
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        return None
+
+
 class FakeConnection:
-    def __init__(self) -> None:
+    def __init__(self, *, user_row: dict | None) -> None:
+        self.user_row = user_row
         self.executed_queries: list[str] = []
 
     async def execute(self, query: str) -> FakeResult:  # NOSONAR
         self.executed_queries.append(query)
         return FakeResult()
 
+    def cursor(self, **kwargs) -> FakeCursor:
+        return FakeCursor(self.user_row)
+
 
 class FakePool:
-    def __init__(self) -> None:
-        self.connection_obj = FakeConnection()
+    def __init__(self, *, user_row: dict | None) -> None:
+        self.connection_obj = FakeConnection(user_row=user_row)
 
     @asynccontextmanager
     async def connection(self) -> AsyncIterator[FakeConnection]:
@@ -77,7 +111,19 @@ class FakePool:
 
 @pytest.fixture
 def fake_pool() -> FakePool:
-    return FakePool()
+    return FakePool(user_row=make_current_user())
+
+
+@pytest.fixture
+def current_user(fake_pool: FakePool) -> dict:
+    assert fake_pool.connection_obj.user_row is not None
+    return fake_pool.connection_obj.user_row
+
+
+@pytest.fixture
+def auth_headers(current_user: dict) -> dict[str, str]:
+    token = create_access_token(data={"sub": str(current_user["id"])})
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
@@ -104,6 +150,8 @@ def test_root_endpoint_returns_hello_world(client: TestClient) -> None:
 def test_list_job_postings_endpoint_returns_paginated_results(
     client: TestClient,
     fake_pool: FakePool,
+    current_user: dict,
+    auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
     sample_job_posting,
 ) -> None:
@@ -115,6 +163,7 @@ def test_list_job_postings_endpoint_returns_paginated_results(
     response = client.get(
         f"{API_PREFIX}/job-postings",
         params={"offset": 5, "limit": 10},
+        headers=auth_headers,
     )
 
     assert response.status_code == 200
@@ -147,6 +196,7 @@ def test_list_job_postings_endpoint_returns_paginated_results(
     }
     get_job_postings.assert_awaited_once_with(
         fake_pool.connection_obj,
+        user_id=current_user["id"],
         limit=10,
         offset=5,
     )
@@ -154,6 +204,7 @@ def test_list_job_postings_endpoint_returns_paginated_results(
 
 def test_job_posting_extraction_endpoint_returns_extracted_payload(
     client: TestClient,
+    auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
     sample_job_posting,
 ) -> None:
@@ -168,6 +219,7 @@ def test_job_posting_extraction_endpoint_returns_extracted_payload(
     response = client.get(
         f"{API_PREFIX}/job-postings/extraction",
         params={"url": sample_job_posting.posting_url},
+        headers=auth_headers,
     )
 
     assert response.status_code == 200
@@ -182,15 +234,46 @@ def test_job_posting_extraction_endpoint_returns_extracted_payload(
 
 def test_job_posting_extraction_endpoint_requires_url_query(
     client: TestClient,
+    auth_headers: dict[str, str],
 ) -> None:
-    response = client.get(f"{API_PREFIX}/job-postings/extraction")
+    response = client.get(f"{API_PREFIX}/job-postings/extraction", headers=auth_headers)
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "kwargs"),
+    [
+        ("get", f"{API_PREFIX}/job-postings", {}),
+        (
+            "get",
+            f"{API_PREFIX}/job-postings/extraction",
+            {"params": {"url": "https://example.com"}},
+        ),
+        (
+            "post",
+            f"{API_PREFIX}/job-postings",
+            {"json": {"platform": "saramin", "posting_id": "4930"}},
+        ),
+        ("get", f"{API_PREFIX}/job-postings/19", {}),
+    ],
+)
+def test_job_posting_routes_require_authentication(
+    client: TestClient,
+    method: str,
+    path: str,
+    kwargs: dict,
+) -> None:
+    response = getattr(client, method)(path, **kwargs)
+
+    assert response.status_code == 401
 
 
 def test_create_job_posting_endpoint_returns_created_record(
     client: TestClient,
     fake_pool: FakePool,
+    current_user: dict,
+    auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
     sample_job_posting,
 ) -> None:
@@ -209,6 +292,7 @@ def test_create_job_posting_endpoint_returns_created_record(
     response = client.post(
         f"{API_PREFIX}/job-postings",
         json=sample_job_posting.model_dump(mode="json"),
+        headers=auth_headers,
     )
 
     assert response.status_code == 201
@@ -224,10 +308,12 @@ def test_create_job_posting_endpoint_returns_created_record(
     assert await_args is not None
     assert await_args.args[0] is fake_pool.connection_obj
     assert await_args.args[1].model_dump() == sample_job_posting.model_dump()
+    assert await_args.kwargs == {"user_id": current_user["id"]}
 
 
 def test_create_job_posting_endpoint_returns_200_for_updates(
     client: TestClient,
+    auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
     sample_job_posting,
 ) -> None:
@@ -249,15 +335,41 @@ def test_create_job_posting_endpoint_returns_200_for_updates(
     response = client.post(
         f"{API_PREFIX}/job-postings",
         json=sample_job_posting.model_dump(mode="json"),
+        headers=auth_headers,
     )
 
     assert response.status_code == 200
     assert response.json()["id"] == 11
 
 
+def test_create_job_posting_endpoint_rejects_blank_posting_id(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_posting,
+) -> None:
+    upsert_job_posting = AsyncMock()
+    monkeypatch.setattr(app_module, "upsert_job_posting", upsert_job_posting)
+
+    payload = sample_job_posting.model_dump(mode="json")
+    payload["posting_id"] = ""
+
+    response = client.post(
+        f"{API_PREFIX}/job-postings",
+        json=payload,
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "posting_id"]
+    assert upsert_job_posting.await_count == 0
+
+
 def test_get_job_posting_detail_endpoint_returns_stored_record(
     client: TestClient,
     fake_pool: FakePool,
+    current_user: dict,
+    auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
     sample_job_posting,
 ) -> None:
@@ -266,7 +378,7 @@ def test_get_job_posting_detail_endpoint_returns_stored_record(
 
     monkeypatch.setattr(app_module, "get_job_posting", get_job_posting)
 
-    response = client.get(f"{API_PREFIX}/job-postings/19")
+    response = client.get(f"{API_PREFIX}/job-postings/19", headers=auth_headers)
 
     assert response.status_code == 200
     assert response.json() == {
@@ -276,11 +388,16 @@ def test_get_job_posting_detail_endpoint_returns_stored_record(
         "created_at": to_api_datetime(stored["created_at"]),
         "updated_at": to_api_datetime(stored["updated_at"]),
     }
-    get_job_posting.assert_awaited_once_with(fake_pool.connection_obj, 19)
+    get_job_posting.assert_awaited_once_with(
+        fake_pool.connection_obj,
+        19,
+        user_id=current_user["id"],
+    )
 
 
 def test_get_job_posting_detail_endpoint_returns_404_when_missing(
     client: TestClient,
+    auth_headers: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -289,7 +406,7 @@ def test_get_job_posting_detail_endpoint_returns_404_when_missing(
         AsyncMock(return_value=None),
     )
 
-    response = client.get(f"{API_PREFIX}/job-postings/404")
+    response = client.get(f"{API_PREFIX}/job-postings/404", headers=auth_headers)
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Job posting 404 not found"}

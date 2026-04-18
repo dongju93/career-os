@@ -8,6 +8,9 @@ os.environ["DATABASE_URL"] = (
     "postgresql://career_os:career_os@localhost:5432/career_os_test"
 )
 os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
+os.environ["GOOGLE_CLIENT_ID"] = "test-google-client-id"
+os.environ["GOOGLE_CLIENT_SECRET"] = "test-google-client-secret"
+os.environ["SECRET_KEY"] = "test-secret-key-for-jwt"
 
 from career_os_api.service.job_posting.platform import Platform
 from career_os_api.service.job_posting.schema import JobPostingExtracted

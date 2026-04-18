@@ -1,9 +1,18 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
-from career_os_api.service.job_posting.platform import Platform
+from career_os_api.service.job_posting.platform import Platform, validate_posting_id
+
+PostingId = Annotated[str, Field(min_length=1, max_length=50)]
+
+
+def _validate_platform_posting_id(posting_id: str, info: ValidationInfo) -> str:
+    platform = info.data.get("platform")
+    if not isinstance(platform, Platform):
+        return posting_id
+    return validate_posting_id(posting_id, platform)
 
 
 class JobPostingExtracted(BaseModel):
@@ -16,7 +25,7 @@ class JobPostingExtracted(BaseModel):
 
     # Identity (derived from URL, echoed back for traceability)
     platform: Platform
-    posting_id: Annotated[str, Field(max_length=50)]
+    posting_id: PostingId
     posting_url: str  # TEXT — no length limit
 
     # Strict common
@@ -56,6 +65,11 @@ class JobPostingExtracted(BaseModel):
         cleaned = [item for item in v if isinstance(item, str) and item.strip()]
         return cleaned or None
 
+    @field_validator("posting_id")
+    @classmethod
+    def validate_platform_posting_id(cls, posting_id: str, info: ValidationInfo) -> str:
+        return _validate_platform_posting_id(posting_id, info)
+
 
 class JobPostingStored(JobPostingExtracted):
     """Response model after a successful upsert into job_postings."""
@@ -71,7 +85,7 @@ class JobPostingListItem(BaseModel):
 
     id: int
     platform: Platform
-    posting_id: str
+    posting_id: PostingId
     posting_url: str
     company_name: str
     job_title: str
@@ -87,6 +101,11 @@ class JobPostingListItem(BaseModel):
     scraped_at: datetime
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("posting_id")
+    @classmethod
+    def validate_platform_posting_id(cls, posting_id: str, info: ValidationInfo) -> str:
+        return _validate_platform_posting_id(posting_id, info)
 
 
 class JobPostingPage(BaseModel):
