@@ -36,6 +36,13 @@ ON CONFLICT (google_id) DO UPDATE
 RETURNING id, google_id, email, name, picture, is_active
 """
 
+_UPDATE_NAME_SQL = """
+UPDATE users
+SET name = %s, updated_at = NOW()
+WHERE id = %s
+RETURNING id, google_id, email, name, picture, is_active
+"""
+
 
 async def find_user_by_google_id(
     conn: AsyncConnection, google_id: str
@@ -48,6 +55,14 @@ async def find_user_by_google_id(
 async def find_user_by_id(conn: AsyncConnection, user_id: UUID) -> UserRow | None:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_FIND_BY_ID_SQL, (user_id,))
+        return await cur.fetchone()  # type: ignore[return-value]
+
+
+async def update_user_name(
+    conn: AsyncConnection, user_id: UUID, name: str
+) -> UserRow | None:
+    async with conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(_UPDATE_NAME_SQL, (name, user_id))
         return await cur.fetchone()  # type: ignore[return-value]
 
 
