@@ -473,6 +473,19 @@ def test_update_current_user_rejects_empty_name(
     assert response.status_code == 422
 
 
+def test_update_current_user_rejects_whitespace_only_name(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = client.patch(
+        f"{API_PREFIX}/auth/me",
+        json={"name": "   "},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 422
+
+
 def test_update_current_user_rejects_name_exceeding_max_length(
     client: TestClient,
     auth_headers: dict[str, str],
@@ -492,13 +505,16 @@ def test_update_current_user_requires_auth(client: TestClient) -> None:
     assert response.status_code == 401
 
 
-def test_logout_returns_204(
+def test_logout_returns_200_with_message(
     client: TestClient,
     auth_headers: dict[str, str],
 ) -> None:
     response = client.post(f"{API_PREFIX}/auth/logout", headers=auth_headers)
 
-    assert response.status_code == 204
+    assert response.status_code == 200
+    assert response.json() == {
+        "message": "세션이 종료되었습니다. 토큰은 클라이언트에서 삭제해 주세요."
+    }
 
 
 def test_logout_requires_auth(client: TestClient) -> None:
