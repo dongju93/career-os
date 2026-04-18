@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Annotated
+from uuid import UUID
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
@@ -13,6 +14,22 @@ def _validate_platform_posting_id(posting_id: str, info: ValidationInfo) -> str:
     if not isinstance(platform, Platform):
         return posting_id
     return validate_posting_id(posting_id, platform)
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
+
+class GoogleLoginResponse(BaseModel):
+    message: str
+    user_id: UUID
+    email: str
+    name: str | None
+    picture: str | None
+    access_token: str
+    token_type: str = "bearer"
+
+
+# ── Job Postings ──────────────────────────────────────────────────────────────
 
 
 class JobPostingExtracted(BaseModel):

@@ -6,7 +6,6 @@ from fastapi.responses import JSONResponse
 
 from career_os_api.auth.dependencies import get_current_user
 from career_os_api.auth.jwt import create_access_token
-from career_os_api.auth.schema import GoogleLoginResponse
 from career_os_api.config import settings
 from career_os_api.constants import API_V1
 from career_os_api.database.job_postings import (
@@ -15,14 +14,15 @@ from career_os_api.database.job_postings import (
     upsert_job_posting,
 )
 from career_os_api.database.users import upsert_user
-from career_os_api.service.job_posting.extractor import extract_job_posting
-from career_os_api.service.job_posting.fetch import fetch_url_content
-from career_os_api.service.job_posting.schema import (
+from career_os_api.models import (
+    GoogleLoginResponse,
     JobPostingExtracted,
     JobPostingListItem,
     JobPostingPage,
     JobPostingStored,
 )
+from career_os_api.service.job_posting.extractor import extract_job_posting
+from career_os_api.service.job_posting.fetch import fetch_url_content
 
 v1_router = APIRouter(prefix=f"/{API_V1}")
 

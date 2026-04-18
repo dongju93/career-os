@@ -5,7 +5,7 @@ from uuid import UUID
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
-from career_os_api.service.job_posting.schema import JobPostingExtracted
+from career_os_api.models import JobPostingExtracted
 
 
 class UpsertResult(TypedDict):
