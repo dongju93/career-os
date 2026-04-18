@@ -1,13 +1,3 @@
-from uuid import UUID
+from career_os_api.auth.schema import GoogleLoginResponse
 
-from pydantic import BaseModel
-
-
-class GoogleLoginResponse(BaseModel):
-    message: str
-    user_id: UUID
-    email: str
-    name: str | None
-    picture: str | None
-    access_token: str
-    token_type: str = "bearer"
+__all__ = ["GoogleLoginResponse"]

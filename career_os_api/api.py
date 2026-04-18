@@ -1,16 +1,20 @@
 from typing import Annotated
 
+from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from career_os_api.auth.dependencies import get_current_user
-from career_os_api.auth.router import router as auth_router
+from career_os_api.auth.jwt import create_access_token
+from career_os_api.auth.schema import GoogleLoginResponse
+from career_os_api.config import settings
 from career_os_api.constants import API_V1
 from career_os_api.database.job_postings import (
     get_job_posting,
     get_job_postings,
     upsert_job_posting,
 )
+from career_os_api.database.users import create_user, find_user_by_google_id
 from career_os_api.service.job_posting.extractor import extract_job_posting
 from career_os_api.service.job_posting.fetch import fetch_url_content
 from career_os_api.service.job_posting.schema import (
@@ -21,26 +25,113 @@ from career_os_api.service.job_posting.schema import (
 )
 
 v1_router = APIRouter(prefix=f"/{API_V1}")
-v1_router.include_router(auth_router)
-_current_user_dep = Depends(get_current_user)
+
+oauth = OAuth()
+oauth.register(
+    name="google",
+    client_id=settings.google_client_id,
+    client_secret=settings.google_client_secret,
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    client_kwargs={"scope": "openid email profile"},
+)
+
+_CurrentUser = Annotated[dict, Depends(get_current_user)]
 
 
-@v1_router.get("/")
-def main() -> JSONResponse:
+# ── System ────────────────────────────────────────────────────────────────────
+
+
+@v1_router.get("/", tags=["system"])
+def root() -> JSONResponse:
     return JSONResponse(
         content={"message": "Hello, World!"},
         status_code=status.HTTP_200_OK,
     )
 
 
-@v1_router.get("/job-postings")
+@v1_router.get("/health/db", tags=["system"])
+async def db_health(request: Request) -> JSONResponse:
+    async with request.app.state.pool.connection() as conn:
+        result = await conn.execute("SELECT 1")
+        row = await result.fetchone()
+    return JSONResponse(
+        content={"database": "connected", "result": row[0]},
+        status_code=status.HTTP_200_OK,
+    )
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
+
+@v1_router.get("/auth/google", tags=["auth"])
+async def google_login(request: Request):
+    return await oauth.google.authorize_redirect(request, settings.redirect_uri)
+
+
+@v1_router.get(
+    "/auth/google/callback",
+    tags=["auth"],
+    response_model=GoogleLoginResponse,
+    responses={400: {"description": "Google 로그인 실패"}},
+)
+async def google_callback(request: Request):
+    try:
+        token = await oauth.google.authorize_access_token(request)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Google 토큰 교환 실패: {exc}",
+        ) from exc
+
+    user_info = token.get("userinfo")
+    if not user_info or not user_info.get("sub"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google 사용자 정보를 가져올 수 없습니다",
+        )
+
+    google_id: str = user_info["sub"]
+    email: str = user_info["email"]
+    name: str | None = user_info.get("name")
+    picture: str | None = user_info.get("picture")
+
+    async with request.app.state.pool.connection() as conn:
+        existing = await find_user_by_google_id(conn, google_id)
+        user = existing if existing else await create_user(conn, google_id, email, name, picture)
+
+    access_token = create_access_token(data={"sub": str(user["id"])})
+    return GoogleLoginResponse(
+        message="Google 로그인 성공",
+        user_id=user["id"],
+        email=user["email"],
+        name=user["name"],
+        picture=user["picture"],
+        access_token=access_token,
+    )
+
+
+@v1_router.get("/auth/me", tags=["auth"])
+async def read_current_user(current_user: _CurrentUser) -> JSONResponse:
+    return JSONResponse(
+        content={
+            "user_id": str(current_user["id"]),
+            "email": current_user["email"],
+            "name": current_user["name"],
+            "picture": current_user["picture"],
+        },
+        status_code=status.HTTP_200_OK,
+    )
+
+
+# ── Job Postings ──────────────────────────────────────────────────────────────
+
+
+@v1_router.get("/job-postings", tags=["job-postings"])
 async def list_job_postings(
     request: Request,
-    current_user=_current_user_dep,
+    current_user: _CurrentUser,
     offset: Annotated[int, Query(ge=0, description="Number of records to skip")] = 0,
-    limit: Annotated[
-        int, Query(ge=1, le=100, description="Max records to return")
-    ] = 20,
+    limit: Annotated[int, Query(ge=1, le=100, description="Max records to return")] = 20,
 ) -> JobPostingPage:
     async with request.app.state.pool.connection() as conn:
         rows, total = await get_job_postings(
@@ -59,6 +150,7 @@ async def list_job_postings(
 
 @v1_router.get(
     "/job-postings/extraction",
+    tags=["job-postings"],
     responses={
         400: {"description": "Invalid URL, unsupported domain, or missing posting ID"},
         404: {"description": "URL returned a 404 from the upstream server"},
@@ -71,7 +163,7 @@ async def list_job_postings(
 )
 async def get_job_posting_extraction(
     url: Annotated[str, Query(description="Job posting URL")],
-    _current_user=_current_user_dep,
+    _current_user: _CurrentUser,
 ) -> JobPostingExtracted:
     content, _ = await fetch_url_content(url)
     return await extract_job_posting(html_content=content, source_url=url)
@@ -79,6 +171,7 @@ async def get_job_posting_extraction(
 
 @v1_router.post(
     "/job-postings",
+    tags=["job-postings"],
     status_code=status.HTTP_201_CREATED,
     responses={
         # "model" causes FastAPI to emit a full JSON Schema $ref for this status code,
@@ -95,7 +188,7 @@ async def create_job_posting(
     data: JobPostingExtracted,
     request: Request,
     response: Response,
-    current_user=_current_user_dep,
+    current_user: _CurrentUser,
 ) -> JobPostingStored:
     async with request.app.state.pool.connection() as conn:
         row = await upsert_job_posting(conn, data, user_id=current_user["id"])
@@ -112,12 +205,13 @@ async def create_job_posting(
 
 @v1_router.get(
     "/job-postings/{job_id}",
+    tags=["job-postings"],
     responses={404: {"description": "Job posting not found"}},
 )
 async def get_job_posting_detail(
     job_id: int,
     request: Request,
-    current_user=_current_user_dep,
+    current_user: _CurrentUser,
 ) -> JobPostingStored:
     async with request.app.state.pool.connection() as conn:
         row = await get_job_posting(conn, job_id, user_id=current_user["id"])
@@ -127,29 +221,3 @@ async def get_job_posting_detail(
             detail=f"Job posting {job_id} not found",
         )
     return JobPostingStored(**row)
-
-
-@v1_router.get("/health/db")
-async def db_health(request: Request) -> JSONResponse:
-    async with request.app.state.pool.connection() as conn:
-        result = await conn.execute("SELECT 1")
-        row = await result.fetchone()
-    return JSONResponse(
-        content={"database": "connected", "result": row[0]},
-        status_code=status.HTTP_200_OK,
-    )
-
-
-@v1_router.get("/me")
-async def read_current_user(
-    current_user=_current_user_dep,
-) -> JSONResponse:
-    return JSONResponse(
-        content={
-            "user_id": str(current_user["id"]),
-            "email": current_user["email"],
-            "name": current_user["name"],
-            "picture": current_user["picture"],
-        },
-        status_code=status.HTTP_200_OK,
-    )
