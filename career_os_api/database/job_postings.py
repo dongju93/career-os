@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import TypedDict
+from uuid import UUID
 
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
@@ -17,6 +18,7 @@ class UpsertResult(TypedDict):
 
 _UPSERT_SQL = """
 INSERT INTO job_postings (
+    user_id,
     platform, posting_id, posting_url,
     company_name, job_title, experience_req, deadline, location,
     employment_type, job_description, responsibilities, qualifications,
@@ -26,9 +28,9 @@ INSERT INTO job_postings (
     homepage, job_category, industry
 ) VALUES (
     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
 )
-ON CONFLICT (platform, posting_id) DO UPDATE SET
+ON CONFLICT (user_id, platform, posting_id) DO UPDATE SET
     posting_url        = EXCLUDED.posting_url,
     company_name       = EXCLUDED.company_name,
     job_title          = EXCLUDED.job_title,
@@ -65,11 +67,16 @@ SELECT
     employment_type, salary, tech_stack, tags,
     job_category, industry, scraped_at, created_at, updated_at
 FROM job_postings
+WHERE user_id = %s
 ORDER BY scraped_at DESC
 LIMIT %s OFFSET %s
 """
 
-_COUNT_SQL = "SELECT COUNT(*) AS total FROM job_postings"
+_COUNT_SQL = """
+SELECT COUNT(*) AS total
+FROM job_postings
+WHERE user_id = %s
+"""
 
 _DETAIL_SQL = """
 SELECT
@@ -83,16 +90,20 @@ SELECT
     scraped_at, created_at, updated_at
 FROM job_postings
 WHERE id = %s
+  AND user_id = %s
 """
 
 
 async def upsert_job_posting(
-    conn: AsyncConnection, data: JobPostingExtracted
+    conn: AsyncConnection,
+    data: JobPostingExtracted,
+    user_id: UUID,
 ) -> UpsertResult:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(
             _UPSERT_SQL,
             (
+                user_id,
                 str(data.platform),
                 data.posting_id,
                 data.posting_url,
@@ -126,18 +137,27 @@ async def upsert_job_posting(
 
 
 async def get_job_postings(
-    conn: AsyncConnection, limit: int, offset: int
+    conn: AsyncConnection,
+    *,
+    user_id: UUID,
+    limit: int,
+    offset: int,
 ) -> tuple[list[dict], int]:
     async with conn.cursor(row_factory=dict_row) as cur:
-        await cur.execute(_LIST_SQL, (limit, offset))
+        await cur.execute(_LIST_SQL, (user_id, limit, offset))
         rows = await cur.fetchall()
-        await cur.execute(_COUNT_SQL)
+        await cur.execute(_COUNT_SQL, (user_id,))
         count_row = await cur.fetchone()
     assert count_row is not None  # COUNT(*) always returns exactly one row
     return rows, count_row["total"]
 
 
-async def get_job_posting(conn: AsyncConnection, job_id: int) -> dict | None:
+async def get_job_posting(
+    conn: AsyncConnection,
+    job_id: int,
+    *,
+    user_id: UUID,
+) -> dict | None:
     async with conn.cursor(row_factory=dict_row) as cur:
-        await cur.execute(_DETAIL_SQL, (job_id,))
+        await cur.execute(_DETAIL_SQL, (job_id, user_id))
         return await cur.fetchone()

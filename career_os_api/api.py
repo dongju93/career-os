@@ -22,6 +22,7 @@ from career_os_api.service.job_posting.schema import (
 
 v1_router = APIRouter(prefix=f"/{API_V1}")
 v1_router.include_router(auth_router)
+_current_user_dep = Depends(get_current_user)
 
 
 @v1_router.get("/")
@@ -35,13 +36,19 @@ def main() -> JSONResponse:
 @v1_router.get("/job-postings")
 async def list_job_postings(
     request: Request,
+    current_user=_current_user_dep,
     offset: Annotated[int, Query(ge=0, description="Number of records to skip")] = 0,
     limit: Annotated[
         int, Query(ge=1, le=100, description="Max records to return")
     ] = 20,
 ) -> JobPostingPage:
     async with request.app.state.pool.connection() as conn:
-        rows, total = await get_job_postings(conn, limit=limit, offset=offset)
+        rows, total = await get_job_postings(
+            conn,
+            user_id=current_user["id"],
+            limit=limit,
+            offset=offset,
+        )
     return JobPostingPage(
         items=[JobPostingListItem(**row) for row in rows],
         total=total,
@@ -64,6 +71,7 @@ async def list_job_postings(
 )
 async def get_job_posting_extraction(
     url: Annotated[str, Query(description="Job posting URL")],
+    _current_user=_current_user_dep,
 ) -> JobPostingExtracted:
     content, _ = await fetch_url_content(url)
     return await extract_job_posting(html_content=content, source_url=url)
@@ -87,9 +95,10 @@ async def create_job_posting(
     data: JobPostingExtracted,
     request: Request,
     response: Response,
+    current_user=_current_user_dep,
 ) -> JobPostingStored:
     async with request.app.state.pool.connection() as conn:
-        row = await upsert_job_posting(conn, data)
+        row = await upsert_job_posting(conn, data, user_id=current_user["id"])
     if not row["inserted"]:
         response.status_code = status.HTTP_200_OK
     return JobPostingStored(
@@ -108,9 +117,10 @@ async def create_job_posting(
 async def get_job_posting_detail(
     job_id: int,
     request: Request,
+    current_user=_current_user_dep,
 ) -> JobPostingStored:
     async with request.app.state.pool.connection() as conn:
-        row = await get_job_posting(conn, job_id)
+        row = await get_job_posting(conn, job_id, user_id=current_user["id"])
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -128,9 +138,6 @@ async def db_health(request: Request) -> JSONResponse:
         content={"database": "connected", "result": row[0]},
         status_code=status.HTTP_200_OK,
     )
-
-
-_current_user_dep = Depends(get_current_user)
 
 
 @v1_router.get("/me")
