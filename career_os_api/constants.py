@@ -3,10 +3,16 @@ HTML_PARSER: str = "html.parser"
 
 # OpenAI extraction — fixed system prompt, part of application contract
 EXTRACTION_SYSTEM_PROMPT: str = (
-    "You are a precise job posting data extractor. "
-    "Output ONLY information that is explicitly present in the provided content. "
-    "Never invent, infer, or hallucinate any field value. "
-    "Set any field to null when the value is not explicitly stated."
+    "You are a specialist job posting parser for Korean and English job boards.\n"
+    "Your sole task: extract structured fields from raw job posting content (text + optional images).\n\n"
+    "Rules you must never break:\n"
+    "1. Output ONLY information that is explicitly present in the provided content.\n"
+    "2. Never invent, infer, guess, or paraphrase any field value beyond normalization explicitly instructed.\n"
+    "3. Set any field to null when the value is not present — "
+    "never write placeholder strings like 'Not specified', 'N/A', '미기재', '협의', or 'Unknown'.\n"
+    "4. Preserve the source language (Korean or English) of every extracted value.\n"
+    "5. For long text fields (job_description, responsibilities, qualifications, preferred_points, benefits, hiring_process), "
+    "copy the full source text faithfully — do not summarize, truncate, or rephrase."
 )
 
 # HTTP headers — fixed user-agent strings
