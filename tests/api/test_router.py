@@ -412,6 +412,101 @@ def test_get_job_posting_detail_endpoint_returns_404_when_missing(
     assert response.json() == {"detail": "Job posting 404 not found"}
 
 
+def test_read_current_user_returns_user_info(
+    client: TestClient,
+    current_user: dict,
+    auth_headers: dict[str, str],
+) -> None:
+    response = client.get(f"{API_PREFIX}/auth/me", headers=auth_headers)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "user_id": str(current_user["id"]),
+        "email": current_user["email"],
+        "name": current_user["name"],
+        "picture": current_user["picture"],
+    }
+
+
+def test_read_current_user_requires_auth(client: TestClient) -> None:
+    response = client.get(f"{API_PREFIX}/auth/me")
+
+    assert response.status_code == 401
+
+
+def test_update_current_user_returns_updated_name(
+    client: TestClient,
+    fake_pool: FakePool,
+    current_user: dict,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    updated_user = {**current_user, "name": "New Name"}
+    update_user_name_mock = AsyncMock(return_value=updated_user)
+    monkeypatch.setattr(app_module, "update_user_name", update_user_name_mock)
+
+    response = client.patch(
+        f"{API_PREFIX}/auth/me",
+        json={"name": "New Name"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "New Name"
+    update_user_name_mock.assert_awaited_once_with(
+        fake_pool.connection_obj,
+        current_user["id"],
+        "New Name",
+    )
+
+
+def test_update_current_user_rejects_empty_name(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = client.patch(
+        f"{API_PREFIX}/auth/me",
+        json={"name": ""},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 422
+
+
+def test_update_current_user_rejects_name_exceeding_max_length(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = client.patch(
+        f"{API_PREFIX}/auth/me",
+        json={"name": "x" * 101},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 422
+
+
+def test_update_current_user_requires_auth(client: TestClient) -> None:
+    response = client.patch(f"{API_PREFIX}/auth/me", json={"name": "New Name"})
+
+    assert response.status_code == 401
+
+
+def test_logout_returns_204(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = client.post(f"{API_PREFIX}/auth/logout", headers=auth_headers)
+
+    assert response.status_code == 204
+
+
+def test_logout_requires_auth(client: TestClient) -> None:
+    response = client.post(f"{API_PREFIX}/auth/logout")
+
+    assert response.status_code == 401
+
+
 def test_db_health_endpoint_uses_app_pool(
     client: TestClient,
     fake_pool: FakePool,
