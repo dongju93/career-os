@@ -3,7 +3,7 @@ import pytest
 from fastapi import HTTPException
 
 from career_os_api.service.job_posting import saramin as saramin_module
-from tests.support import SequenceAsyncClient, make_http_status_error, make_response
+from tests.httpx_stubs import SequenceAsyncClient, make_http_status_error, make_response
 
 
 @pytest.mark.asyncio

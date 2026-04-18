@@ -14,7 +14,7 @@ from career_os_api.database.job_postings import (
     upsert_job_posting,
 )
 from career_os_api.database.users import upsert_user
-from career_os_api.models import (
+from career_os_api.schemas import (
     GoogleLoginResponse,
     JobPostingExtracted,
     JobPostingListItem,

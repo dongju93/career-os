@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from career_os_api.models import JobPostingExtracted
+from career_os_api.schemas import JobPostingExtracted
 from career_os_api.service.job_posting.platform import Platform
 
 

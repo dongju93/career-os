@@ -15,7 +15,7 @@ from openai.types.chat import (
 
 from career_os_api.config import settings
 from career_os_api.constants import EXTRACTION_SYSTEM_PROMPT, HTML_PARSER
-from career_os_api.models import JobPostingExtracted
+from career_os_api.schemas import JobPostingExtracted
 from career_os_api.service.job_posting.platform import (
     PLATFORM_BASE_URLS,
     Platform,

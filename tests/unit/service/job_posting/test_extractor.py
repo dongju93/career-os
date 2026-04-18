@@ -16,10 +16,10 @@ from openai.types.chat import (
 )
 
 from career_os_api.config import settings
-from career_os_api.models import JobPostingExtracted
+from career_os_api.schemas import JobPostingExtracted
 from career_os_api.service.job_posting import extractor as extractor_module
 from career_os_api.service.job_posting.platform import Platform
-from tests.support import SequenceAsyncClient, make_response
+from tests.httpx_stubs import SequenceAsyncClient, make_response
 
 UserContentPart = (
     ChatCompletionContentPartTextParam | ChatCompletionContentPartImageParam

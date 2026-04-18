@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-import career_os_api.api as app_module
+import career_os_api.router as app_module
 import main as main_module
 from career_os_api.auth.jwt import create_access_token
 from career_os_api.constants import API_V1
