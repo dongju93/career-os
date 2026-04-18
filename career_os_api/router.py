@@ -100,6 +100,7 @@ async def google_callback(request: Request):
     async with request.app.state.pool.connection() as conn:
         user = await upsert_user(conn, google_id, email, name, picture)
 
+    request.session.clear()
     request.session["user_id"] = str(user["id"])
     access_token = create_access_token(data={"sub": str(user["id"])})
     return GoogleLoginResponse(
@@ -125,7 +126,10 @@ async def read_current_user(current_user: _CurrentUser) -> CurrentUserResponse:
 @v1_router.patch(
     "/auth/me",
     tags=["auth"],
-    responses={401: {"description": "인증 실패"}},
+    responses={
+        401: {"description": "인증 실패"},
+        404: {"description": "사용자를 찾을 수 없습니다"},
+    },
 )
 async def update_current_user(
     data: UpdateCurrentUserRequest,
@@ -136,7 +140,7 @@ async def update_current_user(
         user = await update_user_name(conn, current_user["id"], data.name)
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="사용자를 찾을 수 없습니다",
         )
     return CurrentUserResponse(
@@ -147,10 +151,17 @@ async def update_current_user(
     )
 
 
-@v1_router.post("/auth/logout", tags=["auth"], status_code=status.HTTP_204_NO_CONTENT)
-async def logout_current_user(request: Request, current_user: _CurrentUser) -> Response:
+@v1_router.post("/auth/logout", tags=["auth"])
+async def logout_current_user(
+    request: Request, current_user: _CurrentUser
+) -> JSONResponse:
     request.session.clear()
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return JSONResponse(
+        content={
+            "message": "세션이 종료되었습니다. 토큰은 클라이언트에서 삭제해 주세요."
+        },
+        status_code=status.HTTP_200_OK,
+    )
 
 
 # ── Job Postings ──────────────────────────────────────────────────────────────
