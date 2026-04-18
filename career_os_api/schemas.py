@@ -39,6 +39,14 @@ class CurrentUserResponse(BaseModel):
 class UpdateCurrentUserRequest(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=100)]
 
+    @field_validator("name")
+    @classmethod
+    def reject_whitespace_only(cls, v: str) -> str:
+        if not v.strip():
+            msg = "Name must contain at least one non-whitespace character"
+            raise ValueError(msg)
+        return v.strip()
+
 
 # ── Job Postings ──────────────────────────────────────────────────────────────
 
