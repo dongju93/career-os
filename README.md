@@ -92,12 +92,12 @@ graph TD
 
 ### 요청 및 데이터 흐름
 
-1. 클라이언트가 `GET /v1/job-postings/extraction?url=...`를 호출합니다.
+1. 클라이언트가 Bearer access token과 함께 `GET /v1/job-postings/extraction?url=...`를 호출합니다.
 2. `fetch_url_content()`가 외부 HTTP 요청을 보내기 전에 지원 도메인 맵 기준으로 호스트를 검증합니다.
 3. Saramin URL은 `fetch_saramin_job_posting()`으로 분기되며, Saramin의 `view-ajax` 엔드포인트를 호출하고 필요 시 iframe 상세 콘텐츠를 가져온 뒤, 허용된 채용 공고 섹션만 추출합니다. Wanted URL은 `fetch_wanted_job_posting()`으로 분기되며, `/api/v4/jobs/{id}`를 호출해 받은 JSON을 추출용 HTML로 재구성합니다.
 4. `extract_job_posting()`은 HTML을 텍스트로 변환하고, 참조된 이미지를 최대 `MAX_IMAGES`개까지 내려받은 뒤, `response_format=JobPostingExtracted`로 `AsyncOpenAI().chat.completions.parse()`를 호출합니다.
-5. 클라이언트는 `POST /v1/job-postings`로 구조화된 payload를 저장할 수 있으며, `upsert_job_posting()`이 PostgreSQL에 레코드를 기록하고 insert인지 update인지 보고합니다.
-6. `GET /v1/job-postings`는 요약 projection을 반환하고, `GET /v1/job-postings/{job_id}`는 동일 테이블의 전체 행을 반환합니다.
+5. 클라이언트는 `POST /v1/job-postings`로 구조화된 payload를 저장할 수 있으며, `upsert_job_posting()`이 인증된 사용자 ID를 `user_id`에 함께 기록하고 사용자 단위로 insert/update를 판별합니다.
+6. `GET /v1/job-postings`와 `GET /v1/job-postings/{job_id}`는 인증된 사용자가 저장한 공고만 조회합니다.
 
 ## 기술 스택
 
@@ -243,13 +243,13 @@ uv run fastapi run main.py
 | 메서드 | 경로                          | 목적                                 | 비고                                                                                                            |
 | ------ | ----------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
 | `GET`  | `/v1/`                        | 서비스 스모크 엔드포인트             | `{"message": "Hello, World!"}` 반환                                                                             |
-| `GET`  | `/v1/job-postings`            | 페이지네이션된 요약 목록             | 쿼리 파라미터: `offset >= 0`, `1 <= limit <= 100`                                                               |
-| `GET`  | `/v1/job-postings/extraction` | `url`에서 채용 공고를 fetch하고 추출 | `JobPostingExtracted` 반환, 라우트는 `400`, `404`, `502`를 문서화하며 `url` 누락 시 `422`는 FastAPI가 자동 생성 |
-| `POST` | `/v1/job-postings`            | 정규화된 채용 공고 upsert            | insert 시 `201`, update 시 `200` 반환                                                                           |
-| `GET`  | `/v1/job-postings/{job_id}`   | DB id로 저장된 채용 공고 조회        | 행이 없으면 `404` 반환                                                                                          |
+| `GET`  | `/v1/job-postings`            | 페이지네이션된 요약 목록             | Bearer 토큰 필요, 현재 사용자가 저장한 공고만 반환, 쿼리 파라미터: `offset >= 0`, `1 <= limit <= 100`                     |
+| `GET`  | `/v1/job-postings/extraction` | `url`에서 채용 공고를 fetch하고 추출 | Bearer 토큰 필요, `JobPostingExtracted` 반환, 라우트는 `400`, `404`, `502`를 문서화하며 `url` 누락 시 `422`는 FastAPI가 자동 생성 |
+| `POST` | `/v1/job-postings`            | 정규화된 채용 공고 upsert            | Bearer 토큰 필요, `user_id` 기준으로 사용자별 insert/update를 수행하며 insert 시 `201`, update 시 `200` 반환                    |
+| `GET`  | `/v1/job-postings/{job_id}`   | DB id로 저장된 채용 공고 조회        | Bearer 토큰 필요, 현재 사용자가 저장한 공고만 조회하며 없으면 `404` 반환                                                     |
 | `GET`  | `/v1/health/db`               | 데이터베이스 연결 확인               | 구성된 pool을 통해 `SELECT 1` 실행                                                                              |
 
-`JobPostingExtracted`와 `JobPostingStored`는 `job_postings` 테이블을 반영합니다. 스키마 그룹은 다음과 같습니다.
+`JobPostingExtracted`와 `JobPostingStored`는 `job_postings`의 채용공고 컬럼을 반영하며, 저장 소유권은 `user_id` 컬럼으로 별도 관리합니다. 스키마 그룹은 다음과 같습니다.
 
 - 식별자: `platform`, `posting_id`, `posting_url`
 - 필수 공통 필드: `company_name`, `job_title`
@@ -260,7 +260,9 @@ uv run fastapi run main.py
 추출 요청 예시:
 
 ```bash
-curl 'http://127.0.0.1:8000/v1/job-postings/extraction?url=https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930'
+curl \
+  -H 'Authorization: Bearer <access-token>' \
+  'http://127.0.0.1:8000/v1/job-postings/extraction?url=https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930'
 ```
 
 `tests/conftest.py`의 테스트 fixture 기준 응답 예시는 다음과 같습니다.
