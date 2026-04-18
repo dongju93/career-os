@@ -14,7 +14,7 @@ from career_os_api.database.job_postings import (
     get_job_postings,
     upsert_job_posting,
 )
-from career_os_api.database.users import create_user, find_user_by_google_id
+from career_os_api.database.users import upsert_user
 from career_os_api.service.job_posting.extractor import extract_job_posting
 from career_os_api.service.job_posting.fetch import fetch_url_content
 from career_os_api.service.job_posting.schema import (
@@ -96,8 +96,7 @@ async def google_callback(request: Request):
     picture: str | None = user_info.get("picture")
 
     async with request.app.state.pool.connection() as conn:
-        existing = await find_user_by_google_id(conn, google_id)
-        user = existing if existing else await create_user(conn, google_id, email, name, picture)
+        user = await upsert_user(conn, google_id, email, name, picture)
 
     access_token = create_access_token(data={"sub": str(user["id"])})
     return GoogleLoginResponse(
@@ -131,7 +130,9 @@ async def list_job_postings(
     request: Request,
     current_user: _CurrentUser,
     offset: Annotated[int, Query(ge=0, description="Number of records to skip")] = 0,
-    limit: Annotated[int, Query(ge=1, le=100, description="Max records to return")] = 20,
+    limit: Annotated[
+        int, Query(ge=1, le=100, description="Max records to return")
+    ] = 20,
 ) -> JobPostingPage:
     async with request.app.state.pool.connection() as conn:
         rows, total = await get_job_postings(

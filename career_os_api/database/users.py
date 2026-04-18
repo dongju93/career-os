@@ -26,9 +26,13 @@ FROM users
 WHERE id = %s
 """
 
-_INSERT_SQL = """
+_UPSERT_SQL = """
 INSERT INTO users (google_id, email, name, picture)
 VALUES (%s, %s, %s, %s)
+ON CONFLICT (google_id) DO UPDATE
+    SET email   = EXCLUDED.email,
+        name    = EXCLUDED.name,
+        picture = EXCLUDED.picture
 RETURNING id, google_id, email, name, picture, is_active
 """
 
@@ -47,7 +51,7 @@ async def find_user_by_id(conn: AsyncConnection, user_id: UUID) -> UserRow | Non
         return await cur.fetchone()  # type: ignore[return-value]
 
 
-async def create_user(
+async def upsert_user(
     conn: AsyncConnection,
     google_id: str,
     email: str,
@@ -55,7 +59,7 @@ async def create_user(
     picture: str | None,
 ) -> UserRow:
     async with conn.cursor(row_factory=dict_row) as cur:
-        await cur.execute(_INSERT_SQL, (google_id, email, name, picture))
+        await cur.execute(_UPSERT_SQL, (google_id, email, name, picture))
         row = await cur.fetchone()
     assert row is not None
     return row  # type: ignore[return-value]
