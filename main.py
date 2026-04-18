@@ -25,6 +25,11 @@ career_os = FastAPI(
     redoc_url=f"/{API_V1}/redoc",
 )
 
-career_os.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
+career_os.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.secret_key,
+    https_only=True,
+    max_age=settings.jwt_expire_minutes * 60,
+)
 
 career_os.include_router(v1_router)
