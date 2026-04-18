@@ -51,7 +51,11 @@ class _FakeApp:
         self.state = type("State", (), {"pool": _FakePool(row)})()
 
 
-async def test_get_current_user_valid_token():
+def _make_request(row, *, session=None):
+    return type("Request", (), {"app": _FakeApp(row), "session": session or {}})()
+
+
+async def test_get_current_user_bearer_token():
     user_id = uuid4()
     token = create_access_token(data={"sub": str(user_id)})
     row = {
@@ -62,14 +66,44 @@ async def test_get_current_user_valid_token():
         "picture": None,
         "is_active": True,
     }
-    request = type("Request", (), {"app": _FakeApp(row)})()
-    user = await get_current_user(request, token)
+    user = await get_current_user(_make_request(row), token)
     assert user["id"] == user_id
     assert user["email"] == "test@example.com"
 
 
+async def test_get_current_user_session_cookie():
+    user_id = uuid4()
+    row = {
+        "id": user_id,
+        "google_id": "g-123",
+        "email": "test@example.com",
+        "name": "Test",
+        "picture": None,
+        "is_active": True,
+    }
+    request = _make_request(row, session={"user_id": str(user_id)})
+    user = await get_current_user(request, None)
+    assert user["id"] == user_id
+
+
+async def test_get_current_user_session_takes_precedence_over_bearer():
+    session_user_id = uuid4()
+    row = {
+        "id": session_user_id,
+        "google_id": "g-123",
+        "email": "session@example.com",
+        "name": "Session User",
+        "picture": None,
+        "is_active": True,
+    }
+    token = create_access_token(data={"sub": str(uuid4())})
+    request = _make_request(row, session={"user_id": str(session_user_id)})
+    user = await get_current_user(request, token)
+    assert user["id"] == session_user_id
+
+
 async def test_get_current_user_invalid_token():
-    request = type("Request", (), {"app": _FakeApp(None)})()
+    request = _make_request(None)
     with pytest.raises(HTTPException) as exc_info:
         await get_current_user(request, "bad-token")
     assert exc_info.value.status_code == 401
@@ -77,7 +111,14 @@ async def test_get_current_user_invalid_token():
 
 async def test_get_current_user_user_not_found():
     token = create_access_token(data={"sub": str(uuid4())})
-    request = type("Request", (), {"app": _FakeApp(None)})()
+    request = _make_request(None)
     with pytest.raises(HTTPException) as exc_info:
         await get_current_user(request, token)
+    assert exc_info.value.status_code == 401
+
+
+async def test_get_current_user_no_auth_raises_401():
+    request = _make_request(None)
+    with pytest.raises(HTTPException) as exc_info:
+        await get_current_user(request, None)
     assert exc_info.value.status_code == 401

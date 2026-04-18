@@ -98,6 +98,7 @@ async def google_callback(request: Request):
     async with request.app.state.pool.connection() as conn:
         user = await upsert_user(conn, google_id, email, name, picture)
 
+    request.session["user_id"] = str(user["id"])
     access_token = create_access_token(data={"sub": str(user["id"])})
     return GoogleLoginResponse(
         message="Google 로그인 성공",
