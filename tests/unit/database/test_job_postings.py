@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from typing import cast
+from uuid import uuid4
 
 import pytest
 from psycopg import AsyncConnection
@@ -61,6 +62,7 @@ async def test_upsert_job_posting_executes_sql_with_model_fields(
     sample_job_posting,
 ) -> None:
     timestamp = datetime(2026, 4, 13, 9, 0, tzinfo=UTC)
+    user_id = uuid4()
     returned_row = {
         "id": 7,
         "scraped_at": timestamp,
@@ -74,6 +76,7 @@ async def test_upsert_job_posting_executes_sql_with_model_fields(
     row = await job_postings_module.upsert_job_posting(
         cast(AsyncConnection, conn),
         sample_job_posting,
+        user_id=user_id,
     )
 
     assert row == returned_row
@@ -82,6 +85,7 @@ async def test_upsert_job_posting_executes_sql_with_model_fields(
         (
             job_postings_module._UPSERT_SQL,
             (
+                user_id,
                 "saramin",
                 sample_job_posting.posting_id,
                 sample_job_posting.posting_url,
@@ -114,6 +118,7 @@ async def test_upsert_job_posting_executes_sql_with_model_fields(
 
 @pytest.mark.asyncio
 async def test_get_job_postings_uses_dict_rows_and_returns_count() -> None:
+    user_id = uuid4()
     rows = [
         {
             "id": 1,
@@ -141,6 +146,7 @@ async def test_get_job_postings_uses_dict_rows_and_returns_count() -> None:
 
     result_rows, total = await job_postings_module.get_job_postings(
         cast(AsyncConnection, conn),
+        user_id=user_id,
         limit=20,
         offset=40,
     )
@@ -149,13 +155,14 @@ async def test_get_job_postings_uses_dict_rows_and_returns_count() -> None:
     assert total == 3
     assert conn.cursor_row_factories == [dict_row]
     assert cursor.execute_calls == [
-        (job_postings_module._LIST_SQL, (20, 40)),
-        (job_postings_module._COUNT_SQL, None),
+        (job_postings_module._LIST_SQL, (user_id, 20, 40)),
+        (job_postings_module._COUNT_SQL, (user_id,)),
     ]
 
 
 @pytest.mark.asyncio
 async def test_get_job_posting_uses_detail_query_and_returns_row() -> None:
+    user_id = uuid4()
     row = {
         "id": 19,
         "platform": "saramin",
@@ -164,10 +171,14 @@ async def test_get_job_posting_uses_detail_query_and_returns_row() -> None:
     cursor = FakeCursor(fetchone_results=[row])
     conn = FakeConnection(cursor=cursor)
 
-    result = await job_postings_module.get_job_posting(cast(AsyncConnection, conn), 19)
+    result = await job_postings_module.get_job_posting(
+        cast(AsyncConnection, conn),
+        19,
+        user_id=user_id,
+    )
 
     assert result == row
     assert conn.cursor_row_factories == [dict_row]
     assert cursor.execute_calls == [
-        (job_postings_module._DETAIL_SQL, (19,)),
+        (job_postings_module._DETAIL_SQL, (19, user_id)),
     ]
