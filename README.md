@@ -16,6 +16,7 @@
 - [테스트](#테스트)
 - [배포](#배포)
 - [설계 패턴과 규약](#설계-패턴과-규약)
+  - [Firecrawl을 사용하지 않는 이유](#firecrawl을-사용하지-않는-이유)
 - [문제 해결](#문제-해결)
 - [기여](#기여)
 
@@ -240,14 +241,14 @@ uv run fastapi run main.py
 
 앱 실행 시 FastAPI는 `/v1/docs`와 `/v1/redoc`에 OpenAPI 및 대화형 문서도 제공합니다.
 
-| 메서드 | 경로                          | 목적                                 | 비고                                                                                                            |
-| ------ | ----------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `GET`  | `/v1/`                        | 서비스 스모크 엔드포인트             | `{"message": "Hello, World!"}` 반환                                                                             |
-| `GET`  | `/v1/job-postings`            | 페이지네이션된 요약 목록             | Bearer 토큰 필요, 현재 사용자가 저장한 공고만 반환, 쿼리 파라미터: `offset >= 0`, `1 <= limit <= 100`                     |
+| 메서드 | 경로                          | 목적                                 | 비고                                                                                                                              |
+| ------ | ----------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/v1/`                        | 서비스 스모크 엔드포인트             | `{"message": "Hello, World!"}` 반환                                                                                               |
+| `GET`  | `/v1/job-postings`            | 페이지네이션된 요약 목록             | Bearer 토큰 필요, 현재 사용자가 저장한 공고만 반환, 쿼리 파라미터: `offset >= 0`, `1 <= limit <= 100`                             |
 | `GET`  | `/v1/job-postings/extraction` | `url`에서 채용 공고를 fetch하고 추출 | Bearer 토큰 필요, `JobPostingExtracted` 반환, 라우트는 `400`, `404`, `502`를 문서화하며 `url` 누락 시 `422`는 FastAPI가 자동 생성 |
-| `POST` | `/v1/job-postings`            | 정규화된 채용 공고 upsert            | Bearer 토큰 필요, `user_id` 기준으로 사용자별 insert/update를 수행하며 insert 시 `201`, update 시 `200` 반환                    |
-| `GET`  | `/v1/job-postings/{job_id}`   | DB id로 저장된 채용 공고 조회        | Bearer 토큰 필요, 현재 사용자가 저장한 공고만 조회하며 없으면 `404` 반환                                                     |
-| `GET`  | `/v1/health/db`               | 데이터베이스 연결 확인               | 구성된 pool을 통해 `SELECT 1` 실행                                                                              |
+| `POST` | `/v1/job-postings`            | 정규화된 채용 공고 upsert            | Bearer 토큰 필요, `user_id` 기준으로 사용자별 insert/update를 수행하며 insert 시 `201`, update 시 `200` 반환                      |
+| `GET`  | `/v1/job-postings/{job_id}`   | DB id로 저장된 채용 공고 조회        | Bearer 토큰 필요, 현재 사용자가 저장한 공고만 조회하며 없으면 `404` 반환                                                          |
+| `GET`  | `/v1/health/db`               | 데이터베이스 연결 확인               | 구성된 pool을 통해 `SELECT 1` 실행                                                                                                |
 
 `JobPostingExtracted`와 `JobPostingStored`는 `job_postings`의 채용공고 컬럼을 반영하며, 저장 소유권은 `user_id` 컬럼으로 별도 관리합니다. 스키마 그룹은 다음과 같습니다.
 
@@ -355,6 +356,20 @@ uvx pyrefly check
 | Repository 유사 SQL 모듈 | `career_os_api/database/job_postings.py`                                                           | 라우트 핸들러 밖에서 SQL, conflict 처리, row projection을 집중 관리 |
 | 시작 시 부트스트랩       | `main.py`, `career_os_api/database/schemas.py`                                                     | 요청 처리 전에 pool과 필수 스키마가 준비되도록 보장                 |
 | 플랫폼 전용 위임 구조    | `career_os_api/service/job_posting/fetch.py`, `platform.py`, `saramin.py`, `wanted.py`             | 플랫폼별 fetch 규칙을 라우트 계층과 분리하면서 공통 추출 흐름 유지  |
+
+### Firecrawl을 사용하지 않는 이유
+
+Firecrawl은 헤드리스 브라우저로 페이지를 렌더링한 뒤 마크다운이나 HTML로 반환하는 범용 웹 스크레이핑 서비스입니다. 일반적인 JavaScript 렌더링 사이트에는 유용하지만, 이 프로젝트의 현재 대상 플랫폼에는 적합하지 않습니다.
+
+**Saramin**: `saramin.py`는 공개 페이지 HTML 대신 내부 AJAX 엔드포인트(`/zf_user/jobs/relay/view-ajax`)를 직접 호출합니다. 이 엔드포인트는 추천 공고, 배너, 사이드바 없이 공고 데이터만 반환합니다. Firecrawl로 전체 페이지를 렌더링하면 불필요한 콘텐츠가 포함되어 LLM 추출 비용이 증가하고 정확도가 낮아집니다.
+
+**Wanted**: `wanted.py`는 `/api/v4/jobs/{id}` REST API를 직접 호출해 깔끔한 JSON을 받아 추출용 HTML로 재구성합니다. Firecrawl로 React SPA를 렌더링하는 방식보다 노이즈가 없고 안정적입니다.
+
+**이미지 임베디드 텍스트**: 한국 채용 공고는 설명 텍스트를 이미지로 삽입하는 경우가 많습니다. `extractor.py`는 `<img>` 태그를 직접 수집해 base64로 인코딩한 뒤 OpenAI vision 입력으로 전달합니다. Firecrawl은 이미지 URL을 제공하지만 vision 모델 입력까지 자동으로 연결하지는 않습니다.
+
+**추가 비용과 의존성 없음**: 현재 파이프라인은 httpx(무료)로 fetch하고 OpenAI API 한 번으로 추출을 완료합니다. Firecrawl을 추가하면 페이지당 크레딧 비용, 외부 서비스 의존성, 헤드리스 브라우저 부팅 시간이 추가됩니다.
+
+Firecrawl은 내부 API나 AJAX 엔드포인트가 없는 새 플랫폼을 지원해야 할 때 `fetch.py`의 폴백 경로로 도입하는 것이 적합합니다.
 
 ### 코드 규약
 
