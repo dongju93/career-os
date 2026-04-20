@@ -1,56 +1,62 @@
-import { AppShell, Badge, Burger, Group, Stack, Text } from '@mantine/core';
+import { AppShell, Burger, Group, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { Outlet, NavLink as RouterNavLink } from 'react-router';
-import { useWorkspaceStore } from '../store/workspace-store';
+import { useAuthStore } from '../store/auth-store';
 import '../App.css';
 
 const navigationItems = [
   {
-    to: '/',
-    label: 'Overview',
-    hint: 'Configured runtime and UI shell',
-  },
-  {
-    to: '/tooling',
-    label: 'Tooling',
-    hint: 'Testing, state, and styling setup',
+    to: '/job-postings',
+    label: '채용공고',
+    hint: '저장한 채용공고 목록',
   },
 ];
 
 export function AppLayout() {
   const [opened, { close, toggle }] = useDisclosure(false);
-  const sharedCount = useWorkspaceStore((state) => state.sharedCount);
+  const user = useAuthStore((state) => state.user);
+
+  const userInitial = (user?.name ?? user?.email ?? 'U')
+    .charAt(0)
+    .toUpperCase();
 
   return (
     <AppShell
-      header={{ height: 72 }}
+      header={{ height: 64 }}
       navbar={{
         breakpoint: 'md',
         collapsed: { mobile: !opened },
-        width: 292,
+        width: 260,
       }}
       padding={0}
     >
       <AppShell.Header className="app-header">
         <Group h="100%" justify="space-between" px="lg">
           <Group gap="sm">
-            <div className="app-mark">CO</div>
-            <Stack gap={0}>
-              <Text c="white" fw={700} size="sm">
-                Career OS Web
-              </Text>
-              <Text c="rgba(255,255,255,0.68)" size="xs">
-                Mantine, Router, Zustand, Tailwind, Vitest, Playwright
-              </Text>
-            </Stack>
+            <div className="brand-icon">CO</div>
+            <span className="brand-name">Career OS</span>
           </Group>
 
           <Group gap="sm">
-            <Badge color="orange" size="lg" variant="light">
-              {sharedCount} synced state
-            </Badge>
+            {user && (
+              <Group gap="xs" visibleFrom="sm">
+                <Text c="dimmed" size="sm">
+                  {user.name ?? user.email}
+                </Text>
+                <div className="user-avatar">
+                  {user.picture ? (
+                    <img
+                      alt={user.name ?? ''}
+                      referrerPolicy="no-referrer"
+                      src={user.picture}
+                    />
+                  ) : (
+                    userInitial
+                  )}
+                </div>
+              </Group>
+            )}
             <Burger
-              color="white"
               hiddenFrom="md"
               onClick={toggle}
               opened={opened}
@@ -61,37 +67,22 @@ export function AppLayout() {
       </AppShell.Header>
 
       <AppShell.Navbar className="app-navbar" p="md">
-        <Stack gap="md">
-          <div className="rounded-[1.6rem] border border-slate-200/70 bg-white/78 p-4 shadow-[0_24px_55px_-48px_rgba(15,23,42,0.35)] backdrop-blur">
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.28em] text-slate-500">
-              Starter status
-            </p>
-            <p className="mt-2 text-base font-semibold text-slate-900">
-              All installed packages are connected to a working baseline.
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Navigate between pages to verify routing, shared state, styled
-              components, utility classes, unit tests, and E2E coverage.
-            </p>
-          </div>
-
-          <nav className="flex flex-col gap-2">
-            {navigationItems.map((item) => (
-              <RouterNavLink
-                key={item.to}
-                aria-label={item.label}
-                className={({ isActive }) =>
-                  `app-nav-link ${isActive ? 'is-active' : ''}`
-                }
-                onClick={close}
-                to={item.to}
-              >
-                <span className="app-nav-link__title">{item.label}</span>
-                <span className="app-nav-link__hint">{item.hint}</span>
-              </RouterNavLink>
-            ))}
-          </nav>
-        </Stack>
+        <nav className="flex flex-col gap-1.5">
+          {navigationItems.map((item) => (
+            <RouterNavLink
+              key={item.to}
+              aria-label={item.label}
+              className={({ isActive }) =>
+                `app-nav-link ${isActive ? 'is-active' : ''}`
+              }
+              onClick={close}
+              to={item.to}
+            >
+              <span className="app-nav-link__title">{item.label}</span>
+              <span className="app-nav-link__hint">{item.hint}</span>
+            </RouterNavLink>
+          ))}
+        </nav>
       </AppShell.Navbar>
 
       <AppShell.Main className="app-main">
