@@ -24,8 +24,9 @@ export function AuthCallbackPage() {
 
     const accessToken = searchParams.get('access_token');
     const oauthError = searchParams.get('error');
+    const rawNext = searchParams.get('next');
     const nextPath = readStoredRedirectPath(
-      getSafeRedirectPath(searchParams.get('next')),
+      rawNext ? getSafeRedirectPath(rawNext) : '/job-postings',
     );
 
     setLoading(true);

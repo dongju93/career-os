@@ -61,7 +61,7 @@ export function LoginPage() {
   }, [errorParam, setError]);
 
   if (token) {
-    return <Navigate replace to={nextPath} />;
+    return <Navigate replace to={nextPath === '/' ? '/job-postings' : nextPath} />;
   }
 
   function handleGoogleLogin() {

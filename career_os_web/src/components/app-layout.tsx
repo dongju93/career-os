@@ -15,6 +15,11 @@ const navigationItems = [
     label: 'Tooling',
     hint: 'Testing, state, and styling setup',
   },
+  {
+    to: '/job-postings',
+    label: '채용공고',
+    hint: '저장한 채용공고 목록',
+  },
 ];
 
 export function AppLayout() {
