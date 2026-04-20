@@ -392,6 +392,13 @@ uvx pyrefly check
 
 ## 배포
 
+**프로덕션 URL**: `https://career-os.fastapicloud.dev`
+
+| 구성 요소    | 플랫폼                          | 비고                                           |
+| ------------ | ------------------------------- | ---------------------------------------------- |
+| API 서버     | FastAPI Cloud (SaaS)            | `.fastapicloud/cloud.json`에 앱 연결 정보 저장 |
+| 데이터베이스 | Neon (서버리스 PostgreSQL SaaS) | `DATABASE_URL`에 Neon 연결 문자열 사용         |
+
 배포 자동화는 이 저장소에 부분적으로만 나타납니다.
 
 - `.github/workflows/` 아래 CI/CD 워크플로 파일이 없습니다.
