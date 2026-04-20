@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from career_os_api.config import settings
@@ -25,6 +26,13 @@ career_os = FastAPI(
     redoc_url=f"/{API_V1}/redoc",
 )
 
+career_os.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 career_os.add_middleware(
     SessionMiddleware,
     secret_key=settings.secret_key,

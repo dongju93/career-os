@@ -2,7 +2,7 @@ from typing import Annotated
 
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from career_os_api.auth.dependencies import get_current_user
 from career_os_api.auth.jwt import create_access_token
@@ -66,7 +66,12 @@ async def db_health(request: Request) -> JSONResponse:
 
 
 @v1_router.get("/auth/google", tags=["auth"])
-async def google_login(request: Request):
+async def google_login(
+    request: Request,
+    callback_url: Annotated[str | None, Query()] = None,
+):
+    if callback_url:
+        request.session["callback_url"] = callback_url
     return await oauth.google.authorize_redirect(request, settings.redirect_uri)
 
 
@@ -100,9 +105,14 @@ async def google_callback(request: Request):
     async with request.app.state.pool.connection() as conn:
         user = await upsert_user(conn, google_id, email, name, picture)
 
+    callback_url = request.session.get("callback_url")
     request.session.clear()
     request.session["user_id"] = str(user["id"])
     access_token = create_access_token(data={"sub": str(user["id"])})
+
+    if callback_url:
+        return RedirectResponse(f"{callback_url}?access_token={access_token}")
+
     return GoogleLoginResponse(
         message="Google 로그인 성공",
         user_id=user["id"],

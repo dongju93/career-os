@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     google_client_secret: str
     redirect_uri: str = "https://career-os.fastapicloud.dev/v1/auth/google/callback"
 
+    # CORS — comma-separated list of allowed origins
+    allowed_origins: list[str] = [
+        "https://career-os-sigma.vercel.app",
+        "http://localhost:4173",
+        "http://localhost:5173",
+    ]
+
     # JWT — required
     secret_key: str
 
