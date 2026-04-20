@@ -1,12 +1,10 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { AppLayout } from '../components/app-layout';
 import { ProtectedRoute } from '../components/protected-route';
 import { AuthCallbackPage } from '../pages/auth-callback-page';
-import { HomePage } from '../pages/home-page';
 import { JobPostingsPage } from '../pages/job-postings-page';
 import { LoginPage } from '../pages/login-page';
 import { NotFoundPage } from '../pages/not-found-page';
-import { ToolingPage } from '../pages/tooling-page';
 
 export const appRoutes = [
   {
@@ -26,11 +24,7 @@ export const appRoutes = [
         children: [
           {
             index: true,
-            element: <HomePage />,
-          },
-          {
-            path: 'tooling',
-            element: <ToolingPage />,
+            element: <Navigate replace to="/job-postings" />,
           },
           {
             path: 'job-postings',

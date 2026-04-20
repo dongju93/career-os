@@ -7,6 +7,7 @@ import {
   getSafeRedirectPath,
   storeRedirectPath,
 } from '../utils/auth-redirect';
+import '../App.css';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'https://career-os.fastapicloud.dev';
@@ -61,7 +62,9 @@ export function LoginPage() {
   }, [errorParam, setError]);
 
   if (token) {
-    return <Navigate replace to={nextPath === '/' ? '/job-postings' : nextPath} />;
+    return (
+      <Navigate replace to={nextPath === '/' ? '/job-postings' : nextPath} />
+    );
   }
 
   function handleGoogleLogin() {
@@ -77,13 +80,23 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         <Stack gap="xl">
-          <div className="flex flex-col items-center gap-5">
-            <div className="app-mark text-[1.1rem]">CO</div>
-            <Stack align="center" gap="xs">
+          <Stack align="center" gap="sm">
+            <div
+              className="brand-icon"
+              style={{
+                height: '3rem',
+                width: '3rem',
+                fontSize: '1rem',
+                borderRadius: '14px',
+              }}
+            >
+              CO
+            </div>
+            <Stack align="center" gap={4}>
               <Title
                 className="text-center"
                 order={1}
-                style={{ fontSize: '2rem', letterSpacing: '-0.02em' }}
+                style={{ fontSize: '2rem', letterSpacing: '-0.03em' }}
               >
                 Career OS
               </Title>
@@ -91,7 +104,7 @@ export function LoginPage() {
                 Track every application. Land your next role.
               </Text>
             </Stack>
-          </div>
+          </Stack>
 
           <div className="rounded-[1.6rem] border border-slate-200/70 bg-white/80 p-8 shadow-[0_24px_55px_-48px_rgba(15,23,42,0.35)] backdrop-blur">
             <Stack gap="lg">
