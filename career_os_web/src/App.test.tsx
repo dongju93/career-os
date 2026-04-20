@@ -1,9 +1,22 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { useAuthStore } from './store/auth-store';
 import { renderRoute } from './test/test-utils';
 
 describe('Career OS Web app shell', () => {
+  beforeEach(() => {
+    useAuthStore.getState().setAuth(
+      {
+        id: 'user-1',
+        email: 'user@example.com',
+        name: 'Career OS User',
+        picture: null,
+      },
+      'test-token',
+    );
+  });
+
   it('renders the overview route and updates shared Zustand state', async () => {
     const user = userEvent.setup();
 

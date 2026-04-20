@@ -1,25 +1,41 @@
 import { createBrowserRouter } from 'react-router';
 import { AppLayout } from '../components/app-layout';
+import { ProtectedRoute } from '../components/protected-route';
+import { AuthCallbackPage } from '../pages/auth-callback-page';
 import { HomePage } from '../pages/home-page';
+import { LoginPage } from '../pages/login-page';
 import { NotFoundPage } from '../pages/not-found-page';
 import { ToolingPage } from '../pages/tooling-page';
 
 export const appRoutes = [
   {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
+    path: '/auth/callback',
+    element: <AuthCallbackPage />,
+  },
+  {
     path: '/',
-    element: <AppLayout />,
+    element: <ProtectedRoute />,
     children: [
       {
-        index: true,
-        element: <HomePage />,
-      },
-      {
-        path: 'tooling',
-        element: <ToolingPage />,
-      },
-      {
-        path: '*',
-        element: <NotFoundPage />,
+        element: <AppLayout />,
+        children: [
+          {
+            index: true,
+            element: <HomePage />,
+          },
+          {
+            path: 'tooling',
+            element: <ToolingPage />,
+          },
+          {
+            path: '*',
+            element: <NotFoundPage />,
+          },
+        ],
       },
     ],
   },
