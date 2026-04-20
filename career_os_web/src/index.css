@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+:root {
+  color: #172033;
+  background-color: #fff7ed;
+  font-family:
+    "IBM Plex Sans", "Avenir Next", "Segoe UI Variable", "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(251, 146, 60, 0.14),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(244, 114, 182, 0.1),
+      transparent 20%
+    ),
+    #fff7ed;
+}
+
+body,
+#root {
+  min-height: 100vh;
+  margin: 0;
+}
+
+body {
+  color: #172033;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: rgba(251, 146, 60, 0.24);
+}
