@@ -1,21 +1,17 @@
 import { expect, test } from '@playwright/test';
 
-test('loads the overview route and opens the tooling page', async ({
+test('redirects unauthenticated visitors to the login page', async ({
   page,
 }) => {
-  await page.goto('/');
+  await page.goto('/tooling');
 
   await expect(
     page.getByRole('heading', {
-      name: /all installed packages are now wired into the app/i,
+      name: /sign in to your account/i,
     }),
   ).toBeVisible();
-
-  await page.getByRole('link', { name: /tooling/i }).click();
-
+  await expect(page).toHaveURL(/\/login\?next=%2Ftooling$/);
   await expect(
-    page.getByRole('heading', {
-      name: /each installed package now has a working entry point/i,
-    }),
+    page.getByRole('button', { name: /continue with google/i }),
   ).toBeVisible();
 });
