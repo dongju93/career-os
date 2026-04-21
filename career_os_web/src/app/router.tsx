@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router';
 import { AppLayout } from '../components/app-layout';
 import { ProtectedRoute } from '../components/protected-route';
+import { AddJobPostingPage } from '../pages/add-job-posting-page';
 import { AuthCallbackPage } from '../pages/auth-callback-page';
 import { JobPostingsPage } from '../pages/job-postings-page';
 import { LoginPage } from '../pages/login-page';
@@ -29,6 +30,10 @@ export const appRoutes = [
           {
             path: 'job-postings',
             element: <JobPostingsPage />,
+          },
+          {
+            path: 'job-postings/new',
+            element: <AddJobPostingPage />,
           },
           {
             path: '*',
