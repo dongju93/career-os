@@ -1,15 +1,12 @@
 import type { JobPostingPage } from '../types/job-posting';
-
-const API_BASE =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
-  'http://localhost:8000';
+import { API_BASE_URL } from './api-base-url';
 
 export async function fetchJobPostings(
   token: string,
   offset = 0,
   limit = 50,
 ): Promise<JobPostingPage> {
-  const url = `${API_BASE}/v1/job-postings?offset=${offset}&limit=${limit}`;
+  const url = `${API_BASE_URL}/v1/job-postings?offset=${offset}&limit=${limit}`;
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });

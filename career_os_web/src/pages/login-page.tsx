@@ -1,6 +1,7 @@
 import { Alert, Button, Stack, Text, Title } from '@mantine/core';
 import { useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
+import { API_BASE_URL } from '../services/api-base-url';
 import { useAuthStore } from '../store/auth-store';
 import {
   buildGoogleLoginUrl,
@@ -8,9 +9,6 @@ import {
   storeRedirectPath,
 } from '../utils/auth-redirect';
 import '../App.css';
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? 'https://career-os.fastapicloud.dev';
 
 function GoogleIcon() {
   return (

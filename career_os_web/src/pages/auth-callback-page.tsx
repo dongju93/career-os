@@ -1,6 +1,7 @@
 import { Loader, Stack, Text } from '@mantine/core';
 import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { API_BASE_URL } from '../services/api-base-url';
 import { useAuthStore } from '../store/auth-store';
 import {
   buildLoginPath,
@@ -8,9 +9,6 @@ import {
   getSafeRedirectPath,
   readStoredRedirectPath,
 } from '../utils/auth-redirect';
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
