@@ -2,6 +2,7 @@ import {
   Alert,
   Anchor,
   Badge,
+  Button,
   Card,
   Group,
   Skeleton,
@@ -10,6 +11,7 @@ import {
   Title,
 } from '@mantine/core';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { fetchJobPostings } from '../services/job-postings';
 import { useAuthStore } from '../store/auth-store';
 import type { JobPostingListItem } from '../types/job-posting';
@@ -166,14 +168,19 @@ export function JobPostingsPage() {
 
   return (
     <Stack gap="xl">
-      <div>
-        <Title order={2}>저장한 채용공고</Title>
-        {!isLoading && !error && (
-          <Text c="dimmed" mt={4} size="sm">
-            총 {total}개의 채용공고가 저장되어 있습니다.
-          </Text>
-        )}
-      </div>
+      <Group justify="space-between" align="flex-end">
+        <div>
+          <Title order={2}>저장한 채용공고</Title>
+          {!isLoading && !error && (
+            <Text c="dimmed" mt={4} size="sm">
+              총 {total}개의 채용공고가 저장되어 있습니다.
+            </Text>
+          )}
+        </div>
+        <Button component={Link} radius="xl" to="/job-postings/new">
+          새 채용공고 등록
+        </Button>
+      </Group>
 
       {isLoading && <LoadingSkeleton />}
 
@@ -193,6 +200,9 @@ export function JobPostingsPage() {
             <Text c="dimmed" size="sm" ta="center">
               채용공고 URL을 등록하면 여기에 표시됩니다.
             </Text>
+            <Button component={Link} radius="xl" to="/job-postings/new">
+              첫 채용공고 등록하기
+            </Button>
           </Stack>
         </Card>
       )}
