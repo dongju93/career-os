@@ -11,6 +11,11 @@ const navigationItems = [
     label: '채용공고',
     hint: '저장한 채용공고 목록',
   },
+  {
+    to: '/job-postings/new',
+    label: '채용공고 등록',
+    hint: '새 URL 스크랩 및 저장',
+  },
 ];
 
 export function AppLayout() {
