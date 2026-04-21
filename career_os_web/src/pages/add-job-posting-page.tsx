@@ -153,6 +153,10 @@ export function AddJobPostingPage() {
     setIsExtracting(true);
     setExtractError(null);
     setSavedInfo(null);
+    setMeta(null);
+    setFormData(null);
+    setFormErrors({});
+    setSaveError(null);
     try {
       const data = await extractJobPosting(token, url.trim());
       setMeta({
