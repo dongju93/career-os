@@ -2,7 +2,7 @@ import type { JobPostingPage } from '../types/job-posting';
 
 const API_BASE =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
-  'https://career-os.fastapicloud.dev';
+  'http://localhost:8000';
 
 export async function fetchJobPostings(
   token: string,

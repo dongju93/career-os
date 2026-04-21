@@ -10,7 +10,7 @@ import {
 } from '../utils/auth-redirect';
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? 'https://career-os.fastapicloud.dev';
+  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
