@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { Card, CardContent } from '@/components/ui/card';
 import { API_BASE_URL } from '../services/api-base-url';
 import { useAuthStore } from '../store/auth-store';
 import {
@@ -65,14 +66,32 @@ export function AuthCallbackPage() {
   }, [navigate, searchParams, setAuth, setError, setLoading]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="relative">
-          <div className="absolute inset-0 bg-linear-to-br from-primary/30 to-teal-500/20 blur-xl rounded-full scale-150" />
-          <Loader2 className="h-10 w-10 text-primary animate-spin relative z-10" />
-        </div>
-        <p className="text-sm text-muted-foreground">로그인 완료 중...</p>
-      </div>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute right-[-8rem] top-[-8rem] h-96 w-96 rounded-full bg-linear-to-br from-cyan-400/30 via-primary/15 to-transparent blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-[-6rem] left-[-5rem] h-72 w-72 rounded-full bg-linear-to-tr from-teal-400/25 via-primary/12 to-transparent blur-3xl"
+      />
+
+      <Card className="w-full max-w-sm animate-fade-in">
+        <CardContent className="flex flex-col items-center gap-5 px-8 py-10 text-center">
+          <div className="relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-primary/10 border border-primary/20">
+            <div className="absolute inset-2 rounded-full bg-linear-to-br from-primary/15 to-teal-500/12 blur-md" />
+            <Loader2 className="relative z-10 h-10 w-10 animate-spin text-primary" />
+          </div>
+          <div>
+            <p className="text-lg font-semibold tracking-tight">
+              로그인 완료 중
+            </p>
+            <p className="mt-1 text-sm text-gray-600">
+              계정 정보를 확인한 뒤 작업 공간으로 이동합니다.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

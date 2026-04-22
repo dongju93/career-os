@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { API_BASE_URL } from '../services/api-base-url';
 import { useAuthStore } from '../store/auth-store';
@@ -74,78 +76,58 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      {/* Background decoration blobs */}
+    <div className="relative isolate flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
+      {/* Vibrant ambient blobs behind the glass card */}
       <div
         aria-hidden="true"
-        className="absolute top-0 right-0 w-96 h-96 bg-linear-to-br from-primary/20 to-teal-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"
+        className="pointer-events-none absolute right-[-10rem] top-[-10rem] h-[28rem] w-[28rem] rounded-full bg-linear-to-br from-cyan-400/40 via-primary/25 to-transparent blur-3xl"
       />
       <div
         aria-hidden="true"
-        className="absolute bottom-0 left-0 w-80 h-80 bg-linear-to-tr from-teal-500/15 to-primary/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none"
+        className="pointer-events-none absolute bottom-[-8rem] left-[-6rem] h-96 w-96 rounded-full bg-linear-to-tr from-teal-400/35 via-primary/20 to-transparent blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute top-[40%] left-[20%] h-64 w-64 rounded-full bg-linear-to-br from-purple-500/30 to-pink-500/20 blur-3xl"
       />
 
-      <Card className="w-full max-w-md mx-4 animate-fade-in">
-        <CardContent className="pt-8 pb-8 px-8">
-          {/* Logo */}
-          <div className="flex flex-col items-center gap-4 mb-8">
-            <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-primary to-teal-600 text-white font-bold text-xl flex items-center justify-center shadow-xl">
+      {/* Single frosted glass card */}
+      <Card className="mx-4 w-full max-w-md animate-fade-in">
+        <CardContent className="px-8 pb-8 pt-8">
+          <div className="mb-8 flex flex-col items-center gap-4">
+            <span className="rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold tracking-[0.2em] text-primary uppercase border border-primary/20">
+              Frosted Workspace
+            </span>
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-teal-400 text-lg font-black text-slate-900 shadow-lg shadow-primary/30">
               CO
             </div>
             <div className="text-center">
               <h1 className="text-3xl font-bold tracking-tight">Career OS</h1>
-              <p className="text-muted-foreground mt-1">
-                채용 공고 관리 시스템
+              <p className="text-gray-600 mx-auto mt-1 max-w-[18rem] text-sm leading-6 text-balance">
+                여러 채용공고를 한곳에 모아 정리하는 워크스페이스
               </p>
             </div>
           </div>
 
-          {/* Error */}
           {error && (
-            <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              {error}
-            </div>
+            <Alert className="mb-4" variant="destructive">
+              <AlertTitle>로그인 실패</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
-          {/* Google sign-in */}
-          <button
-            className="w-full h-12 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 shadow-sm rounded-xl flex items-center justify-center gap-3 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading}
-            type="button"
+          <Button
+            className="w-full justify-center"
+            loading={isLoading}
+            variant="glass"
             onClick={handleGoogleLogin}
           >
-            {isLoading ? (
-              <svg
-                aria-hidden="true"
-                className="animate-spin"
-                fill="none"
-                height={16}
-                viewBox="0 0 24 24"
-                width={16}
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  fill="currentColor"
-                />
-              </svg>
-            ) : (
-              <GoogleIcon />
-            )}
+            {!isLoading && <GoogleIcon />}
             Google로 계속하기
-          </button>
+          </Button>
 
-          {/* Footer */}
-          <p className="text-xs text-muted-foreground text-center mt-6">
-            계속함으로써 서비스 이용약관에 동의합니다
+          <p className="text-gray-500 mx-auto mt-6 max-w-[16rem] text-center text-xs leading-5 text-balance">
+            계속하면 서비스 이용약관에 동의하게 됩니다.
           </p>
         </CardContent>
       </Card>

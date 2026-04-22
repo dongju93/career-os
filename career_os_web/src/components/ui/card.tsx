@@ -3,16 +3,22 @@ import { cn } from '@/lib/utils';
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   glass?: boolean;
+  interactive?: boolean;
 }
 
-export function Card({ className, glass = true, ...props }: CardProps) {
+export function Card({
+  className,
+  glass = true,
+  interactive = false,
+  ...props
+}: CardProps) {
   return (
     <div
       className={cn(
         'rounded-2xl',
         glass
-          ? 'glass-card hover:shadow-lg transition-shadow duration-200'
-          : 'bg-card border border-border shadow-sm',
+          ? cn('glass', interactive && 'glass-hover cursor-pointer')
+          : 'surface',
         className,
       )}
       {...props}

@@ -34,79 +34,96 @@ function platformVariant(platform: Platform) {
   return platform === 'saramin' ? 'saramin' : 'wanted';
 }
 
-function JobPostingCard({ item }: { item: JobPostingListItem }) {
+function SummaryChip({ label, value }: { label: string; value: string }) {
   return (
-    <Card className="hover:-translate-y-1 hover:shadow-xl transition-all duration-300 cursor-pointer">
-      <CardContent className="p-5">
-        {/* Platform + date */}
-        <div className="flex items-center justify-between mb-3">
+    <div className="min-w-28 rounded-xl border-white/12 bg-accent px-4 py-2.5 backdrop-blur-md">
+      <p className="text-[11px] font-medium tracking-wide text-gray-600 uppercase">
+        {label}
+      </p>
+      <p className="mt-0.5 text-lg font-semibold tracking-tight text-foreground">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function JobPostingCard({ item }: { item: JobPostingListItem }) {
+  const hasDetails = Boolean(
+    item.location || item.experience_req || item.deadline || item.salary,
+  );
+
+  return (
+    <Card className="group overflow-hidden" interactive>
+      <CardContent className="relative p-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <Badge variant={platformVariant(item.platform)}>
             {item.platform}
           </Badge>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs font-medium text-gray-600">
             {formatRelativeDate(item.created_at)}
           </span>
         </div>
 
-        {/* Company */}
-        <div className="flex items-center gap-1.5 mb-1">
-          <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <span className="text-sm font-medium text-muted-foreground truncate">
+        <div className="mb-1.5 flex items-center gap-1.5">
+          <Building2 className="h-3.5 w-3.5 text-gray-600 shrink-0" />
+          <span className="text-sm font-medium text-gray-600 truncate">
             {item.company_name}
           </span>
         </div>
 
-        {/* Job title */}
         <a
-          className="group flex items-start gap-1.5 mb-3"
+          className="flex items-start gap-2"
           href={item.posting_url}
           rel="noreferrer"
           target="_blank"
         >
-          <h3 className="text-base font-bold leading-tight group-hover:text-primary transition-colors line-clamp-2">
+          <h3 className="line-clamp-2 text-lg font-bold leading-tight tracking-tight transition-colors group-hover:text-primary">
             {item.job_title}
           </h3>
-          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
+          <ExternalLink className="mt-1 h-3.5 w-3.5 shrink-0 text-primary/60 transition-transform group-hover:translate-x-0.5" />
         </a>
 
-        {/* Meta */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs text-muted-foreground">
-          {item.location && (
-            <span className="flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
-              {item.location}
-            </span>
-          )}
-          {item.experience_req && (
-            <span className="flex items-center gap-1">
-              <Briefcase className="h-3 w-3" />
-              {item.experience_req}
-            </span>
-          )}
-        </div>
+        {hasDetails && (
+          <div className="mt-3 rounded-xl border border-white/8 bg-muted p-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+              {item.location && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  {item.location}
+                </span>
+              )}
+              {item.experience_req && (
+                <span className="flex items-center gap-1">
+                  <Briefcase className="h-3 w-3" />
+                  {item.experience_req}
+                </span>
+              )}
+            </div>
 
-        {/* Deadline + salary */}
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-3">
-          {item.deadline && (
-            <span className="text-destructive font-medium">
-              마감: {item.deadline}
-            </span>
-          )}
-          {item.salary && (
-            <span className="text-muted-foreground">{item.salary}</span>
-          )}
-        </div>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              {item.deadline && (
+                <span className="inline-flex items-center rounded-full bg-red-500/8 px-2.5 py-0.5 text-xs font-medium text-red-600 border border-red-500/15">
+                  마감: {item.deadline}
+                </span>
+              )}
+              {item.salary && (
+                <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-gray-600 border">
+                  {item.salary}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
-        {/* Tech stack */}
         {item.tech_stack && item.tech_stack.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="mt-3 flex flex-wrap gap-1.5">
             {item.tech_stack.slice(0, 5).map((tag) => (
-              <Badge key={tag} className="text-xs" variant="outline">
+              <Badge key={tag} className="text-xs" variant="secondary">
                 {tag}
               </Badge>
             ))}
             {item.tech_stack.length > 5 && (
-              <Badge className="text-xs" variant="secondary">
+              <Badge className="text-xs" variant="outline">
                 +{item.tech_stack.length - 5}
               </Badge>
             )}
@@ -121,7 +138,7 @@ const SKELETON_KEYS = ['sk-a', 'sk-b', 'sk-c', 'sk-d', 'sk-e', 'sk-f'];
 
 function LoadingCard() {
   return (
-    <Card className="p-6 space-y-3">
+    <Card className="space-y-3 p-6">
       <Skeleton className="h-4 w-24" />
       <Skeleton className="h-6 w-3/4" />
       <Skeleton className="h-5 w-full" />
@@ -164,27 +181,43 @@ export function JobPostingsPage() {
   }, [token]);
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="animate-fade-in space-y-6">
+      {/* Page header — transparent, floating on background */}
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
+          <p className="mb-2 text-xs font-semibold tracking-[0.15em] text-primary uppercase">
+            Job Archive
+          </p>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             채용공고
           </h1>
           {!isLoading && !error && total > 0 && (
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-gray-600 mt-1">
               총 {total}개의 채용공고
             </p>
           )}
         </div>
-        <Button asChild>
-          <Link to="/job-postings/new">
-            <PlusCircle className="h-4 w-4" />새 채용공고 등록
-          </Link>
-        </Button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <SummaryChip
+            label="저장된 공고"
+            value={isLoading ? '-' : total.toString()}
+          />
+          <SummaryChip
+            label="최근 등록"
+            value={
+              !isLoading && items.length > 0
+                ? formatRelativeDate(items[0].created_at)
+                : '-'
+            }
+          />
+          <Button asChild className="sm:self-stretch">
+            <Link to="/job-postings/new">
+              <PlusCircle className="h-4 w-4" />새 채용공고 등록
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {/* Loading */}
       {isLoading && (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {SKELETON_KEYS.map((key) => (
@@ -193,7 +226,6 @@ export function JobPostingsPage() {
         </div>
       )}
 
-      {/* Error */}
       {!isLoading && error && (
         <Alert variant="destructive">
           <AlertTitle>불러오기 실패</AlertTitle>
@@ -201,18 +233,20 @@ export function JobPostingsPage() {
         </Alert>
       )}
 
-      {/* Empty state */}
       {!isLoading && !error && items.length === 0 && (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="col-span-full py-16 flex flex-col items-center gap-4 text-center">
-            <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-primary/20 to-teal-500/10 flex items-center justify-center">
-              <Sparkles className="h-8 w-8 text-primary" />
+          <Card
+            className="col-span-full flex flex-col items-center gap-4 py-16 text-center"
+            glass
+          >
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20">
+              <Sparkles className="h-7 w-7" />
             </div>
             <div>
               <h3 className="text-lg font-semibold">
                 아직 저장된 채용공고가 없어요
               </h3>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-gray-600 mt-1">
                 첫 번째 채용공고를 등록해 보세요
               </p>
             </div>
@@ -226,7 +260,6 @@ export function JobPostingsPage() {
         </div>
       )}
 
-      {/* Grid */}
       {!isLoading && !error && items.length > 0 && (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
