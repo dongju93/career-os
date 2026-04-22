@@ -1,4 +1,5 @@
 from typing import Annotated
+from urllib.parse import urlencode
 
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -16,7 +17,6 @@ from career_os_api.database.job_postings import (
 from career_os_api.database.users import update_user_name, upsert_user
 from career_os_api.schemas import (
     CurrentUserResponse,
-    GoogleLoginResponse,
     JobPostingExtracted,
     JobPostingListItem,
     JobPostingPage,
@@ -78,23 +78,28 @@ async def google_login(
 @v1_router.get(
     "/auth/google/callback",
     tags=["auth"],
-    response_model=GoogleLoginResponse,
     responses={400: {"description": "Google 로그인 실패"}},
 )
-async def google_callback(request: Request):
+async def google_callback(request: Request) -> RedirectResponse:
+    # Always redirect back to the frontend. Returning JSON here caused mobile
+    # browsers to download the response as `callback.txt` when the session
+    # cookie carrying `callback_url` was dropped during the cross-site OAuth
+    # round trip.
+    target = request.session.get("callback_url") or settings.frontend_url
+
     try:
         token = await oauth.google.authorize_access_token(request)
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Google 토큰 교환 실패: {exc}",
-        ) from exc
+        request.session.clear()
+        return RedirectResponse(
+            f"{target}?{urlencode({'error': f'Google 토큰 교환 실패: {exc}'})}"
+        )
 
     user_info = token.get("userinfo")
     if not user_info or not user_info.get("sub"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Google 사용자 정보를 가져올 수 없습니다",
+        request.session.clear()
+        return RedirectResponse(
+            f"{target}?{urlencode({'error': 'Google 사용자 정보를 가져올 수 없습니다'})}"
         )
 
     google_id: str = user_info["sub"]
@@ -105,22 +110,11 @@ async def google_callback(request: Request):
     async with request.app.state.pool.connection() as conn:
         user = await upsert_user(conn, google_id, email, name, picture)
 
-    callback_url = request.session.get("callback_url")
     request.session.clear()
     request.session["user_id"] = str(user["id"])
     access_token = create_access_token(data={"sub": str(user["id"])})
 
-    if callback_url:
-        return RedirectResponse(f"{callback_url}?access_token={access_token}")
-
-    return GoogleLoginResponse(
-        message="Google 로그인 성공",
-        user_id=user["id"],
-        email=user["email"],
-        name=user["name"],
-        picture=user["picture"],
-        access_token=access_token,
-    )
+    return RedirectResponse(f"{target}?{urlencode({'access_token': access_token})}")
 
 
 @v1_router.get("/auth/me", tags=["auth"])
