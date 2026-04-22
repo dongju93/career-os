@@ -1,14 +1,15 @@
-import { Alert, Button, Stack, Text, Title } from '@mantine/core';
 import { useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
-import { API_BASE_URL } from '../services/api-base-url';
-import { useAuthStore } from '../store/auth-store';
+import { API_BASE_URL } from '@/services/api-base-url';
+import { useAuthStore } from '@/store/auth-store';
 import {
   buildGoogleLoginUrl,
   getSafeRedirectPath,
   storeRedirectPath,
-} from '../utils/auth-redirect';
-import '../App.css';
+} from '@/utils/auth-redirect';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 function GoogleIcon() {
   return (
@@ -75,84 +76,64 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        <Stack gap="xl">
-          <Stack align="center" gap="sm">
-            <div
-              className="brand-icon"
-              style={{
-                height: '3rem',
-                width: '3rem',
-                fontSize: '1rem',
-                borderRadius: '14px',
-              }}
-            >
-              CO
-            </div>
-            <Stack align="center" gap={4}>
-              <Title
-                className="text-center"
-                order={1}
-                style={{ fontSize: '2rem', letterSpacing: '-0.03em' }}
-              >
-                Career OS
-              </Title>
-              <Text c="dimmed" className="text-center" size="md">
-                Track every application. Land your next role.
-              </Text>
-            </Stack>
-          </Stack>
+    <div className="min-h-screen flex items-center justify-center px-4 py-12">
+      {/* Background decorations */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-gradient-to-br from-primary/20 to-teal-500/10 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-gradient-to-tr from-cyan-500/15 to-primary/5 blur-3xl" />
+      </div>
 
-          <div className="rounded-[1.6rem] border border-slate-200/70 bg-white/80 p-8 shadow-[0_24px_55px_-48px_rgba(15,23,42,0.35)] backdrop-blur">
-            <Stack gap="lg">
-              <Stack gap="xs">
-                <Title order={3} style={{ fontSize: '1.15rem' }}>
-                  Sign in to your account
-                </Title>
-                <Text c="dimmed" size="sm">
-                  Manage job applications, track progress, and stay organized —
-                  all in one place.
-                </Text>
-              </Stack>
-
-              {error && (
-                <Alert color="red" radius="lg" variant="light">
-                  {error}
-                </Alert>
-              )}
-
-              <Button
-                fullWidth
-                disabled={isLoading}
-                leftSection={<GoogleIcon />}
-                loading={isLoading}
-                onClick={handleGoogleLogin}
-                radius="xl"
-                size="md"
-                styles={{
-                  root: {
-                    backgroundColor: '#fff',
-                    border: '1px solid #e2e8f0',
-                    color: '#1e293b',
-                    fontWeight: 600,
-                    '&:hover': {
-                      backgroundColor: '#f8fafc',
-                    },
-                  },
-                }}
-                variant="default"
-              >
-                Continue with Google
-              </Button>
-
-              <Text c="dimmed" className="text-center" size="xs">
-                By signing in, you agree to our Terms of Service and Privacy
-                Policy.
-              </Text>
-            </Stack>
+      <div className="relative w-full max-w-md animate-fade-in">
+        {/* Logo Section */}
+        <div className="flex flex-col items-center mb-8 space-y-4">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-teal-600 text-white font-bold text-xl shadow-xl shadow-primary/30">
+            CO
           </div>
-        </Stack>
+          <div className="text-center space-y-1">
+            <h1 className="text-3xl font-bold tracking-tight">Career OS</h1>
+            <p className="text-muted-foreground">
+              Track every application. Land your next role.
+            </p>
+          </div>
+        </div>
+
+        {/* Login Card */}
+        <Card className="glass-card">
+          <CardHeader className="text-center pb-2">
+            <CardTitle className="text-xl">Sign in to your account</CardTitle>
+            <CardDescription className="text-balance">
+              Manage job applications, track progress, and stay organized - all in one place.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button
+              className="w-full h-12 gap-3 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 shadow-sm"
+              disabled={isLoading}
+              loading={isLoading}
+              onClick={handleGoogleLogin}
+            >
+              <GoogleIcon />
+              Continue with Google
+            </Button>
+
+            <p className="text-center text-xs text-muted-foreground px-4">
+              By signing in, you agree to our Terms of Service and Privacy Policy.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Footer */}
+        <div className="mt-8 text-center">
+          <p className="text-xs text-muted-foreground">
+            Built for job seekers who want to stay organized
+          </p>
+        </div>
       </div>
     </div>
   );

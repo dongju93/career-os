@@ -1,14 +1,14 @@
-import { Loader, Stack, Text } from '@mantine/core';
+import { Loader2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { API_BASE_URL } from '../services/api-base-url';
-import { useAuthStore } from '../store/auth-store';
+import { API_BASE_URL } from '@/services/api-base-url';
+import { useAuthStore } from '@/store/auth-store';
 import {
   buildLoginPath,
   consumeStoredRedirectPath,
   getSafeRedirectPath,
   readStoredRedirectPath,
-} from '../utils/auth-redirect';
+} from '@/utils/auth-redirect';
 
 export function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -65,13 +65,14 @@ export function AuthCallbackPage() {
   }, [navigate, searchParams, setAuth, setError, setLoading]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <Stack align="center" gap="md">
-        <Loader color="orange" size="lg" />
-        <Text c="dimmed" size="sm">
-          Completing sign-in…
-        </Text>
-      </Stack>
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4 animate-fade-in">
+        <div className="relative">
+          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary/30 to-teal-500/20 blur-xl" />
+          <Loader2 className="h-10 w-10 text-primary animate-spin relative" />
+        </div>
+        <p className="text-sm text-muted-foreground">Completing sign-in...</p>
+      </div>
     </div>
   );
 }
