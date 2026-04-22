@@ -132,9 +132,9 @@ function FormSection({
 }) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="inline-flex items-center gap-2 rounded-full bg-accent border px-3 py-1.5">
         <ChevronRight className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-600">
           {title}
         </h3>
       </div>
@@ -160,10 +160,10 @@ function FormField({
     <div className="space-y-1.5">
       <Label htmlFor={id}>
         {label}
-        {required && <span className="text-destructive ml-0.5">*</span>}
+        {required && <span className="text-red-400 ml-0.5">*</span>}
       </Label>
       {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   );
 }
@@ -262,51 +262,68 @@ export function AddJobPostingPage() {
   /* ── Phase 3: Success ── */
   if (savedInfo) {
     return (
-      <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
+      <div className="mx-auto max-w-4xl animate-fade-in space-y-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             채용공고 등록
           </h1>
+          <p className="mt-1 text-sm text-gray-600">
+            추출부터 저장까지 한 번에 완료했습니다.
+          </p>
         </div>
-        <Card className="py-12 flex flex-col items-center gap-4 text-center animate-fade-in">
-          <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
-            <CheckCircle2 className="h-8 w-8 text-green-600" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold">저장 완료!</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              채용공고가 성공적으로 저장되었습니다
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Button asChild variant="outline">
-              <Link to="/job-postings">목록으로</Link>
-            </Button>
-            <Button onClick={handleReset}>
-              <PlusCircle className="h-4 w-4" />
-              다른 공고 등록
-            </Button>
-          </div>
+        <Card className="animate-fade-in py-12 text-center">
+          <CardContent className="flex flex-col items-center gap-4 px-6 py-0">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-400 border border-emerald-400/20">
+              <CheckCircle2 className="h-7 w-7" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold">저장 완료!</h3>
+              <p className="mt-1 text-sm text-gray-600">
+                채용공고가 성공적으로 저장되었습니다
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button asChild variant="outline">
+                <Link to="/job-postings">목록으로</Link>
+              </Button>
+              <Button onClick={handleReset}>
+                <PlusCircle className="h-4 w-4" />
+                다른 공고 등록
+              </Button>
+            </div>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
-      {/* Page header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-          채용공고 등록
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          URL을 입력하여 채용공고를 자동으로 불러옵니다
-        </p>
+    <div className="mx-auto max-w-4xl animate-fade-in space-y-6">
+      {/* Page header — transparent, floating on background */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="mb-2 text-xs font-semibold tracking-[0.15em] text-primary uppercase">
+            Capture Flow
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            채용공고 등록
+          </h1>
+          <p className="mt-1 text-sm text-gray-600">
+            URL을 입력해 공고를 추출한 뒤, 필요한 항목만 다듬어 저장합니다.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="saramin">saramin</Badge>
+          <Badge variant="wanted">wanted</Badge>
+          <span className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-gray-600 border">
+            URL 기반 자동 추출
+          </span>
+        </div>
       </div>
 
-      {/* Phase 1: URL input */}
-      <Card>
-        <CardHeader>
+      {/* URL Card — glass */}
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b border-white/8">
           <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5 text-primary" />
             채용공고 URL
@@ -316,7 +333,7 @@ export function AddJobPostingPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 rounded-xl border border-white/8 bg-muted p-3 sm:flex-row">
             <Input
               className="flex-1"
               disabled={isExtracting}
@@ -327,7 +344,11 @@ export function AddJobPostingPage() {
                 if (e.key === 'Enter') handleExtract();
               }}
             />
-            <Button loading={isExtracting} onClick={handleExtract}>
+            <Button
+              className="sm:min-w-32"
+              loading={isExtracting}
+              onClick={handleExtract}
+            >
               <Search className="h-4 w-4" />
               불러오기
             </Button>
@@ -343,10 +364,9 @@ export function AddJobPostingPage() {
         </CardContent>
       </Card>
 
-      {/* Phase 2: Extracted form */}
       {formData && meta && (
-        <Card>
-          <CardHeader className="border-b bg-linear-to-r from-primary/5 to-teal-500/5">
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b border-white/8 bg-white/3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Badge
@@ -362,7 +382,7 @@ export function AddJobPostingPage() {
                 </div>
               </div>
               <a
-                className="text-muted-foreground hover:text-primary transition-colors"
+                className="text-gray-600 hover:text-primary transition-colors"
                 href={meta.posting_url}
                 rel="noopener noreferrer"
                 target="_blank"
@@ -373,7 +393,6 @@ export function AddJobPostingPage() {
           </CardHeader>
 
           <CardContent className="space-y-8 pt-6">
-            {/* 기본 정보 */}
             <FormSection
               gridClass="grid gap-4 grid-cols-1 sm:grid-cols-2"
               title="기본 정보"
@@ -406,7 +425,6 @@ export function AddJobPostingPage() {
               </FormField>
             </FormSection>
 
-            {/* 근무 조건 */}
             <FormSection
               gridClass="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
               title="근무 조건"
@@ -455,7 +473,6 @@ export function AddJobPostingPage() {
               </FormField>
             </FormSection>
 
-            {/* 직무 내용 */}
             <FormSection title="직무 내용">
               <FormField id="job_description" label="업무 내용">
                 <Textarea
@@ -487,7 +504,6 @@ export function AddJobPostingPage() {
               </FormField>
             </FormSection>
 
-            {/* 분류 및 태그 */}
             <FormSection title="분류 및 태그">
               <FormField id="tech_stack" label="기술 스택">
                 <TagInput
@@ -523,7 +539,6 @@ export function AddJobPostingPage() {
               </div>
             </FormSection>
 
-            {/* 지원 정보 */}
             <FormSection
               gridClass="grid gap-4 grid-cols-1 sm:grid-cols-2"
               title="지원 정보"
@@ -583,7 +598,7 @@ export function AddJobPostingPage() {
             )}
           </CardContent>
 
-          <CardFooter className="border-t pt-6 flex justify-end gap-3">
+          <CardFooter className="flex justify-end gap-3 border-t border-white/8 pt-6">
             <Button variant="outline" onClick={() => navigate('/job-postings')}>
               취소
             </Button>

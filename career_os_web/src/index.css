@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ── Tailwind theme tokens mapped from CSS custom properties ── */
+/* ── Tailwind theme tokens ── */
 @theme inline {
   --font-sans:
     "Inter", "IBM Plex Sans", "Segoe UI Variable", "Segoe UI", system-ui,
@@ -29,25 +29,25 @@
 
 /* ── Semantic color tokens ── */
 :root {
-  --background: 220 20% 97%;
-  --foreground: 220 25% 10%;
-  --card: 0 0% 100%;
-  --card-foreground: 220 25% 10%;
+  --background: 0 0% 100%;
+  --foreground: 0 0% 9%;
+  --card: 210 20% 98%;
+  --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
-  --popover-foreground: 220 25% 10%;
-  --primary: 185 65% 45%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 185 72% 42%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 220 15% 92%;
-  --secondary-foreground: 220 25% 20%;
-  --muted: 220 15% 94%;
-  --muted-foreground: 220 10% 45%;
-  --accent: 185 50% 94%;
-  --accent-foreground: 185 65% 35%;
+  --secondary: 210 20% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 20% 96%;
+  --muted-foreground: 215 16% 35%;
+  --accent: 185 40% 94%;
+  --accent-foreground: 185 72% 32%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
-  --border: 220 15% 88%;
-  --input: 220 15% 88%;
-  --ring: 185 65% 45%;
+  --border: 214 20% 88%;
+  --input: 214 20% 88%;
+  --ring: 185 72% 42%;
   --radius: 1rem;
 }
 
@@ -58,35 +58,19 @@
   box-sizing: border-box;
 }
 
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
   color: hsl(var(--foreground));
   background-color: hsl(var(--background));
-  background-image:
-    radial-gradient(
-      ellipse at 20% 0%,
-      rgba(6, 182, 212, 0.12) 0%,
-      transparent 50%
-    ),
-    radial-gradient(
-      ellipse at 80% 100%,
-      rgba(20, 184, 166, 0.1) 0%,
-      transparent 50%
-    ),
-    radial-gradient(
-      ellipse at 50% 50%,
-      rgba(99, 102, 241, 0.05) 0%,
-      transparent 70%
-    );
-  background-attachment: fixed;
-  font-family:
-    "Inter", "IBM Plex Sans", "Segoe UI Variable", "Segoe UI", system-ui,
-    sans-serif;
+  font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
@@ -101,7 +85,7 @@ h5,
 h6 {
   font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 button,
@@ -123,53 +107,172 @@ a {
 
 /* ── Selection ── */
 ::selection {
-  background: rgba(6, 182, 212, 0.2);
+  background: rgba(6, 182, 212, 0.18);
 }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.3);
+  background: rgba(0, 0, 0, 0.25);
 }
 
-/* ── Glassmorphism utilities ── */
+/* ───────────────────────────────────────────
+   Glassmorphism — visible and tasteful
+   The background is the star; glass is the lens.
+   ─────────────────────────────────────────── */
+
+/*
+  Primary glass — for cards and floating panels.
+  Low opacity so the colorful mesh shows through clearly.
+  High blur so the distortion is obvious.
+*/
 .glass {
   background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  background-image: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(255, 255, 255, 0.6) 100%
+  );
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 2px 16px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
-.glass-card {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+/*
+  Stronger glass — for sidebars and headers where readability matters.
+  Still translucent, but with more substance.
+*/
+.glass-strong {
+  background: rgba(255, 255, 255, 0.85);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.75) 100%
+  );
+  backdrop-filter: blur(24px) saturate(120%);
+  -webkit-backdrop-filter: blur(24px) saturate(120%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.06),
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
-.glass-subtle {
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+/*
+  Light glass — for elements on top of already-glass surfaces
+  (used sparingly, e.g. inner chips)
+*/
+.glass-light {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* Hover lift for interactive glass cards */
+.glass-hover {
+  transition:
+    transform 250ms ease,
+    box-shadow 300ms ease,
+    background 250ms ease;
+}
+.glass-hover:hover {
+  background: rgba(255, 255, 255, 0.8);
+  background-image: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.65) 100%
+  );
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transform: translateY(-2px);
+}
+
+/* Solid surface for when you truly need opacity inside glass */
+.surface {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* ── Buttons ── */
+.btn-primary {
+  background: linear-gradient(135deg, hsl(185 72% 40%), hsl(185 68% 34%));
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(6, 182, 212, 0.2);
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, hsl(185 72% 44%), hsl(185 68% 38%));
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 4px 12px rgba(6, 182, 212, 0.3);
+}
+
+.btn-secondary {
+  background: rgba(0, 0, 0, 0.04);
+  color: hsl(var(--foreground));
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.07);
+  border-color: rgba(0, 0, 0, 0.16);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  border: 1px solid transparent;
+}
+.btn-ghost:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: hsl(var(--foreground));
+}
+
+/* ── Inputs ── */
+.input-clean {
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: hsl(var(--foreground));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.input-clean::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+.input-clean:hover {
+  border-color: rgba(0, 0, 0, 0.16);
+}
+.input-clean:focus {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: hsl(var(--primary) / 0.5);
+  box-shadow:
+    0 0 0 3px hsl(var(--primary) / 0.1),
+    inset 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 /* ── Animations ── */
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -177,7 +280,7 @@ a {
   }
 }
 .animate-fade-in {
-  animation: fade-in 0.4s ease-out;
+  animation: fade-in 0.4s ease-out both;
 }
 
 @keyframes slide-in-right {
@@ -191,15 +294,5 @@ a {
   }
 }
 .animate-slide-in {
-  animation: slide-in-right 0.3s ease-out;
-}
-
-@keyframes pulse-glow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.3);
-  }
-  50% {
-    box-shadow: 0 0 20px 4px hsl(var(--primary) / 0.15);
-  }
+  animation: slide-in-right 0.3s ease-out both;
 }

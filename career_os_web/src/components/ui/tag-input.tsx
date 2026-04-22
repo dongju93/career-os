@@ -45,15 +45,15 @@ export function TagInput({
   return (
     <div
       className={cn(
-        'flex flex-wrap gap-1.5 min-h-11 w-full rounded-xl border border-input bg-white/70 backdrop-blur-sm px-3 py-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 transition-colors',
+        'input-clean flex min-h-10 w-full flex-wrap gap-1.5 rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 transition-all',
         className,
       )}
     >
       {value.map((tag) => (
-        <Badge key={tag} className="gap-1 pr-1" variant="secondary">
+        <Badge key={tag} className="gap-1 pr-1" variant="glass">
           {tag}
           <button
-            className="hover:text-destructive transition-colors"
+            className="transition-colors hover:text-red-300"
             onClick={() => removeTag(tag)}
             type="button"
           >
