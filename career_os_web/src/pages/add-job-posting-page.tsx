@@ -1,34 +1,33 @@
 import {
-  Alert,
-  Anchor,
-  Badge,
-  Button,
-  Card,
-  Divider,
-  Group,
-  SimpleGrid,
-  Stack,
-  TagsInput,
-  Text,
-  Textarea,
-  TextInput,
-  Title,
-} from '@mantine/core';
+  AlertCircle,
+  CheckCircle2,
+  ChevronRight,
+  ExternalLink,
+  PlusCircle,
+  Save,
+  Search,
+} from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { TagInput } from '@/components/ui/tag-input';
+import { Textarea } from '@/components/ui/textarea';
 import { extractJobPosting, saveJobPosting } from '../services/job-postings';
 import { useAuthStore } from '../store/auth-store';
 import type { JobPostingExtracted, Platform } from '../types/job-posting';
-
-const PLATFORM_LABELS: Record<Platform, string> = {
-  saramin: '사람인',
-  wanted: '원티드',
-};
-
-const PLATFORM_COLORS: Record<Platform, string> = {
-  saramin: 'orange',
-  wanted: 'teal',
-};
 
 interface FormState {
   company_name: string;
@@ -122,6 +121,53 @@ function toExtracted(
   };
 }
 
+function FormSection({
+  title,
+  gridClass,
+  children,
+}: {
+  title: string;
+  gridClass?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <ChevronRight className="h-4 w-4 text-primary" />
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </h3>
+      </div>
+      <div className={gridClass ?? 'grid gap-4 grid-cols-1'}>{children}</div>
+    </div>
+  );
+}
+
+function FormField({
+  label,
+  required,
+  error,
+  children,
+  id,
+}: {
+  label: string;
+  required?: boolean;
+  error?: string;
+  children: ReactNode;
+  id?: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>
+        {label}
+        {required && <span className="text-destructive ml-0.5">*</span>}
+      </Label>
+      {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
 export function AddJobPostingPage() {
   const token = useAuthStore((state) => state.token);
   const navigate = useNavigate();
@@ -165,8 +211,6 @@ export function AddJobPostingPage() {
         posting_url: data.posting_url,
       });
       setFormData(toFormState(data));
-      setFormErrors({});
-      setSaveError(null);
     } catch (err) {
       setExtractError(
         err instanceof Error
@@ -215,307 +259,341 @@ export function AddJobPostingPage() {
     setSavedInfo(null);
   }
 
+  /* ── Phase 3: Success ── */
   if (savedInfo) {
     return (
-      <Stack gap="xl">
-        <Title order={2}>새 채용공고 등록</Title>
-        <Card padding="xl" radius="xl" withBorder>
-          <Stack align="center" gap="md" py="xl">
-            <Text size="3xl">✅</Text>
-            <Title order={3} ta="center">
-              채용공고가 저장되었습니다
-            </Title>
-            <Text c="dimmed" size="sm" ta="center">
-              {savedInfo.company_name} · {savedInfo.job_title}
-            </Text>
-            <Group mt="md">
-              <Button
-                radius="xl"
-                variant="outline"
-                onClick={() => navigate('/job-postings')}
-              >
-                목록으로 돌아가기
-              </Button>
-              <Button radius="xl" onClick={handleReset}>
-                새 공고 등록
-              </Button>
-            </Group>
-          </Stack>
+      <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            채용공고 등록
+          </h1>
+        </div>
+        <Card className="py-12 flex flex-col items-center gap-4 text-center animate-fade-in">
+          <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
+            <CheckCircle2 className="h-8 w-8 text-green-600" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold">저장 완료!</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              채용공고가 성공적으로 저장되었습니다
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button asChild variant="outline">
+              <Link to="/job-postings">목록으로</Link>
+            </Button>
+            <Button onClick={handleReset}>
+              <PlusCircle className="h-4 w-4" />
+              다른 공고 등록
+            </Button>
+          </div>
         </Card>
-      </Stack>
+      </div>
     );
   }
 
   return (
-    <Stack gap="xl">
+    <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
+      {/* Page header */}
       <div>
-        <Title order={2}>새 채용공고 등록</Title>
-        <Text c="dimmed" mt={4} size="sm">
-          URL을 입력하면 채용공고 정보를 자동으로 불러옵니다.
-        </Text>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+          채용공고 등록
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          URL을 입력하여 채용공고를 자동으로 불러옵니다
+        </p>
       </div>
 
-      <Card padding="lg" radius="xl" withBorder>
-        <Stack gap="md">
-          <Text fw={600}>채용공고 URL</Text>
-          <Group align="flex-end" gap="sm">
-            <TextInput
-              flex={1}
+      {/* Phase 1: URL input */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5 text-primary" />
+            채용공고 URL
+          </CardTitle>
+          <CardDescription>
+            사람인 또는 원티드 채용공고 URL을 입력하세요
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-3">
+            <Input
+              className="flex-1"
               disabled={isExtracting}
-              placeholder="https://www.saramin.co.kr/... 또는 https://www.wanted.co.kr/..."
-              radius="xl"
-              size="md"
+              placeholder="https://www.saramin.co.kr/..."
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleExtract();
               }}
             />
-            <Button
-              disabled={!url.trim() || isExtracting}
-              loading={isExtracting}
-              radius="xl"
-              size="md"
-              onClick={handleExtract}
-            >
+            <Button loading={isExtracting} onClick={handleExtract}>
+              <Search className="h-4 w-4" />
               불러오기
             </Button>
-          </Group>
+          </div>
+
           {extractError && (
-            <Alert
-              color="red"
-              radius="xl"
-              title="불러오기 실패"
-              variant="light"
-            >
-              {extractError}
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>오류</AlertTitle>
+              <AlertDescription>{extractError}</AlertDescription>
             </Alert>
           )}
-        </Stack>
+        </CardContent>
       </Card>
 
+      {/* Phase 2: Extracted form */}
       {formData && meta && (
-        <Card padding="lg" radius="xl" withBorder>
-          <Stack gap="xl">
-            <Group gap="sm">
-              <Badge
-                color={PLATFORM_COLORS[meta.platform]}
-                radius="xl"
-                size="sm"
-                variant="light"
-              >
-                {PLATFORM_LABELS[meta.platform]}
-              </Badge>
-              <Anchor
-                c="dimmed"
+        <Card>
+          <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-teal-500/5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Badge
+                  variant={meta.platform === 'saramin' ? 'saramin' : 'wanted'}
+                >
+                  {meta.platform}
+                </Badge>
+                <div>
+                  <CardTitle>{formData.company_name}</CardTitle>
+                  <CardDescription className="mt-0.5">
+                    {formData.job_title}
+                  </CardDescription>
+                </div>
+              </div>
+              <a
+                className="text-muted-foreground hover:text-primary transition-colors"
                 href={meta.posting_url}
                 rel="noopener noreferrer"
-                size="xs"
                 target="_blank"
-                className="truncate"
               >
-                {meta.posting_url}
-              </Anchor>
-            </Group>
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </div>
+          </CardHeader>
 
-            <Stack gap="sm">
-              <Divider label="기본 정보" labelPosition="left" />
-              <TextInput
-                required
+          <CardContent className="space-y-8 pt-6">
+            {/* 기본 정보 */}
+            <FormSection
+              gridClass="grid gap-4 grid-cols-1 sm:grid-cols-2"
+              title="기본 정보"
+            >
+              <FormField
                 error={formErrors.company_name}
+                id="company_name"
                 label="회사명"
-                radius="md"
-                value={formData.company_name}
-                onChange={(e) => patch({ company_name: e.target.value })}
-              />
-              <TextInput
                 required
+              >
+                <Input
+                  id="company_name"
+                  error={!!formErrors.company_name}
+                  value={formData.company_name}
+                  onChange={(e) => patch({ company_name: e.target.value })}
+                />
+              </FormField>
+              <FormField
                 error={formErrors.job_title}
-                label="공고 제목"
-                radius="md"
-                value={formData.job_title}
-                onChange={(e) => patch({ job_title: e.target.value })}
-              />
-            </Stack>
+                id="job_title"
+                label="채용공고 제목"
+                required
+              >
+                <Input
+                  id="job_title"
+                  error={!!formErrors.job_title}
+                  value={formData.job_title}
+                  onChange={(e) => patch({ job_title: e.target.value })}
+                />
+              </FormField>
+            </FormSection>
 
-            <Stack gap="sm">
-              <Divider label="근무 조건" labelPosition="left" />
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-                <TextInput
-                  label="근무지"
-                  radius="md"
+            {/* 근무 조건 */}
+            <FormSection
+              gridClass="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+              title="근무 조건"
+            >
+              <FormField id="location" label="근무지역">
+                <Input
+                  id="location"
                   value={formData.location}
                   onChange={(e) => patch({ location: e.target.value })}
                 />
-                <TextInput
-                  label="경력"
-                  radius="md"
+              </FormField>
+              <FormField id="experience_req" label="경력">
+                <Input
+                  id="experience_req"
                   value={formData.experience_req}
                   onChange={(e) => patch({ experience_req: e.target.value })}
                 />
-                <TextInput
-                  label="고용 형태"
-                  radius="md"
+              </FormField>
+              <FormField id="employment_type" label="근무형태">
+                <Input
+                  id="employment_type"
                   value={formData.employment_type}
                   onChange={(e) => patch({ employment_type: e.target.value })}
                 />
-                <TextInput
-                  label="학력"
-                  radius="md"
+              </FormField>
+              <FormField id="education_req" label="학력">
+                <Input
+                  id="education_req"
                   value={formData.education_req}
                   onChange={(e) => patch({ education_req: e.target.value })}
                 />
-                <TextInput
-                  label="급여"
-                  radius="md"
+              </FormField>
+              <FormField id="salary" label="급여">
+                <Input
+                  id="salary"
                   value={formData.salary}
                   onChange={(e) => patch({ salary: e.target.value })}
                 />
-                <TextInput
-                  label="마감일"
-                  radius="md"
+              </FormField>
+              <FormField id="deadline" label="마감일">
+                <Input
+                  id="deadline"
                   value={formData.deadline}
                   onChange={(e) => patch({ deadline: e.target.value })}
                 />
-              </SimpleGrid>
-            </Stack>
+              </FormField>
+            </FormSection>
 
-            <Stack gap="sm">
-              <Divider label="직무 내용" labelPosition="left" />
-              <Textarea
-                autosize
-                label="업무 내용"
-                minRows={2}
-                radius="md"
-                value={formData.job_description}
-                onChange={(e) => patch({ job_description: e.target.value })}
-              />
-              <Textarea
-                autosize
-                label="담당 업무"
-                minRows={2}
-                radius="md"
-                value={formData.responsibilities}
-                onChange={(e) => patch({ responsibilities: e.target.value })}
-              />
-              <Textarea
-                autosize
-                label="자격 요건"
-                minRows={2}
-                radius="md"
-                value={formData.qualifications}
-                onChange={(e) => patch({ qualifications: e.target.value })}
-              />
-              <Textarea
-                autosize
-                label="우대 사항"
-                minRows={2}
-                radius="md"
-                value={formData.preferred_points}
-                onChange={(e) => patch({ preferred_points: e.target.value })}
-              />
-              <Textarea
-                autosize
-                label="복리 후생"
-                minRows={2}
-                radius="md"
-                value={formData.benefits}
-                onChange={(e) => patch({ benefits: e.target.value })}
-              />
-              <Textarea
-                autosize
-                label="채용 절차"
-                minRows={2}
-                radius="md"
-                value={formData.hiring_process}
-                onChange={(e) => patch({ hiring_process: e.target.value })}
-              />
-            </Stack>
-
-            <Stack gap="sm">
-              <Divider label="분류 및 태그" labelPosition="left" />
-              <TagsInput
-                label="기술 스택"
-                radius="md"
-                value={formData.tech_stack}
-                onChange={(v) => patch({ tech_stack: v })}
-              />
-              <TagsInput
-                label="태그"
-                radius="md"
-                value={formData.tags}
-                onChange={(v) => patch({ tags: v })}
-              />
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-                <TextInput
-                  label="직무 분류"
-                  radius="md"
-                  value={formData.job_category}
-                  onChange={(e) => patch({ job_category: e.target.value })}
+            {/* 직무 내용 */}
+            <FormSection title="직무 내용">
+              <FormField id="job_description" label="업무 내용">
+                <Textarea
+                  id="job_description"
+                  value={formData.job_description}
+                  onChange={(e) => patch({ job_description: e.target.value })}
                 />
-                <TextInput
-                  label="산업군"
-                  radius="md"
-                  value={formData.industry}
-                  onChange={(e) => patch({ industry: e.target.value })}
+              </FormField>
+              <FormField id="responsibilities" label="담당업무">
+                <Textarea
+                  id="responsibilities"
+                  value={formData.responsibilities}
+                  onChange={(e) => patch({ responsibilities: e.target.value })}
                 />
-              </SimpleGrid>
-            </Stack>
+              </FormField>
+              <FormField id="qualifications" label="자격요건">
+                <Textarea
+                  id="qualifications"
+                  value={formData.qualifications}
+                  onChange={(e) => patch({ qualifications: e.target.value })}
+                />
+              </FormField>
+              <FormField id="preferred_points" label="우대사항">
+                <Textarea
+                  id="preferred_points"
+                  value={formData.preferred_points}
+                  onChange={(e) => patch({ preferred_points: e.target.value })}
+                />
+              </FormField>
+            </FormSection>
 
-            <Stack gap="sm">
-              <Divider label="지원 정보" labelPosition="left" />
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-                <TextInput
-                  label="지원 방법"
-                  radius="md"
+            {/* 분류 및 태그 */}
+            <FormSection title="분류 및 태그">
+              <FormField id="tech_stack" label="기술 스택">
+                <TagInput
+                  id="tech_stack"
+                  placeholder="기술명 입력 후 Enter"
+                  value={formData.tech_stack}
+                  onChange={(v) => patch({ tech_stack: v })}
+                />
+              </FormField>
+              <FormField id="tags" label="태그">
+                <TagInput
+                  id="tags"
+                  placeholder="태그 입력 후 Enter"
+                  value={formData.tags}
+                  onChange={(v) => patch({ tags: v })}
+                />
+              </FormField>
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                <FormField id="job_category" label="직군/직무">
+                  <Input
+                    id="job_category"
+                    value={formData.job_category}
+                    onChange={(e) => patch({ job_category: e.target.value })}
+                  />
+                </FormField>
+                <FormField id="industry" label="산업군">
+                  <Input
+                    id="industry"
+                    value={formData.industry}
+                    onChange={(e) => patch({ industry: e.target.value })}
+                  />
+                </FormField>
+              </div>
+            </FormSection>
+
+            {/* 지원 정보 */}
+            <FormSection
+              gridClass="grid gap-4 grid-cols-1 sm:grid-cols-2"
+              title="지원 정보"
+            >
+              <FormField id="benefits" label="복리후생">
+                <Textarea
+                  id="benefits"
+                  value={formData.benefits}
+                  onChange={(e) => patch({ benefits: e.target.value })}
+                />
+              </FormField>
+              <FormField id="hiring_process" label="채용 절차">
+                <Textarea
+                  id="hiring_process"
+                  value={formData.hiring_process}
+                  onChange={(e) => patch({ hiring_process: e.target.value })}
+                />
+              </FormField>
+              <FormField id="application_method" label="지원방법">
+                <Input
+                  id="application_method"
                   value={formData.application_method}
                   onChange={(e) =>
                     patch({ application_method: e.target.value })
                   }
                 />
-                <TextInput
-                  label="지원 양식"
-                  radius="md"
+              </FormField>
+              <FormField id="application_form" label="지원 양식">
+                <Input
+                  id="application_form"
                   value={formData.application_form}
                   onChange={(e) => patch({ application_form: e.target.value })}
                 />
-                <TextInput
-                  label="담당자"
-                  radius="md"
+              </FormField>
+              <FormField id="contact_person" label="담당자">
+                <Input
+                  id="contact_person"
                   value={formData.contact_person}
                   onChange={(e) => patch({ contact_person: e.target.value })}
                 />
-                <TextInput
-                  label="홈페이지"
-                  radius="md"
+              </FormField>
+              <FormField id="homepage" label="홈페이지">
+                <Input
+                  id="homepage"
                   value={formData.homepage}
                   onChange={(e) => patch({ homepage: e.target.value })}
                 />
-              </SimpleGrid>
-            </Stack>
+              </FormField>
+            </FormSection>
 
             {saveError && (
-              <Alert color="red" radius="xl" title="저장 실패" variant="light">
-                {saveError}
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>저장 실패</AlertTitle>
+                <AlertDescription>{saveError}</AlertDescription>
               </Alert>
             )}
+          </CardContent>
 
-            <Group justify="flex-end" gap="sm">
-              <Button
-                disabled={isSaving}
-                radius="xl"
-                variant="subtle"
-                onClick={() => navigate('/job-postings')}
-              >
-                취소
-              </Button>
-              <Button loading={isSaving} radius="xl" onClick={handleSave}>
-                저장
-              </Button>
-            </Group>
-          </Stack>
+          <CardFooter className="border-t pt-6 flex justify-end gap-3">
+            <Button variant="outline" onClick={() => navigate('/job-postings')}>
+              취소
+            </Button>
+            <Button loading={isSaving} onClick={handleSave}>
+              <Save className="h-4 w-4" />
+              저장
+            </Button>
+          </CardFooter>
         </Card>
       )}
-    </Stack>
+    </div>
   );
 }

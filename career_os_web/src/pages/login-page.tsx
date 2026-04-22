@@ -1,6 +1,6 @@
-import { Alert, Button, Stack, Text, Title } from '@mantine/core';
 import { useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
+import { Card, CardContent } from '@/components/ui/card';
 import { API_BASE_URL } from '../services/api-base-url';
 import { useAuthStore } from '../store/auth-store';
 import {
@@ -8,7 +8,6 @@ import {
   getSafeRedirectPath,
   storeRedirectPath,
 } from '../utils/auth-redirect';
-import '../App.css';
 
 function GoogleIcon() {
   return (
@@ -52,9 +51,9 @@ export function LoginPage() {
   useEffect(() => {
     setError(
       errorParam === 'auth_failed'
-        ? 'Google login failed. Please try again.'
+        ? '로그인에 실패했습니다. 다시 시도해주세요.'
         : errorParam
-          ? 'An unexpected error occurred. Please try again.'
+          ? '예상치 못한 오류가 발생했습니다. 다시 시도해주세요.'
           : null,
     );
   }, [errorParam, setError]);
@@ -75,85 +74,81 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        <Stack gap="xl">
-          <Stack align="center" gap="sm">
-            <div
-              className="brand-icon"
-              style={{
-                height: '3rem',
-                width: '3rem',
-                fontSize: '1rem',
-                borderRadius: '14px',
-              }}
-            >
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+      {/* Background decoration blobs */}
+      <div
+        aria-hidden="true"
+        className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-primary/20 to-teal-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute bottom-0 left-0 w-80 h-80 bg-gradient-to-tr from-teal-500/15 to-primary/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none"
+      />
+
+      <Card className="w-full max-w-md mx-4 animate-fade-in">
+        <CardContent className="pt-8 pb-8 px-8">
+          {/* Logo */}
+          <div className="flex flex-col items-center gap-4 mb-8">
+            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary to-teal-600 text-white font-bold text-xl flex items-center justify-center shadow-xl">
               CO
             </div>
-            <Stack align="center" gap={4}>
-              <Title
-                className="text-center"
-                order={1}
-                style={{ fontSize: '2rem', letterSpacing: '-0.03em' }}
-              >
-                Career OS
-              </Title>
-              <Text c="dimmed" className="text-center" size="md">
-                Track every application. Land your next role.
-              </Text>
-            </Stack>
-          </Stack>
-
-          <div className="rounded-[1.6rem] border border-slate-200/70 bg-white/80 p-8 shadow-[0_24px_55px_-48px_rgba(15,23,42,0.35)] backdrop-blur">
-            <Stack gap="lg">
-              <Stack gap="xs">
-                <Title order={3} style={{ fontSize: '1.15rem' }}>
-                  Sign in to your account
-                </Title>
-                <Text c="dimmed" size="sm">
-                  Manage job applications, track progress, and stay organized —
-                  all in one place.
-                </Text>
-              </Stack>
-
-              {error && (
-                <Alert color="red" radius="lg" variant="light">
-                  {error}
-                </Alert>
-              )}
-
-              <Button
-                fullWidth
-                disabled={isLoading}
-                leftSection={<GoogleIcon />}
-                loading={isLoading}
-                onClick={handleGoogleLogin}
-                radius="xl"
-                size="md"
-                styles={{
-                  root: {
-                    backgroundColor: '#fff',
-                    border: '1px solid #e2e8f0',
-                    color: '#1e293b',
-                    fontWeight: 600,
-                    '&:hover': {
-                      backgroundColor: '#f8fafc',
-                    },
-                  },
-                }}
-                variant="default"
-              >
-                Continue with Google
-              </Button>
-
-              <Text c="dimmed" className="text-center" size="xs">
-                By signing in, you agree to our Terms of Service and Privacy
-                Policy.
-              </Text>
-            </Stack>
+            <div className="text-center">
+              <h1 className="text-3xl font-bold tracking-tight">Career OS</h1>
+              <p className="text-muted-foreground mt-1">
+                채용 공고 관리 시스템
+              </p>
+            </div>
           </div>
-        </Stack>
-      </div>
+
+          {/* Error */}
+          {error && (
+            <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+
+          {/* Google sign-in */}
+          <button
+            className="w-full h-12 bg-white hover:bg-gray-50 text-gray-800 border border-gray-200 shadow-sm rounded-xl flex items-center justify-center gap-3 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading}
+            type="button"
+            onClick={handleGoogleLogin}
+          >
+            {isLoading ? (
+              <svg
+                aria-hidden="true"
+                className="animate-spin"
+                fill="none"
+                height={16}
+                viewBox="0 0 24 24"
+                width={16}
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  fill="currentColor"
+                />
+              </svg>
+            ) : (
+              <GoogleIcon />
+            )}
+            Google로 계속하기
+          </button>
+
+          {/* Footer */}
+          <p className="text-xs text-muted-foreground text-center mt-6">
+            계속함으로써 서비스 이용약관에 동의합니다
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

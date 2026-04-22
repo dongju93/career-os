@@ -57,12 +57,10 @@ describe('Career OS Web app shell', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: /저장한 채용공고/i,
+        name: /^채용공고$/i,
       }),
     ).toBeInTheDocument();
-    expect(
-      await screen.findByText(/총 1개의 채용공고가 저장되어 있습니다\./i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/총 1개의 채용공고/i)).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /frontend engineer/i }),
     ).toHaveAttribute('href', 'https://www.wanted.co.kr/wd/1');
@@ -95,12 +93,12 @@ describe('Career OS Web app shell', () => {
 
     renderRoute('/');
 
-    await screen.findByRole('heading', { name: /저장한 채용공고/i });
+    await screen.findByRole('heading', { name: /^채용공고$/i });
     await user.click(screen.getByRole('button', { name: /로그아웃/i }));
 
     expect(
       await screen.findByRole('heading', {
-        name: /sign in to your account/i,
+        name: /^Career OS$/i,
       }),
     ).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
