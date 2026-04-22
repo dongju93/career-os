@@ -1,8 +1,11 @@
-# CareerOS
+# CareerOS API
 
 한국 채용 플랫폼(사람인, 원티드)의 채용 공고를 수집·추출·저장하는 FastAPI 백엔드 서비스입니다.
 
-**프로덕션**: `https://career-os.fastapicloud.dev`
+**프로덕션**
+
+- SwaggerUI: `https://career-os.fastapicloud.dev/v1/docs`
+- ReDoc: `https://career-os.fastapicloud.dev/v1/redoc`
 
 ---
 
