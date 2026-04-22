@@ -45,7 +45,7 @@ export function TagInput({
   return (
     <div
       className={cn(
-        'flex flex-wrap gap-1.5 min-h-[2.75rem] w-full rounded-xl border border-input bg-white/70 backdrop-blur-sm px-3 py-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 transition-colors',
+        'flex flex-wrap gap-1.5 min-h-11 w-full rounded-xl border border-input bg-white/70 backdrop-blur-sm px-3 py-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 transition-colors',
         className,
       )}
     >
@@ -62,7 +62,7 @@ export function TagInput({
         </Badge>
       ))}
       <input
-        className="flex-1 min-w-[8rem] bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        className="flex-1 min-w-32 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         id={id}
         placeholder={value.length === 0 ? placeholder : ''}
         value={inputValue}

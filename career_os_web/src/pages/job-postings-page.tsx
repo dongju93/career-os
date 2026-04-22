@@ -50,7 +50,7 @@ function JobPostingCard({ item }: { item: JobPostingListItem }) {
 
         {/* Company */}
         <div className="flex items-center gap-1.5 mb-1">
-          <Building2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+          <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <span className="text-sm font-medium text-muted-foreground truncate">
             {item.company_name}
           </span>
@@ -66,7 +66,7 @@ function JobPostingCard({ item }: { item: JobPostingListItem }) {
           <h3 className="text-base font-bold leading-tight group-hover:text-primary transition-colors line-clamp-2">
             {item.job_title}
           </h3>
-          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
         </a>
 
         {/* Meta */}
@@ -205,7 +205,7 @@ export function JobPostingsPage() {
       {!isLoading && !error && items.length === 0 && (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <Card className="col-span-full py-16 flex flex-col items-center gap-4 text-center">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-teal-500/10 flex items-center justify-center">
+            <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-primary/20 to-teal-500/10 flex items-center justify-center">
               <Sparkles className="h-8 w-8 text-primary" />
             </div>
             <div>

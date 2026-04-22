@@ -7,7 +7,7 @@ export function NotFoundPage() {
   return (
     <div className="min-h-[60vh] flex items-center justify-center animate-fade-in">
       <Card className="max-w-md w-full mx-auto py-12 flex flex-col items-center gap-4 text-center">
-        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-muted/50 to-muted flex items-center justify-center">
+        <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-muted/50 to-muted flex items-center justify-center">
           <FileQuestion className="h-8 w-8 text-muted-foreground" />
         </div>
         <div>

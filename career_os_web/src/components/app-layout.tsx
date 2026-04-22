@@ -52,7 +52,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
     <div className="flex flex-col h-full p-6">
       {/* Logo */}
       <div className="flex items-center gap-3 px-2 mb-8">
-        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-teal-600 text-white font-bold text-sm flex items-center justify-center shadow-lg">
+        <div className="h-10 w-10 rounded-xl bg-linear-to-br from-primary to-teal-600 text-white font-bold text-sm flex items-center justify-center shadow-lg">
           CO
         </div>
         <div>
@@ -86,7 +86,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               <>
                 <div
                   className={cn(
-                    'h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors',
+                    'h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition-colors',
                     isActive ? 'bg-primary text-white' : 'bg-muted/50',
                   )}
                 >
@@ -142,7 +142,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               )}
             </div>
             <Button
-              className="flex-shrink-0"
+              className="shrink-0"
               size="icon"
               variant="ghost"
               onClick={handleLogout}
@@ -186,7 +186,7 @@ export function AppLayout() {
         </Button>
 
         <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary to-teal-600 text-white font-bold text-xs flex items-center justify-center">
+          <div className="h-7 w-7 rounded-lg bg-linear-to-br from-primary to-teal-600 text-white font-bold text-xs flex items-center justify-center">
             CO
           </div>
           <span className="text-base font-bold tracking-tight">Career OS</span>

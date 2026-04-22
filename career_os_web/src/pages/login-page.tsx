@@ -78,18 +78,18 @@ export function LoginPage() {
       {/* Background decoration blobs */}
       <div
         aria-hidden="true"
-        className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-primary/20 to-teal-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"
+        className="absolute top-0 right-0 w-96 h-96 bg-linear-to-br from-primary/20 to-teal-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"
       />
       <div
         aria-hidden="true"
-        className="absolute bottom-0 left-0 w-80 h-80 bg-gradient-to-tr from-teal-500/15 to-primary/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none"
+        className="absolute bottom-0 left-0 w-80 h-80 bg-linear-to-tr from-teal-500/15 to-primary/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none"
       />
 
       <Card className="w-full max-w-md mx-4 animate-fade-in">
         <CardContent className="pt-8 pb-8 px-8">
           {/* Logo */}
           <div className="flex flex-col items-center gap-4 mb-8">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary to-teal-600 text-white font-bold text-xl flex items-center justify-center shadow-xl">
+            <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-primary to-teal-600 text-white font-bold text-xl flex items-center justify-center shadow-xl">
               CO
             </div>
             <div className="text-center">

@@ -14,7 +14,7 @@ export function Separator({
     <div
       className={cn(
         'bg-border/60',
-        orientation === 'horizontal' ? 'h-[1px] w-full' : 'h-full w-[1px]',
+        orientation === 'horizontal' ? 'h-px w-full' : 'h-full w-px',
         className,
       )}
       aria-hidden="true"

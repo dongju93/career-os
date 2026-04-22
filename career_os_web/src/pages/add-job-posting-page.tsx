@@ -346,7 +346,7 @@ export function AddJobPostingPage() {
       {/* Phase 2: Extracted form */}
       {formData && meta && (
         <Card>
-          <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-teal-500/5">
+          <CardHeader className="border-b bg-linear-to-r from-primary/5 to-teal-500/5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Badge

@@ -68,7 +68,7 @@ export function AuthCallbackPage() {
     <div className="min-h-screen flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-teal-500/20 blur-xl rounded-full scale-150" />
+          <div className="absolute inset-0 bg-linear-to-br from-primary/30 to-teal-500/20 blur-xl rounded-full scale-150" />
           <Loader2 className="h-10 w-10 text-primary animate-spin relative z-10" />
         </div>
         <p className="text-sm text-muted-foreground">로그인 완료 중...</p>
