@@ -1,4 +1,4 @@
-import { Loader, Stack, Text } from '@mantine/core';
+import { Loader2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { API_BASE_URL } from '../services/api-base-url';
@@ -30,7 +30,7 @@ export function AuthCallbackPage() {
     setLoading(true);
 
     if (oauthError || !accessToken) {
-      setError('Google login failed. Please try again.');
+      setError('Google 로그인에 실패했습니다. 다시 시도해주세요.');
       navigate(buildLoginPath(nextPath, { error: 'auth_failed' }), {
         replace: true,
       });
@@ -57,7 +57,7 @@ export function AuthCallbackPage() {
         navigate(consumeStoredRedirectPath(nextPath), { replace: true });
       })
       .catch(() => {
-        setError('Failed to complete login. Please try again.');
+        setError('로그인 완료에 실패했습니다. 다시 시도해주세요.');
         navigate(buildLoginPath(nextPath, { error: 'auth_failed' }), {
           replace: true,
         });
@@ -65,13 +65,14 @@ export function AuthCallbackPage() {
   }, [navigate, searchParams, setAuth, setError, setLoading]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <Stack align="center" gap="md">
-        <Loader color="orange" size="lg" />
-        <Text c="dimmed" size="sm">
-          Completing sign-in…
-        </Text>
-      </Stack>
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-teal-500/20 blur-xl rounded-full scale-150" />
+          <Loader2 className="h-10 w-10 text-primary animate-spin relative z-10" />
+        </div>
+        <p className="text-sm text-muted-foreground">로그인 완료 중...</p>
+      </div>
     </div>
   );
 }

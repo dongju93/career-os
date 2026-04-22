@@ -16,7 +16,7 @@ describe('authentication flow', () => {
     const { router } = renderRoute('/job-postings?tab=filters');
 
     expect(
-      await screen.findByRole('heading', { name: /sign in to your account/i }),
+      await screen.findByRole('heading', { name: /^Career OS$/i }),
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/login');
     expect(router.state.location.search).toBe(
@@ -46,7 +46,7 @@ describe('authentication flow', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: /저장한 채용공고/i,
+        name: /^채용공고$/i,
       }),
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/job-postings');
@@ -103,7 +103,7 @@ describe('authentication flow', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: /저장한 채용공고/i,
+        name: /^채용공고$/i,
       }),
     ).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
@@ -131,9 +131,11 @@ describe('authentication flow', () => {
     const { router } = renderRoute('/auth/callback?error=auth_failed');
 
     expect(
-      await screen.findByRole('heading', { name: /sign in to your account/i }),
+      await screen.findByRole('heading', { name: /^Career OS$/i }),
     ).toBeInTheDocument();
-    expect(await screen.findByText(/google login failed/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/로그인에 실패했습니다\. 다시 시도해주세요\./i),
+    ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/login');
     expect(router.state.location.search).toBe(
       '?next=%2Fjob-postings&error=auth_failed',

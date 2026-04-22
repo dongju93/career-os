@@ -1,140 +1,137 @@
 import {
-  Alert,
-  Anchor,
-  Badge,
-  Button,
-  Card,
-  Group,
-  Skeleton,
-  Stack,
-  Text,
-  Title,
-} from '@mantine/core';
+  Briefcase,
+  Building2,
+  ExternalLink,
+  MapPin,
+  PlusCircle,
+  Sparkles,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { fetchJobPostings } from '../services/job-postings';
 import { useAuthStore } from '../store/auth-store';
-import type { JobPostingListItem } from '../types/job-posting';
+import type { JobPostingListItem, Platform } from '../types/job-posting';
 
-const PLATFORM_LABELS: Record<string, string> = {
-  saramin: '사람인',
-  wanted: '원티드',
-};
-
-const PLATFORM_COLORS: Record<string, string> = {
-  saramin: 'orange',
-  wanted: 'teal',
-};
-
-function JobPostingCard({ item }: { item: JobPostingListItem }) {
-  const platformLabel = PLATFORM_LABELS[item.platform] ?? item.platform;
-  const platformColor = PLATFORM_COLORS[item.platform] ?? 'gray';
-  const addedAt = new Date(item.created_at).toLocaleDateString('ko-KR', {
-    year: 'numeric',
+function formatRelativeDate(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / 86_400_000);
+  if (days === 0) return '오늘';
+  if (days === 1) return '어제';
+  if (days < 7) return `${days}일 전`;
+  if (days < 30) return `${Math.floor(days / 7)}주 전`;
+  return new Date(iso).toLocaleDateString('ko-KR', {
     month: 'short',
     day: 'numeric',
   });
+}
 
+function platformVariant(platform: Platform) {
+  return platform === 'saramin' ? 'saramin' : 'wanted';
+}
+
+function JobPostingCard({ item }: { item: JobPostingListItem }) {
   return (
-    <Card padding="lg" radius="xl" withBorder>
-      <Stack gap="xs">
-        <Group justify="space-between" wrap="wrap">
-          <Badge color={platformColor} radius="xl" size="sm" variant="light">
-            {platformLabel}
+    <Card className="hover:-translate-y-1 hover:shadow-xl transition-all duration-300 cursor-pointer">
+      <CardContent className="p-5">
+        {/* Platform + date */}
+        <div className="flex items-center justify-between mb-3">
+          <Badge variant={platformVariant(item.platform)}>
+            {item.platform}
           </Badge>
-          <Text c="dimmed" size="xs">
-            {addedAt} 저장
-          </Text>
-        </Group>
-
-        <div>
-          <Text fw={600} size="sm" c="dimmed">
-            {item.company_name}
-          </Text>
-          <Anchor
-            href={item.posting_url}
-            rel="noopener noreferrer"
-            size="md"
-            target="_blank"
-            fw={700}
-            c="dark"
-            underline="hover"
-          >
-            {item.job_title}
-          </Anchor>
+          <span className="text-xs text-muted-foreground">
+            {formatRelativeDate(item.created_at)}
+          </span>
         </div>
 
-        <Group gap="xs" wrap="wrap">
+        {/* Company */}
+        <div className="flex items-center gap-1.5 mb-1">
+          <Building2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+          <span className="text-sm font-medium text-muted-foreground truncate">
+            {item.company_name}
+          </span>
+        </div>
+
+        {/* Job title */}
+        <a
+          className="group flex items-start gap-1.5 mb-3"
+          href={item.posting_url}
+          rel="noreferrer"
+          target="_blank"
+        >
+          <h3 className="text-base font-bold leading-tight group-hover:text-primary transition-colors line-clamp-2">
+            {item.job_title}
+          </h3>
+          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+        </a>
+
+        {/* Meta */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs text-muted-foreground">
           {item.location && (
-            <Text size="xs" c="dimmed">
-              📍 {item.location}
-            </Text>
+            <span className="flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              {item.location}
+            </span>
           )}
           {item.experience_req && (
-            <Text size="xs" c="dimmed">
-              · {item.experience_req}
-            </Text>
+            <span className="flex items-center gap-1">
+              <Briefcase className="h-3 w-3" />
+              {item.experience_req}
+            </span>
           )}
-          {item.employment_type && (
-            <Text size="xs" c="dimmed">
-              · {item.employment_type}
-            </Text>
-          )}
-        </Group>
+        </div>
 
-        <Group justify="space-between" align="center" wrap="wrap">
-          <Text size="sm" fw={500} c={item.deadline ? 'red.7' : 'dimmed'}>
-            {item.deadline ? `마감 ${item.deadline}` : '마감일 미정'}
-          </Text>
+        {/* Deadline + salary */}
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-3">
+          {item.deadline && (
+            <span className="text-destructive font-medium">
+              마감: {item.deadline}
+            </span>
+          )}
           {item.salary && (
-            <Text size="sm" c="dimmed">
-              {item.salary}
-            </Text>
+            <span className="text-muted-foreground">{item.salary}</span>
           )}
-        </Group>
+        </div>
 
+        {/* Tech stack */}
         {item.tech_stack && item.tech_stack.length > 0 && (
-          <Group gap={4} wrap="wrap">
-            {item.tech_stack.slice(0, 6).map((tech) => (
-              <Badge
-                key={tech}
-                color="gray"
-                radius="xl"
-                size="xs"
-                variant="outline"
-              >
-                {tech}
+          <div className="flex flex-wrap gap-1.5">
+            {item.tech_stack.slice(0, 5).map((tag) => (
+              <Badge key={tag} className="text-xs" variant="outline">
+                {tag}
               </Badge>
             ))}
-            {item.tech_stack.length > 6 && (
-              <Badge color="gray" radius="xl" size="xs" variant="outline">
-                +{item.tech_stack.length - 6}
+            {item.tech_stack.length > 5 && (
+              <Badge className="text-xs" variant="secondary">
+                +{item.tech_stack.length - 5}
               </Badge>
             )}
-          </Group>
+          </div>
         )}
-      </Stack>
+      </CardContent>
     </Card>
   );
 }
 
 const SKELETON_KEYS = ['sk-a', 'sk-b', 'sk-c', 'sk-d', 'sk-e', 'sk-f'];
 
-function LoadingSkeleton() {
+function LoadingCard() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {SKELETON_KEYS.map((key) => (
-        <Card key={key} padding="lg" radius="xl" withBorder>
-          <Stack gap="xs">
-            <Skeleton height={20} radius="xl" width={80} />
-            <Skeleton height={14} mt={4} radius="sm" width="55%" />
-            <Skeleton height={20} radius="sm" width="85%" />
-            <Skeleton height={14} radius="sm" width="65%" />
-            <Skeleton height={14} radius="sm" width="40%" />
-          </Stack>
-        </Card>
-      ))}
-    </div>
+    <Card className="p-6 space-y-3">
+      <Skeleton className="h-4 w-24" />
+      <Skeleton className="h-6 w-3/4" />
+      <Skeleton className="h-5 w-full" />
+      <Skeleton className="h-4 w-1/2" />
+      <div className="flex gap-2 pt-2">
+        <Skeleton className="h-6 w-16" />
+        <Skeleton className="h-6 w-20" />
+        <Skeleton className="h-6 w-14" />
+      </div>
+    </Card>
   );
 }
 
@@ -167,53 +164,76 @@ export function JobPostingsPage() {
   }, [token]);
 
   return (
-    <Stack gap="xl">
-      <Group justify="space-between" align="flex-end">
+    <div className="space-y-8 animate-fade-in">
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <Title order={2}>저장한 채용공고</Title>
-          {!isLoading && !error && (
-            <Text c="dimmed" mt={4} size="sm">
-              총 {total}개의 채용공고가 저장되어 있습니다.
-            </Text>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            채용공고
+          </h1>
+          {!isLoading && !error && total > 0 && (
+            <p className="text-sm text-muted-foreground mt-1">
+              총 {total}개의 채용공고
+            </p>
           )}
         </div>
-        <Button component={Link} radius="xl" to="/job-postings/new">
-          새 채용공고 등록
+        <Button asChild>
+          <Link to="/job-postings/new">
+            <PlusCircle className="h-4 w-4" />새 채용공고 등록
+          </Link>
         </Button>
-      </Group>
+      </div>
 
-      {isLoading && <LoadingSkeleton />}
+      {/* Loading */}
+      {isLoading && (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {SKELETON_KEYS.map((key) => (
+            <LoadingCard key={key} />
+          ))}
+        </div>
+      )}
 
+      {/* Error */}
       {!isLoading && error && (
-        <Alert color="red" radius="xl" title="불러오기 실패" variant="light">
-          {error}
+        <Alert variant="destructive">
+          <AlertTitle>불러오기 실패</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
+      {/* Empty state */}
       {!isLoading && !error && items.length === 0 && (
-        <Card padding="xl" radius="xl" withBorder>
-          <Stack align="center" gap="md" py="xl">
-            <Text size="3xl">📋</Text>
-            <Title order={3} ta="center">
-              저장된 채용공고가 없습니다
-            </Title>
-            <Text c="dimmed" size="sm" ta="center">
-              채용공고 URL을 등록하면 여기에 표시됩니다.
-            </Text>
-            <Button component={Link} radius="xl" to="/job-postings/new">
-              첫 채용공고 등록하기
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <Card className="col-span-full py-16 flex flex-col items-center gap-4 text-center">
+            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-teal-500/10 flex items-center justify-center">
+              <Sparkles className="h-8 w-8 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">
+                아직 저장된 채용공고가 없어요
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                첫 번째 채용공고를 등록해 보세요
+              </p>
+            </div>
+            <Button asChild>
+              <Link to="/job-postings/new">
+                <PlusCircle className="h-4 w-4" />
+                채용공고 등록하기
+              </Link>
             </Button>
-          </Stack>
-        </Card>
+          </Card>
+        </div>
       )}
 
+      {/* Grid */}
       {!isLoading && !error && items.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
             <JobPostingCard key={item.id} item={item} />
           ))}
         </div>
       )}
-    </Stack>
+    </div>
   );
 }
