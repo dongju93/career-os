@@ -1,25 +1,40 @@
-import { AppShell, Burger, Group, Text, UnstyledButton } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
-import { Outlet, NavLink as RouterNavLink, useNavigate } from 'react-router';
+import {
+  Briefcase,
+  ChevronRight,
+  LogOut,
+  Menu,
+  PlusCircle,
+  X,
+} from 'lucide-react';
+import { useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router';
+import { cn } from '@/lib/utils';
 import { logoutUser } from '../services/auth';
 import { useAuthStore } from '../store/auth-store';
-import '../App.css';
+import { AvatarFallback, AvatarImage, AvatarRoot } from './ui/avatar';
+import { Button } from './ui/button';
 
 const navigationItems = [
   {
-    to: '/job-postings',
+    href: '/job-postings',
+    icon: Briefcase,
     label: '채용공고',
-    hint: '저장한 채용공고 목록',
+    description: '저장한 채용공고 관리',
   },
   {
-    to: '/job-postings/new',
+    href: '/job-postings/new',
+    icon: PlusCircle,
     label: '채용공고 등록',
-    hint: '새 URL 스크랩 및 저장',
+    description: '새 URL 스크랩 및 저장',
   },
 ];
 
-export function AppLayout() {
-  const [opened, { close, toggle }] = useDisclosure(false);
+function UserInitials(name: string | null, email: string | null): string {
+  const source = name ?? email ?? 'U';
+  return source.charAt(0).toUpperCase();
+}
+
+function SidebarContent({ onClose }: { onClose?: () => void }) {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
@@ -33,104 +48,182 @@ export function AppLayout() {
     navigate('/login', { replace: true });
   }
 
-  const userInitial = (user?.name ?? user?.email ?? 'U')
-    .charAt(0)
-    .toUpperCase();
+  return (
+    <div className="flex flex-col h-full p-6">
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-2 mb-8">
+        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-teal-600 text-white font-bold text-sm flex items-center justify-center shadow-lg">
+          CO
+        </div>
+        <div>
+          <span className="text-lg font-bold tracking-tight block">
+            Career OS
+          </span>
+          <span className="text-xs text-muted-foreground block">
+            채용 관리 시스템
+          </span>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex flex-col gap-1 flex-1">
+        {navigationItems.map(({ href, icon: Icon, label, description }) => (
+          <NavLink
+            key={href}
+            end
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-200 no-underline',
+                isActive
+                  ? 'bg-primary/10 text-primary shadow-sm'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+              )
+            }
+            to={href}
+            onClick={onClose}
+          >
+            {({ isActive }) => (
+              <>
+                <div
+                  className={cn(
+                    'h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors',
+                    isActive ? 'bg-primary text-white' : 'bg-muted/50',
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold">{label}</div>
+                  <div
+                    className={cn(
+                      'text-xs',
+                      isActive ? 'text-primary/70' : 'text-muted-foreground',
+                    )}
+                  >
+                    {description}
+                  </div>
+                </div>
+                <ChevronRight
+                  className={cn(
+                    'h-4 w-4 transition-opacity',
+                    isActive ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* User section */}
+      <div className="mt-auto pt-4 border-t border-border/50">
+        {user && (
+          <div className="flex items-center gap-3 mb-3">
+            <AvatarRoot>
+              {user.picture && (
+                <AvatarImage
+                  alt={user.name ?? ''}
+                  referrerPolicy="no-referrer"
+                  src={user.picture}
+                />
+              )}
+              <AvatarFallback>
+                {UserInitials(user.name, user.email)}
+              </AvatarFallback>
+            </AvatarRoot>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate">
+                {user.name ?? user.email}
+              </div>
+              {user.name && (
+                <div className="text-xs text-muted-foreground truncate">
+                  {user.email}
+                </div>
+              )}
+            </div>
+            <Button
+              className="flex-shrink-0"
+              size="icon"
+              variant="ghost"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="sr-only">로그아웃</span>
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function AppLayout() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const user = useAuthStore((state) => state.user);
+
+  const userInitial = UserInitials(user?.name ?? null, user?.email ?? null);
 
   return (
-    <AppShell
-      header={{ height: 64 }}
-      navbar={{
-        breakpoint: 'md',
-        collapsed: { mobile: !opened },
-        width: 260,
-      }}
-      padding={0}
-    >
-      <AppShell.Header className="app-header">
-        <Group h="100%" justify="space-between" px="lg">
-          <Group gap="sm">
-            <div className="brand-icon">CO</div>
-            <span className="brand-name">Career OS</span>
-          </Group>
+    <div className="min-h-screen">
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex fixed inset-y-0 left-0 z-50 w-72 glass-card rounded-r-3xl flex-col">
+        <SidebarContent />
+      </aside>
 
-          <Group gap="sm">
-            {user && (
-              <Group gap="xs" visibleFrom="sm">
-                <Text c="dimmed" size="sm">
-                  {user.name ?? user.email}
-                </Text>
-                <div className="user-avatar">
-                  {user.picture ? (
-                    <img
-                      alt={user.name ?? ''}
-                      referrerPolicy="no-referrer"
-                      src={user.picture}
-                    />
-                  ) : (
-                    userInitial
-                  )}
-                </div>
-              </Group>
-            )}
-            <Burger
-              hiddenFrom="md"
-              onClick={toggle}
-              opened={opened}
-              size="sm"
-            />
-          </Group>
-        </Group>
-      </AppShell.Header>
+      {/* Mobile header */}
+      <header className="md:hidden sticky top-0 z-40 h-16 glass-subtle border-b border-white/30 flex items-center justify-between px-4">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => setMobileOpen((o) => !o)}
+        >
+          {mobileOpen ? (
+            <X className="h-5 w-5" />
+          ) : (
+            <Menu className="h-5 w-5" />
+          )}
+          <span className="sr-only">메뉴</span>
+        </Button>
 
-      <AppShell.Navbar className="app-navbar" p="md">
-        <div className="flex flex-col h-full">
-          <nav className="flex flex-col gap-1.5 flex-1">
-            {navigationItems.map((item) => (
-              <RouterNavLink
-                key={item.to}
-                aria-label={item.label}
-                className={({ isActive }) =>
-                  `app-nav-link ${isActive ? 'is-active' : ''}`
-                }
-                onClick={close}
-                to={item.to}
-              >
-                <span className="app-nav-link__title">{item.label}</span>
-                <span className="app-nav-link__hint">{item.hint}</span>
-              </RouterNavLink>
-            ))}
-          </nav>
-
-          <div className="nav-footer">
-            {user && (
-              <div className="nav-user-row">
-                <div className="user-avatar nav-user-avatar">
-                  {user.picture ? (
-                    <img
-                      alt={user.name ?? ''}
-                      referrerPolicy="no-referrer"
-                      src={user.picture}
-                    />
-                  ) : (
-                    (user.name ?? user.email ?? 'U').charAt(0).toUpperCase()
-                  )}
-                </div>
-                <span className="nav-user-name">{user.name ?? user.email}</span>
-              </div>
-            )}
-            <UnstyledButton className="logout-button" onClick={handleLogout}>
-              로그아웃
-            </UnstyledButton>
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary to-teal-600 text-white font-bold text-xs flex items-center justify-center">
+            CO
           </div>
+          <span className="text-base font-bold tracking-tight">Career OS</span>
         </div>
-      </AppShell.Navbar>
 
-      <AppShell.Main className="app-main">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+        <AvatarRoot className="h-8 w-8">
+          {user?.picture && (
+            <AvatarImage
+              alt={user.name ?? ''}
+              referrerPolicy="no-referrer"
+              src={user.picture}
+            />
+          )}
+          <AvatarFallback className="text-xs">{userInitial}</AvatarFallback>
+        </AvatarRoot>
+      </header>
+
+      {/* Mobile sidebar overlay */}
+      {mobileOpen && (
+        <>
+          <div
+            aria-hidden="true"
+            className="md:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="md:hidden fixed inset-y-0 left-0 z-50 w-72 glass-card flex flex-col">
+            <SidebarContent onClose={() => setMobileOpen(false)} />
+          </aside>
+        </>
+      )}
+
+      {/* Main content */}
+      <main className="md:pl-72">
+        <div className="max-w-6xl mx-auto px-4 py-6 md:px-8 md:py-10">
           <Outlet />
         </div>
-      </AppShell.Main>
-    </AppShell>
+      </main>
+    </div>
   );
 }
