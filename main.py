@@ -37,6 +37,7 @@ career_os.add_middleware(
     SessionMiddleware,
     secret_key=settings.secret_key,
     https_only=True,
+    same_site="none",
     max_age=settings.jwt_expire_minutes * 60,
 )
 

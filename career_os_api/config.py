@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     google_client_id: str
     google_client_secret: str
     redirect_uri: str = "https://career-os.fastapicloud.dev/v1/auth/google/callback"
+    # Fallback destination when the session-stored callback_url is missing
+    # (e.g. when the session cookie is lost across the OAuth round trip on
+    # mobile browsers with strict cross-site cookie policies).
+    frontend_url: str = "https://career-os-sigma.vercel.app"
 
     # CORS — comma-separated list of allowed origins
     allowed_origins: list[str] = [
