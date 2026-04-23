@@ -66,7 +66,7 @@ class JobPostingExtracted(BaseModel):
 
     # Strict common
     company_name: Annotated[str, Field(max_length=200)]
-    job_title: Annotated[str, Field(max_length=500)]
+    job_title: Annotated[str, Field(min_length=1, max_length=500)]
     experience_req: Annotated[str, Field(max_length=100)] | None = None
     deadline: Annotated[str, Field(max_length=100)] | None = None
     location: Annotated[str, Field(max_length=300)] | None = None
@@ -91,6 +91,13 @@ class JobPostingExtracted(BaseModel):
     homepage: Annotated[str, Field(max_length=500)] | None = None
     job_category: Annotated[str, Field(max_length=200)] | None = None
     industry: Annotated[str, Field(max_length=200)] | None = None
+
+    @field_validator("job_title")
+    @classmethod
+    def reject_blank_job_title(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("job_title must not be blank")
+        return v
 
     @field_validator("tech_stack", "tags", mode="before")
     @classmethod

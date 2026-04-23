@@ -25,6 +25,30 @@ from career_os_api.service.job_posting.platform import (
 
 _OPENAI_SUPPORTED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
 
+_H1_PREFIX = "[채용공고 제목]"
+_H2_PREFIX = "[섹션]"
+
+
+def _annotate_headings(soup: BeautifulSoup) -> None:
+    """
+    Prefix h1/h2 text with structural markers before plain-text extraction.
+
+    After get_text(), heading context is lost; the model cannot distinguish
+    a job title heading from surrounding metadata. Injecting markers into the
+    soup (before get_text) surfaces that structure in the text content without
+    altering the HTML fed to the image collector (which only reads img.src).
+    """
+    for h1 in soup.find_all("h1"):
+        text = h1.get_text(strip=True)
+        if text:
+            h1.clear()
+            h1.append(f"{_H1_PREFIX} {text}")
+    for h2 in soup.find_all("h2"):
+        text = h2.get_text(strip=True)
+        if text:
+            h2.clear()
+            h2.append(f"{_H2_PREFIX} {text}")
+
 
 async def _collect_images_as_base64(
     soup: BeautifulSoup,
@@ -100,7 +124,11 @@ def _build_messages(
         f"posting_id: {posting_id}\n\n"
         "=== FIELD-BY-FIELD INSTRUCTIONS ===\n"
         "company_name      : Company or organization name. KO: 회사명, 기업명.\n"
-        "job_title         : Exact role title. KO: 채용직군, 포지션, 직무.\n"
+        "job_title         : Exact job posting title. "
+        "The content has been pre-processed: the h1 heading is marked as '[채용공고 제목] <title text>'. "
+        "Extract the text that follows this marker. "
+        "If no [채용공고 제목] marker appears, use the most prominent role name at the very top of the content. "
+        "Never use the '채용직군' category value (e.g. '개발·데이터') — that is a job category, not the title.\n"
         "experience_req    : Experience requirement as written (e.g. '3년 이상', '신입', '경력 무관', 'Entry level'). null if absent.\n"
         "education_req     : Education requirement as written (e.g. '학력 무관', '대졸 이상', \"Bachelor's required\"). null if absent.\n"
         "employment_type   : Contract type as written (e.g. '정규직', '계약직', '인턴', 'Full-time', 'Contract'). null if absent.\n"
@@ -185,6 +213,7 @@ async def extract_job_posting(
     domain_base = PLATFORM_BASE_URLS[platform]
 
     soup = BeautifulSoup(html_content, HTML_PARSER)
+    _annotate_headings(soup)
     text_content = soup.get_text(separator="\n", strip=True)
     posting_id = extract_posting_id(source_url, platform)
     image_data_urls = await _collect_images_as_base64(soup, domain_base)
