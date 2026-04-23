@@ -515,6 +515,31 @@ def test_update_current_user_returns_updated_name(
     )
 
 
+def test_update_current_user_returns_404_when_user_disappears(
+    client: TestClient,
+    fake_pool: FakePool,
+    current_user: dict,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    update_user_name_mock = AsyncMock(return_value=None)
+    monkeypatch.setattr(app_module, "update_user_name", update_user_name_mock)
+
+    response = client.patch(
+        f"{API_PREFIX}/auth/me",
+        json={"name": "New Name"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "사용자를 찾을 수 없습니다"}
+    update_user_name_mock.assert_awaited_once_with(
+        fake_pool.connection_obj,
+        current_user["id"],
+        "New Name",
+    )
+
+
 def test_update_current_user_rejects_empty_name(
     client: TestClient,
     auth_headers: dict[str, str],

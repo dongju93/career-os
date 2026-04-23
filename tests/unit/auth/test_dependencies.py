@@ -102,10 +102,51 @@ async def test_get_current_user_session_takes_precedence_over_bearer():
     assert user["id"] == session_user_id
 
 
+async def test_get_current_user_invalid_session_id_falls_back_to_bearer():
+    bearer_user_id = uuid4()
+    token = create_access_token(data={"sub": str(bearer_user_id)})
+    row = {
+        "id": bearer_user_id,
+        "google_id": "g-123",
+        "email": "bearer@example.com",
+        "name": "Bearer User",
+        "picture": None,
+        "is_active": True,
+    }
+    request = _make_request(row, session={"user_id": "not-a-uuid"})
+    user = await get_current_user(request, token)
+    assert user["id"] == bearer_user_id
+
+
 async def test_get_current_user_invalid_token():
     request = _make_request(None)
     with pytest.raises(HTTPException) as exc_info:
         await get_current_user(request, "bad-token")
+    assert exc_info.value.status_code == 401
+
+
+async def test_get_current_user_token_with_invalid_subject():
+    token = create_access_token(data={"sub": "not-a-uuid"})
+    request = _make_request(None)
+    with pytest.raises(HTTPException) as exc_info:
+        await get_current_user(request, token)
+    assert exc_info.value.status_code == 401
+
+
+async def test_get_current_user_inactive_user():
+    user_id = uuid4()
+    token = create_access_token(data={"sub": str(user_id)})
+    row = {
+        "id": user_id,
+        "google_id": "g-123",
+        "email": "inactive@example.com",
+        "name": "Inactive User",
+        "picture": None,
+        "is_active": False,
+    }
+    request = _make_request(row)
+    with pytest.raises(HTTPException) as exc_info:
+        await get_current_user(request, token)
     assert exc_info.value.status_code == 401
 
 
