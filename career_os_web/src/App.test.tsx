@@ -76,7 +76,10 @@ describe('Career OS Web app shell', () => {
     ).toBeInTheDocument();
     expect(await screen.findByText(/총 1개의 채용공고/i)).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: /frontend engineer/i }),
+      screen.getByRole('heading', { name: /frontend engineer/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /원본 공고 열기/i }),
     ).toHaveAttribute('href', 'https://www.wanted.co.kr/wd/1');
     expect(router.state.location.pathname).toBe('/job-postings');
     expect(fetchMock).toHaveBeenCalledWith(

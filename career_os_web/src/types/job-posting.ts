@@ -49,6 +49,20 @@ export interface JobPostingListItem {
   updated_at: string;
 }
 
+export interface JobPostingDetail extends JobPostingListItem {
+  job_description: string | null;
+  responsibilities: string | null;
+  qualifications: string | null;
+  preferred_points: string | null;
+  benefits: string | null;
+  hiring_process: string | null;
+  education_req: string | null;
+  application_method: string | null;
+  application_form: string | null;
+  contact_person: string | null;
+  homepage: string | null;
+}
+
 export interface JobPostingPage {
   items: JobPostingListItem[];
   total: number;

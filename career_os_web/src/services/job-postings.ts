@@ -1,4 +1,8 @@
-import type { JobPostingExtracted, JobPostingPage } from '../types/job-posting';
+import type {
+  JobPostingDetail,
+  JobPostingExtracted,
+  JobPostingPage,
+} from '../types/job-posting';
 import { API_BASE_URL } from './api-base-url';
 import { fetchWithApiRetry } from './api-client';
 
@@ -31,6 +35,18 @@ export async function saveJobPosting(
     '저장에 실패했습니다.',
   );
   return response.status;
+}
+
+export async function fetchJobPosting(
+  token: string,
+  id: number,
+): Promise<JobPostingDetail> {
+  const response = await fetchWithApiRetry(
+    `${API_BASE_URL}/v1/job-postings/${id}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+    '채용공고를 불러오지 못했습니다.',
+  );
+  return response.json() as Promise<JobPostingDetail>;
 }
 
 export async function fetchJobPostings(
