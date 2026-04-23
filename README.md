@@ -1,5 +1,11 @@
 # CareerOS API
 
+![FastAPI](https://img.shields.io/badge/FastAPI-0.135-009688?logo=fastapi&logoColor=white)
+![FastAPI Cloud](https://img.shields.io/badge/FastAPI%20Cloud-Deployed-009688?logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)
+[![codecov](https://codecov.io/github/dongju93/career-os/graph/badge.svg?flag=backend&token=48VXFY8C3M)](https://codecov.io/github/dongju93/career-os)
+
 한국 채용 플랫폼(사람인, 원티드)의 채용 공고를 수집·추출·저장하는 FastAPI 백엔드 서비스입니다.
 
 **프로덕션**
