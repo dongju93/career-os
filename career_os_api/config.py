@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5.4-mini"
     openai_reasoning_effort: Literal[
         "none", "minimal", "low", "medium", "high", "xhigh"
-    ] = "low"
+    ] = "high"
     max_images: int = 10
 
 
