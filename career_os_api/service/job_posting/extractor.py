@@ -23,6 +23,8 @@ from career_os_api.service.job_posting.platform import (
     extract_posting_id,
 )
 
+_OPENAI_SUPPORTED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+
 
 async def _collect_images_as_base64(
     soup: BeautifulSoup,
@@ -68,7 +70,9 @@ async def _collect_images_as_base64(
             try:
                 resp = await client.get(src)
                 if resp.status_code == 200:
-                    mime = resp.headers.get("content-type", "image/png").split(";")[0]
+                    mime = resp.headers.get("content-type", "").split(";")[0].strip()
+                    if mime not in _OPENAI_SUPPORTED_IMAGE_TYPES:
+                        continue
                     b64 = base64.b64encode(resp.content).decode()
                     data_urls.append(f"data:{mime};base64,{b64}")
             except httpx.RequestError:
