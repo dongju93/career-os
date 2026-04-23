@@ -1,9 +1,12 @@
 # CareerOS API
 
-![FastAPI](https://img.shields.io/badge/FastAPI-0.135-009688?logo=fastapi&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?logo=fastapi&logoColor=white)
 ![FastAPI Cloud](https://img.shields.io/badge/FastAPI%20Cloud-Deployed-009688?logo=fastapi&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI_SDK-2.32-412991?logo=openai&logoColor=white)
+![Pyrefly](https://img.shields.io/badge/Pyrefly-0.62-0668E1?logo=meta&logoColor=white)
+![Google OAuth](https://img.shields.io/badge/Google_OAuth-Authlib-4285F4?logo=google&logoColor=white)
 [![codecov](https://codecov.io/github/dongju93/career-os/graph/badge.svg?flag=backend&token=48VXFY8C3M)](https://codecov.io/github/dongju93/career-os)
 
 한국 채용 플랫폼(사람인, 원티드)의 채용 공고를 수집·추출·저장하는 FastAPI 백엔드 서비스입니다.
@@ -60,12 +63,10 @@ API 문서: `http://localhost:8000/v1/docs`
 | 라이브러리                          | 용도                    | 선정 이유                                                                                                                                                                                    |
 | ----------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **FastAPI**                         | ASGI 웹 프레임워크      | `async/await` 네이티브 지원, Pydantic 기반 자동 검증·OpenAPI 문서 생성. 동일 기능을 Flask/Django로 구현할 때 필요한 보일러플레이트 대부분을 제거함                                           |
-| **uv**                              | 의존성 관리·실행        | Rust로 작성된 패키지 매니저. `pip + venv` 대비 설치 속도 10–100배, `pyproject.toml` 단일 파일로 의존성·Python 버전·스크립트 통합 관리                                                        |
 | **psycopg 3 + psycopg-pool**        | PostgreSQL 드라이버     | psycopg 3는 `async/await`를 네이티브 지원하는 공식 차세대 드라이버. `AsyncConnectionPool`로 연결 재사용 비용을 줄임. SQLAlchemy ORM을 배제하고 raw SQL을 직접 사용해 쿼리 의도를 명확히 유지 |
 | **Pydantic v2 + pydantic-settings** | 스키마 검증·설정 관리   | FastAPI 내장 검증 레이어. `pydantic-settings`는 `.env` 파일과 환경 변수를 타입 안전하게 로드하며, 필수 변수 누락 시 import 단계에서 즉시 실패해 런타임 오류를 예방함                         |
 | **Authlib**                         | Google OAuth 클라이언트 | Starlette/FastAPI용 OAuth 2.0 / OpenID Connect 통합을 제공. Google OIDC discovery document를 자동으로 처리해 직접 구현 대비 코드량을 크게 줄임                                               |
 | **python-jose**                     | JWT 발급·검증           | 경량 JWT 라이브러리. `SECRET_KEY` 기반 `HS256` 서명으로 내부 access token 생성·검증을 담당. Authlib의 OAuth 레이어와 분리해 토큰 수명 주기를 앱이 직접 제어함                                |
-| **httpx**                           | 비동기 HTTP 클라이언트  | `requests`의 API 호환 비동기 버전. 사람인 AJAX 엔드포인트·원티드 API·이미지 다운로드를 단일 `AsyncClient`로 처리. `timeout` 파라미터를 환경 변수로 노출해 플랫폼별 응답 지연에 대응          |
 | **Beautiful Soup 4**                | HTML 파싱               | 사람인 공고 섹션 추출(불필요한 추천 영역 제거)과 원티드 API JSON → HTML 재구성에 사용. `lxml` 파서 대신 `html.parser`를 채택해 추가 C 의존성 없이 동작                                       |
 | **OpenAI Python SDK**               | 구조화 데이터 추출      | `chat.completions.parse()`의 `response_format` 파라미터로 `JobPostingExtracted` Pydantic 모델을 직접 지정. 이미지(base64)를 함께 전달해 한국 채용 공고에 빈번한 이미지 내 텍스트도 추출      |
 | **Ruff**                            | 린터·포매터             | Rust 기반. `flake8 + isort + Black` 세 도구를 단일 바이너리로 대체. CI에서 포매팅 검사와 린트를 같은 명령어로 실행                                                                           |
