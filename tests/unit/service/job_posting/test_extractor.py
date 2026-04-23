@@ -30,7 +30,7 @@ class ParseCallKwargs(TypedDict):
     model: str
     messages: list[ChatCompletionMessageParam]
     response_format: type[JobPostingExtracted]
-    temperature: int
+    reasoning_effort: str
 
 
 def _require_system_text(message: ChatCompletionMessageParam) -> str:
@@ -151,14 +151,14 @@ class FakeCompletions:
         model: str,
         messages: list[ChatCompletionMessageParam],
         response_format: type[JobPostingExtracted],
-        temperature: int,
+        reasoning_effort: str,
     ) -> object:
         self.calls.append(
             {
                 "model": model,
                 "messages": messages,
                 "response_format": response_format,
-                "temperature": temperature,
+                "reasoning_effort": reasoning_effort,
             }
         )
         return self._response
