@@ -41,9 +41,9 @@ class Settings(BaseSettings):
 
     # OpenAI extraction — tunable per environment
     openai_model: str = "gpt-5.4-mini"
-    openai_temperature: int = 0
-    openai_max_reasoning_effort: Literal["none", "low", "medium", "high"] = "low"
-    openai_seed: int = 42
+    openai_reasoning_effort: Literal[
+        "none", "minimal", "low", "medium", "high", "xhigh"
+    ] = "low"
     max_images: int = 10
 
 
