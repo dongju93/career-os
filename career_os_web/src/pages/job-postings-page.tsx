@@ -9,7 +9,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -50,20 +50,38 @@ function SummaryChip({ label, value }: { label: string; value: string }) {
 }
 
 function JobPostingCard({ item }: { item: JobPostingListItem }) {
+  const navigate = useNavigate();
   const hasDetails = Boolean(
     item.location || item.experience_req || item.deadline || item.salary,
   );
 
   return (
-    <Card className="group overflow-hidden" interactive>
+    <Card
+      className="group overflow-hidden"
+      interactive
+      onClick={() => navigate(`/job-postings/${item.id}`)}
+    >
       <CardContent className="relative p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <Badge variant={platformVariant(item.platform)}>
             {item.platform}
           </Badge>
-          <span className="text-xs font-medium text-gray-600">
-            {formatRelativeDate(item.created_at)}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-gray-600">
+              {formatRelativeDate(item.created_at)}
+            </span>
+            <a
+              className="flex h-6 w-6 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-accent hover:text-primary"
+              href={item.posting_url}
+              rel="noreferrer"
+              target="_blank"
+              title="원본 공고 열기"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span className="sr-only">원본 공고 열기</span>
+            </a>
+          </div>
         </div>
 
         <div className="mb-1.5 flex items-center gap-1.5">
@@ -73,17 +91,9 @@ function JobPostingCard({ item }: { item: JobPostingListItem }) {
           </span>
         </div>
 
-        <a
-          className="flex items-start gap-2"
-          href={item.posting_url}
-          rel="noreferrer"
-          target="_blank"
-        >
-          <h3 className="line-clamp-2 text-lg font-bold leading-tight tracking-tight transition-colors group-hover:text-primary">
-            {item.job_title}
-          </h3>
-          <ExternalLink className="mt-1 h-3.5 w-3.5 shrink-0 text-primary/60 transition-transform group-hover:translate-x-0.5" />
-        </a>
+        <h3 className="line-clamp-2 text-lg font-bold leading-tight tracking-tight transition-colors group-hover:text-primary">
+          {item.job_title}
+        </h3>
 
         {hasDetails && (
           <div className="mt-3 rounded-xl border border-white/8 bg-muted p-3">
