@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from './store/auth-store';
@@ -31,6 +31,20 @@ const jobPostingPage = {
   offset: 0,
   limit: 50,
 };
+
+async function advanceRetryBackoffTimers() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  for (const delay of [500, 1000, 2000, 4000]) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(delay);
+      await Promise.resolve();
+    });
+  }
+}
 
 describe('Career OS Web app shell', () => {
   beforeEach(() => {
@@ -74,6 +88,7 @@ describe('Career OS Web app shell', () => {
   });
 
   it('shows the API error code page when job postings stay unavailable', async () => {
+    vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 503,
@@ -85,18 +100,24 @@ describe('Career OS Web app shell', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    renderRoute('/job-postings');
+    try {
+      renderRoute('/job-postings');
 
-    expect(
-      await screen.findByRole('heading', {
-        name: /채용공고를 불러오지 못했습니다/i,
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText('DATABASE_UNAVAILABLE')).toBeInTheDocument();
-    expect(
-      screen.queryByText(/Internal Server Error/i),
-    ).not.toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(5);
+      await advanceRetryBackoffTimers();
+
+      expect(
+        screen.getByRole('heading', {
+          name: /채용공고를 불러오지 못했습니다/i,
+        }),
+      ).toBeInTheDocument();
+      expect(screen.getByText('DATABASE_UNAVAILABLE')).toBeInTheDocument();
+      expect(
+        screen.queryByText(/Internal Server Error/i),
+      ).not.toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledTimes(5);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('logs the user out and returns to the login page', async () => {

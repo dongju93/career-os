@@ -18,6 +18,7 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   resetAuthStore();
   window.sessionStorage.clear();
