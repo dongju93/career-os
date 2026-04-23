@@ -14,7 +14,12 @@ from career_os_api.database.job_postings import (
     get_job_postings,
     upsert_job_posting,
 )
+from career_os_api.database.retry import (
+    DatabaseUnavailableError,
+    run_database_operation,
+)
 from career_os_api.database.users import update_user_name, upsert_user
+from career_os_api.responses import api_response
 from career_os_api.schemas import (
     CurrentUserResponse,
     JobPostingExtracted,
@@ -45,20 +50,19 @@ _CurrentUser = Annotated[dict, Depends(get_current_user)]
 
 @v1_router.get("/", tags=["system"])
 def root() -> JSONResponse:
-    return JSONResponse(
-        content={"message": "Hello, World!"},
-        status_code=status.HTTP_200_OK,
-    )
+    return api_response(status_code=status.HTTP_200_OK, message="Hello, World!")
 
 
 @v1_router.get("/health/db", tags=["system"])
 async def db_health(request: Request) -> JSONResponse:
-    async with request.app.state.pool.connection() as conn:
+    async def operation(conn):
         result = await conn.execute("SELECT 1")
         row = await result.fetchone()
-    return JSONResponse(
-        content={"database": "connected", "result": row[0]},
-        status_code=status.HTTP_200_OK,
+        return row[0]
+
+    result = await run_database_operation(request.app.state.pool, operation)
+    return api_response(
+        status_code=status.HTTP_200_OK, database="connected", result=result
     )
 
 
@@ -107,8 +111,15 @@ async def google_callback(request: Request) -> RedirectResponse:
     name: str | None = user_info.get("name")
     picture: str | None = user_info.get("picture")
 
-    async with request.app.state.pool.connection() as conn:
-        user = await upsert_user(conn, google_id, email, name, picture)
+    async def operation(conn):
+        return await upsert_user(conn, google_id, email, name, picture)
+
+    try:
+        user = await run_database_operation(request.app.state.pool, operation)
+    except DatabaseUnavailableError:
+        return RedirectResponse(
+            f"{target}?{urlencode({'error': '데이터베이스 연결이 불안정합니다. 잠시 후 다시 시도해주세요.'})}"
+        )
 
     request.session.clear()
     request.session["user_id"] = str(user["id"])
@@ -140,8 +151,10 @@ async def update_current_user(
     request: Request,
     current_user: _CurrentUser,
 ) -> CurrentUserResponse:
-    async with request.app.state.pool.connection() as conn:
-        user = await update_user_name(conn, current_user["id"], data.name)
+    async def operation(conn):
+        return await update_user_name(conn, current_user["id"], data.name)
+
+    user = await run_database_operation(request.app.state.pool, operation)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -160,11 +173,9 @@ async def logout_current_user(
     request: Request, current_user: _CurrentUser
 ) -> JSONResponse:
     request.session.clear()
-    return JSONResponse(
-        content={
-            "message": "세션이 종료되었습니다. 토큰은 클라이언트에서 삭제해 주세요."
-        },
+    return api_response(
         status_code=status.HTTP_200_OK,
+        message="세션이 종료되었습니다. 토큰은 클라이언트에서 삭제해 주세요.",
     )
 
 
@@ -180,13 +191,15 @@ async def list_job_postings(
         int, Query(ge=1, le=100, description="Max records to return")
     ] = 20,
 ) -> JobPostingPage:
-    async with request.app.state.pool.connection() as conn:
-        rows, total = await get_job_postings(
+    async def operation(conn):
+        return await get_job_postings(
             conn,
             user_id=current_user["id"],
             limit=limit,
             offset=offset,
         )
+
+    rows, total = await run_database_operation(request.app.state.pool, operation)
     return JobPostingPage(
         items=[JobPostingListItem(**row) for row in rows],
         total=total,
@@ -237,8 +250,10 @@ async def create_job_posting(
     response: Response,
     current_user: _CurrentUser,
 ) -> JobPostingStored:
-    async with request.app.state.pool.connection() as conn:
-        row = await upsert_job_posting(conn, data, user_id=current_user["id"])
+    async def operation(conn):
+        return await upsert_job_posting(conn, data, user_id=current_user["id"])
+
+    row = await run_database_operation(request.app.state.pool, operation)
     if not row["inserted"]:
         response.status_code = status.HTTP_200_OK
     return JobPostingStored(
@@ -260,8 +275,10 @@ async def get_job_posting_detail(
     request: Request,
     current_user: _CurrentUser,
 ) -> JobPostingStored:
-    async with request.app.state.pool.connection() as conn:
-        row = await get_job_posting(conn, job_id, user_id=current_user["id"])
+    async def operation(conn):
+        return await get_job_posting(conn, job_id, user_id=current_user["id"])
+
+    row = await run_database_operation(request.app.state.pool, operation)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

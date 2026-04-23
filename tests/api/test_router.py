@@ -6,7 +6,9 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from psycopg import OperationalError
 
+import career_os_api.database.retry as retry_module
 import career_os_api.router as app_module
 import main as main_module
 from career_os_api.auth.jwt import create_access_token
@@ -103,10 +105,20 @@ class FakeConnection:
 class FakePool:
     def __init__(self, *, user_row: dict | None) -> None:
         self.connection_obj = FakeConnection(user_row=user_row)
+        self.connection_attempts = 0
+        self.connection_failures_remaining = 0
 
     @asynccontextmanager
     async def connection(self) -> AsyncIterator[FakeConnection]:
+        self.connection_attempts += 1
+        if self.connection_failures_remaining > 0:
+            self.connection_failures_remaining -= 1
+            raise OperationalError("temporary database connection failure")
         yield self.connection_obj
+
+    def reset_connection_tracking(self) -> None:
+        self.connection_attempts = 0
+        self.connection_failures_remaining = 0
 
 
 @pytest.fixture
@@ -428,6 +440,49 @@ def test_read_current_user_returns_user_info(
     }
 
 
+def test_read_current_user_retries_transient_database_connection_failures(
+    client: TestClient,
+    fake_pool: FakePool,
+    current_user: dict,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sleep = AsyncMock()
+    monkeypatch.setattr(retry_module.asyncio, "sleep", sleep)
+    fake_pool.reset_connection_tracking()
+    fake_pool.connection_failures_remaining = 4
+
+    response = client.get(f"{API_PREFIX}/auth/me", headers=auth_headers)
+
+    assert response.status_code == 200
+    assert response.json()["user_id"] == str(current_user["id"])
+    assert fake_pool.connection_attempts == 5
+    assert sleep.await_count == 4
+
+
+def test_read_current_user_returns_structured_database_error_after_retries(
+    client: TestClient,
+    fake_pool: FakePool,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sleep = AsyncMock()
+    monkeypatch.setattr(retry_module.asyncio, "sleep", sleep)
+    fake_pool.reset_connection_tracking()
+    fake_pool.connection_failures_remaining = 5
+
+    response = client.get(f"{API_PREFIX}/auth/me", headers=auth_headers)
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "code": "DATABASE_UNAVAILABLE",
+        "message": "데이터베이스 연결이 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
+    }
+    assert "Internal Server Error" not in response.text
+    assert fake_pool.connection_attempts == 5
+    assert sleep.await_count == 4
+
+
 def test_read_current_user_requires_auth(client: TestClient) -> None:
     response = client.get(f"{API_PREFIX}/auth/me")
 
@@ -534,3 +589,21 @@ def test_db_health_endpoint_uses_app_pool(
     # init_schema also runs at startup through the same FakeConnection, so
     # verify the health endpoint's query is present rather than exclusive.
     assert "SELECT 1" in fake_pool.connection_obj.executed_queries
+
+
+def test_db_health_endpoint_retries_transient_database_connection_failures(
+    client: TestClient,
+    fake_pool: FakePool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sleep = AsyncMock()
+    monkeypatch.setattr(retry_module.asyncio, "sleep", sleep)
+    fake_pool.reset_connection_tracking()
+    fake_pool.connection_failures_remaining = 4
+
+    response = client.get(f"{API_PREFIX}/health/db")
+
+    assert response.status_code == 200
+    assert response.json() == {"database": "connected", "result": 1}
+    assert fake_pool.connection_attempts == 5
+    assert sleep.await_count == 4

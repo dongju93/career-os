@@ -4,9 +4,17 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 
 from career_os_api.auth.jwt import decode_access_token
+from career_os_api.database.retry import run_database_operation
 from career_os_api.database.users import find_user_by_id
 
 _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
+
+
+async def _find_current_user(request: Request, user_id: UUID):
+    async def operation(conn):
+        return await find_user_by_id(conn, user_id)
+
+    return await run_database_operation(request.app.state.pool, operation)
 
 
 async def get_current_user(
@@ -21,8 +29,7 @@ async def get_current_user(
         except ValueError:
             pass
         else:
-            async with request.app.state.pool.connection() as conn:
-                user = await find_user_by_id(conn, user_id)
+            user = await _find_current_user(request, user_id)
             if user and user["is_active"]:
                 return user
 
@@ -37,8 +44,7 @@ async def get_current_user(
                 except ValueError:
                     pass
                 else:
-                    async with request.app.state.pool.connection() as conn:
-                        user = await find_user_by_id(conn, user_id)
+                    user = await _find_current_user(request, user_id)
                     if user and user["is_active"]:
                         return user
 

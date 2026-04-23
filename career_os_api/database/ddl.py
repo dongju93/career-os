@@ -2,7 +2,10 @@
 DDL definitions for the career-os PostgreSQL schema.
 """
 
+from psycopg import AsyncConnection
 from psycopg_pool import AsyncConnectionPool
+
+from career_os_api.database.retry import run_database_operation
 
 # ---------------------------------------------------------------------------
 # DDL
@@ -122,10 +125,13 @@ COMMENT ON COLUMN users.email     IS 'Google 계정 이메일';
 # ---------------------------------------------------------------------------
 
 
+async def _apply_schema(conn: AsyncConnection) -> None:
+    await conn.execute(CREATE_USERS_TABLE)
+    await conn.execute(CREATE_JOB_POSTINGS_TABLE)
+    await conn.execute(CREATE_INDEXES)
+    await conn.execute(CREATE_COMMENTS)
+
+
 async def init_schema(pool: AsyncConnectionPool) -> None:
     """Apply DDL to the connected database (idempotent via IF NOT EXISTS)."""
-    async with pool.connection() as conn:
-        await conn.execute(CREATE_USERS_TABLE)
-        await conn.execute(CREATE_JOB_POSTINGS_TABLE)
-        await conn.execute(CREATE_INDEXES)
-        await conn.execute(CREATE_COMMENTS)
+    await run_database_operation(pool, _apply_schema)
