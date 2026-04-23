@@ -55,3 +55,4 @@ sketch
 playwright-report/
 test-results/
 coverage/
+.vscode/
