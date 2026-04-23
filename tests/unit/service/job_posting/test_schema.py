@@ -9,6 +9,7 @@ def build_job_posting(
     *,
     platform: Platform = Platform.saramin,
     posting_id: str = "4930",
+    job_title: str = "Backend Engineer",
     tech_stack: list[str] | None = None,
     tags: list[str] | None = None,
 ) -> JobPostingExtracted:
@@ -17,7 +18,7 @@ def build_job_posting(
         posting_id=posting_id,
         posting_url="https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930",
         company_name="Career OS",
-        job_title="Backend Engineer",
+        job_title=job_title,
         tech_stack=tech_stack,
         tags=tags,
     )
@@ -38,6 +39,14 @@ def test_job_posting_extracted_turns_empty_lists_into_none() -> None:
 
     assert posting.tech_stack is None
     assert posting.tags is None
+
+
+@pytest.mark.parametrize("job_title", ["", "   "])
+def test_job_posting_extracted_rejects_blank_job_title(job_title: str) -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        build_job_posting(job_title=job_title)
+
+    assert exc_info.value.errors()[0]["loc"] == ("job_title",)
 
 
 @pytest.mark.parametrize("posting_id", ["", "   "])
