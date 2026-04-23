@@ -204,6 +204,8 @@ async def extract_job_posting(
         messages=messages,
         response_format=JobPostingExtracted,
         temperature=settings.openai_temperature,
+        seed=settings.openai_seed,
+        reasoning_effort=settings.openai_max_reasoning_effort,
     )
 
     message = result.choices[0].message

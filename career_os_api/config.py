@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     # OpenAI extraction — tunable per environment
     openai_model: str = "gpt-5.4-mini"
     openai_temperature: int = 0
+    openai_max_reasoning_effort: Literal["none", "low", "medium", "high"] = "low"
+    openai_seed: int = 42
     max_images: int = 10
 
 
