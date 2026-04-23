@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TagInput } from '@/components/ui/tag-input';
 import { Textarea } from '@/components/ui/textarea';
+import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { extractJobPosting, saveJobPosting } from '../services/job-postings';
 import { useAuthStore } from '../store/auth-store';
 import type { JobPostingExtracted, Platform } from '../types/job-posting';
@@ -168,13 +169,26 @@ function FormField({
   );
 }
 
+function ErrorDescription({ error }: { error: UserFacingError }) {
+  return (
+    <AlertDescription>
+      <span className="block">{error.message}</span>
+      <span className="mt-2 block font-mono text-xs font-semibold">
+        {error.code}
+      </span>
+    </AlertDescription>
+  );
+}
+
 export function AddJobPostingPage() {
   const token = useAuthStore((state) => state.token);
   const navigate = useNavigate();
 
   const [url, setUrl] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
-  const [extractError, setExtractError] = useState<string | null>(null);
+  const [extractError, setExtractError] = useState<UserFacingError | null>(
+    null,
+  );
 
   const [meta, setMeta] = useState<ExtractedMeta | null>(null);
   const [formData, setFormData] = useState<FormState | null>(null);
@@ -184,7 +198,7 @@ export function AddJobPostingPage() {
   }>({});
 
   const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<UserFacingError | null>(null);
   const [savedInfo, setSavedInfo] = useState<{
     company_name: string;
     job_title: string;
@@ -213,9 +227,7 @@ export function AddJobPostingPage() {
       setFormData(toFormState(data));
     } catch (err) {
       setExtractError(
-        err instanceof Error
-          ? err.message
-          : '채용공고 정보를 불러오지 못했습니다.',
+        toUserFacingError(err, '채용공고 정보를 불러오지 못했습니다.'),
       );
     } finally {
       setIsExtracting(false);
@@ -243,7 +255,7 @@ export function AddJobPostingPage() {
         job_title: formData.job_title,
       });
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : '저장에 실패했습니다.');
+      setSaveError(toUserFacingError(err, '저장에 실패했습니다.'));
     } finally {
       setIsSaving(false);
     }
@@ -358,7 +370,7 @@ export function AddJobPostingPage() {
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>오류</AlertTitle>
-              <AlertDescription>{extractError}</AlertDescription>
+              <ErrorDescription error={extractError} />
             </Alert>
           )}
         </CardContent>
@@ -593,7 +605,7 @@ export function AddJobPostingPage() {
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>저장 실패</AlertTitle>
-                <AlertDescription>{saveError}</AlertDescription>
+                <ErrorDescription error={saveError} />
               </Alert>
             )}
           </CardContent>

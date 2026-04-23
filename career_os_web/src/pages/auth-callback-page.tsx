@@ -3,6 +3,8 @@ import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Card, CardContent } from '@/components/ui/card';
 import { API_BASE_URL } from '../services/api-base-url';
+import { fetchWithApiRetry } from '../services/api-client';
+import { toUserFacingError } from '../services/api-error';
 import { useAuthStore } from '../store/auth-store';
 import {
   buildLoginPath,
@@ -38,13 +40,14 @@ export function AuthCallbackPage() {
       return;
     }
 
-    fetch(`${API_BASE_URL}/v1/auth/me`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to fetch user');
-        return res.json();
-      })
+    fetchWithApiRetry(
+      `${API_BASE_URL}/v1/auth/me`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+      '로그인 완료에 실패했습니다. 다시 시도해주세요.',
+    )
+      .then((res) => res.json())
       .then((data) => {
         setAuth(
           {
@@ -57,9 +60,13 @@ export function AuthCallbackPage() {
         );
         navigate(consumeStoredRedirectPath(nextPath), { replace: true });
       })
-      .catch(() => {
-        setError('로그인 완료에 실패했습니다. 다시 시도해주세요.');
-        navigate(buildLoginPath(nextPath, { error: 'auth_failed' }), {
+      .catch((error: unknown) => {
+        const userFacingError = toUserFacingError(
+          error,
+          '로그인 완료에 실패했습니다. 다시 시도해주세요.',
+        );
+        setError(`${userFacingError.message} (${userFacingError.code})`);
+        navigate(buildLoginPath(nextPath, { error: userFacingError.code }), {
           replace: true,
         });
       });

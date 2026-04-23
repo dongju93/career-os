@@ -1,18 +1,20 @@
 import {
+  AlertCircle,
   Briefcase,
   Building2,
   ExternalLink,
   MapPin,
   PlusCircle,
+  RefreshCw,
   Sparkles,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { fetchJobPostings } from '../services/job-postings';
 import { useAuthStore } from '../store/auth-store';
 import type { JobPostingListItem, Platform } from '../types/job-posting';
@@ -152,14 +154,43 @@ function LoadingCard() {
   );
 }
 
+function JobPostingsErrorState({
+  error,
+  onRetry,
+}: {
+  error: UserFacingError;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="min-h-[22rem] rounded-xl border border-red-500/20 bg-red-500/8 px-6 py-12 text-center">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 text-red-500">
+        <AlertCircle className="h-7 w-7" />
+      </div>
+      <h2 className="mt-5 text-xl font-bold tracking-tight">
+        채용공고를 불러오지 못했습니다
+      </h2>
+      <p className="mx-auto mt-2 max-w-xl text-sm text-gray-600">
+        {error.message}
+      </p>
+      <p className="mt-3 font-mono text-xs font-semibold text-red-500">
+        {error.code}
+      </p>
+      <Button className="mt-6" variant="outline" onClick={onRetry}>
+        <RefreshCw className="h-4 w-4" />
+        다시 시도
+      </Button>
+    </div>
+  );
+}
+
 export function JobPostingsPage() {
   const token = useAuthStore((state) => state.token);
   const [items, setItems] = useState<JobPostingListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UserFacingError | null>(null);
 
-  useEffect(() => {
+  const loadJobPostings = useCallback(() => {
     if (!token) return;
 
     setIsLoading(true);
@@ -171,14 +202,16 @@ export function JobPostingsPage() {
         setTotal(page.total);
       })
       .catch((err: unknown) => {
-        setError(
-          err instanceof Error ? err.message : '데이터를 불러오지 못했습니다.',
-        );
+        setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
       })
       .finally(() => {
         setIsLoading(false);
       });
   }, [token]);
+
+  useEffect(() => {
+    loadJobPostings();
+  }, [loadJobPostings]);
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -227,10 +260,7 @@ export function JobPostingsPage() {
       )}
 
       {!isLoading && error && (
-        <Alert variant="destructive">
-          <AlertTitle>불러오기 실패</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <JobPostingsErrorState error={error} onRetry={loadJobPostings} />
       )}
 
       {!isLoading && !error && items.length === 0 && (

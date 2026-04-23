@@ -4,6 +4,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { API_BASE_URL } from '../services/api-base-url';
+import {
+  DATABASE_UNAVAILABLE_CODE,
+  INTERNAL_SERVER_ERROR_CODE,
+} from '../services/api-error';
 import { useAuthStore } from '../store/auth-store';
 import {
   buildGoogleLoginUrl,
@@ -40,6 +44,30 @@ function GoogleIcon() {
   );
 }
 
+function getLoginErrorMessage(errorCode: string | null): string | null {
+  if (!errorCode) return null;
+
+  if (errorCode === 'auth_failed') {
+    return '로그인에 실패했습니다. 다시 시도해주세요.';
+  }
+
+  if (errorCode === DATABASE_UNAVAILABLE_CODE) {
+    return [
+      '데이터베이스 연결이 일시적으로 불안정합니다.',
+      '잠시 후 다시 시도해주세요. (DATABASE_UNAVAILABLE)',
+    ].join(' ');
+  }
+
+  if (errorCode === INTERNAL_SERVER_ERROR_CODE) {
+    return [
+      '서버 오류가 발생했습니다.',
+      '잠시 후 다시 시도해주세요. (INTERNAL_SERVER_ERROR)',
+    ].join(' ');
+  }
+
+  return '예상치 못한 오류가 발생했습니다. 다시 시도해주세요.';
+}
+
 export function LoginPage() {
   const token = useAuthStore((state) => state.token);
   const error = useAuthStore((state) => state.error);
@@ -51,13 +79,7 @@ export function LoginPage() {
   const nextPath = getSafeRedirectPath(searchParams.get('next'));
 
   useEffect(() => {
-    setError(
-      errorParam === 'auth_failed'
-        ? '로그인에 실패했습니다. 다시 시도해주세요.'
-        : errorParam
-          ? '예상치 못한 오류가 발생했습니다. 다시 시도해주세요.'
-          : null,
-    );
+    setError(getLoginErrorMessage(errorParam));
   }, [errorParam, setError]);
 
   if (token) {

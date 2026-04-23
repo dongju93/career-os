@@ -73,6 +73,32 @@ describe('Career OS Web app shell', () => {
     );
   });
 
+  it('shows the API error code page when job postings stay unavailable', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({
+        code: 'DATABASE_UNAVAILABLE',
+        message: '데이터베이스 연결이 일시적으로 불안정합니다.',
+      }),
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings');
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /채용공고를 불러오지 못했습니다/i,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('DATABASE_UNAVAILABLE')).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Internal Server Error/i),
+    ).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+  });
+
   it('logs the user out and returns to the login page', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn(async (_input: string, init?: RequestInit) => {
