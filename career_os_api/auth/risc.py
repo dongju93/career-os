@@ -81,12 +81,15 @@ _jwks_state: dict[str, Any] = {"keys": [], "fetched_at": 0.0}
 
 
 async def _fetch_jwks() -> list[dict[str, Any]]:
-    async with httpx.AsyncClient(
-        timeout=settings.google_risc_http_timeout_seconds
-    ) as client:
-        response = await client.get(settings.google_risc_jwks_uri)
-        response.raise_for_status()
-        data = response.json()
+    try:
+        async with httpx.AsyncClient(
+            timeout=settings.google_risc_http_timeout_seconds
+        ) as client:
+            response = await client.get(settings.google_risc_jwks_uri)
+            response.raise_for_status()
+            data = response.json()
+    except httpx.HTTPError as exc:
+        raise RiscVerificationError(f"Failed to fetch JWKS: {exc}") from exc
     keys = data.get("keys")
     if not isinstance(keys, list):
         raise RiscVerificationError("Malformed JWKS document")
