@@ -72,11 +72,6 @@ CREATE TABLE IF NOT EXISTS users (
 );
 """
 
-ALTER_USERS_TABLE = """
-ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS auth_session_revoked_at TIMESTAMPTZ;
-"""
-
 CREATE_RISC_EVENTS_TABLE = """
 CREATE TABLE IF NOT EXISTS risc_events (
     id          BIGINT        GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -165,7 +160,6 @@ COMMENT ON COLUMN risc_events.payload    IS '검증을 통과한 SET JWT의 원�
 
 async def _apply_schema(conn: AsyncConnection) -> None:
     await conn.execute(CREATE_USERS_TABLE)
-    await conn.execute(ALTER_USERS_TABLE)
     await conn.execute(CREATE_JOB_POSTINGS_TABLE)
     await conn.execute(CREATE_RISC_EVENTS_TABLE)
     await conn.execute(CREATE_INDEXES)
