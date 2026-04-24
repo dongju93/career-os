@@ -78,6 +78,7 @@ API 문서: `http://localhost:8000/v1/docs`
 ## 기능
 
 - **Google OAuth 로그인** — JWT 기반 인증, 세션 쿠키와 Bearer 토큰 이중 지원
+- **Google Cross-Account Protection** — RISC Security Event Token 검증·기록, 세션/토큰 폐기 이벤트 반영
 - **채용 공고 추출** — 사람인·원티드 URL을 입력하면 OpenAI로 구조화된 데이터 반환
 - **공고 저장·관리** — 사용자별 PostgreSQL upsert, 목록/상세 조회
 - **지원 플랫폼** — `saramin.co.kr`, `wanted.co.kr`
@@ -94,6 +95,7 @@ API 문서: `http://localhost:8000/v1/docs`
 | `GET`   | `/health/db`                    |      | DB 연결 확인                               |
 | `GET`   | `/auth/google`                  |      | Google 로그인 시작 (`?callback_url=` 지원) |
 | `GET`   | `/auth/google/callback`         |      | OAuth 콜백, JWT 발급                       |
+| `POST`  | `/auth/google/risc`             |      | Google RISC 보안 이벤트 수신               |
 | `GET`   | `/auth/me`                      |  ✓   | 현재 사용자 조회                           |
 | `PATCH` | `/auth/me`                      |  ✓   | 사용자 이름 수정                           |
 | `POST`  | `/auth/logout`                  |  ✓   | 로그아웃                                   |
