@@ -27,12 +27,14 @@ _DEACTIVATING_EVENTS = frozenset(
     {
         EVENT_ACCOUNT_DISABLED,
         EVENT_ACCOUNT_PURGED,
-        EVENT_CREDENTIAL_CHANGE_REQUIRED,
     }
 )
 
 _SESSION_REVOKING_EVENTS = frozenset(
     {
+        # credential-change-required signals that credentials changed (e.g. password
+        # reset); existing sessions must be invalidated but the account stays active.
+        EVENT_CREDENTIAL_CHANGE_REQUIRED,
         EVENT_SESSIONS_REVOKED,
         EVENT_TOKENS_REVOKED,
     }
