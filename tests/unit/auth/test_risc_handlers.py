@@ -47,7 +47,6 @@ def fake_conn() -> AsyncConnection:
     [
         EVENT_ACCOUNT_DISABLED,
         EVENT_ACCOUNT_PURGED,
-        EVENT_CREDENTIAL_CHANGE_REQUIRED,
     ],
 )
 async def test_apply_deactivating_events_set_user_inactive(
@@ -124,7 +123,10 @@ async def test_apply_verification_event_is_audit_only(
     revoke_sessions.assert_not_awaited()
 
 
-@pytest.mark.parametrize("event_type", [EVENT_SESSIONS_REVOKED, EVENT_TOKENS_REVOKED])
+@pytest.mark.parametrize(
+    "event_type",
+    [EVENT_CREDENTIAL_CHANGE_REQUIRED, EVENT_SESSIONS_REVOKED, EVENT_TOKENS_REVOKED],
+)
 async def test_apply_session_token_revocations_revoke_user_sessions(
     event_type: str,
     fake_conn: AsyncConnection,

@@ -302,3 +302,27 @@ async def test_verify_risc_set_rejects_missing_jti(
 async def test_verify_risc_set_rejects_malformed_jwt() -> None:
     with pytest.raises(RiscVerificationError):
         await verify_risc_set("not-a-jwt")
+
+
+async def test_fetch_jwks_http_error_raises_verification_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import httpx
+
+    class _FailingClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            pass
+
+        async def get(self, _url):
+            raise httpx.ConnectError("network unreachable")
+
+    monkeypatch.setattr(risc_module.httpx, "AsyncClient", _FailingClient)
+
+    with pytest.raises(RiscVerificationError, match="Failed to fetch JWKS"):
+        await risc_module._fetch_jwks()

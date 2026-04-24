@@ -228,6 +228,33 @@ async def test_get_current_user_accepts_session_issued_after_revocation():
     assert user["id"] == user_id
 
 
+async def test_get_current_user_accepts_session_issued_in_same_second_as_revocation():
+    # JWT iat is second-precision. A session issued at T+0.800 after a revocation
+    # at T+0.500 gets iat=T (floor). Without truncating revoked_at to seconds the
+    # comparison T.000 > T.500 is false and the valid session is wrongly rejected.
+    user_id = uuid4()
+    issued_at = int(datetime.now(UTC).timestamp())
+    row = {
+        "id": user_id,
+        "google_id": "g-123",
+        "email": "active@example.com",
+        "name": "Active User",
+        "picture": None,
+        "is_active": True,
+        # revoked_at has sub-second precision within the same second as issued_at
+        "auth_session_revoked_at": datetime.fromtimestamp(issued_at, UTC).replace(
+            microsecond=500_000
+        ),
+    }
+    request = _make_request(
+        row,
+        session={"user_id": str(user_id), "issued_at": issued_at},
+    )
+    user = await get_current_user(request, None)
+    assert user is not None
+    assert user["id"] == user_id
+
+
 async def test_get_current_user_user_not_found():
     token = create_access_token(data={"sub": str(uuid4())})
     request = _make_request(None)
