@@ -26,7 +26,9 @@ def _issued_after_revocation(user: UserRow, issued_at: int | None) -> bool:
         return False
     if revoked_at.tzinfo is None:
         revoked_at = revoked_at.replace(tzinfo=UTC)
-    return datetime.fromtimestamp(issued_at, UTC) > revoked_at
+    # JWT iat is second-precision (floor); truncate revoked_at to seconds so a
+    # session issued within the same second as revocation is not wrongly rejected.
+    return datetime.fromtimestamp(issued_at, UTC) >= revoked_at.replace(microsecond=0)
 
 
 def _is_current_user_session(user: UserRow | None, issued_at: int | None) -> bool:
