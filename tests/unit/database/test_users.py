@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import cast
 from uuid import uuid4
 
@@ -46,6 +47,7 @@ def make_user_row(*, user_id=None) -> dict:
         "name": "Career OS User",
         "picture": None,
         "is_active": True,
+        "auth_session_revoked_at": None,
     }
 
 
@@ -128,6 +130,38 @@ async def test_set_user_active_by_google_id_returns_none_when_unknown() -> None:
         cast(AsyncConnection, conn),
         "missing-id",
         is_active=True,
+    )
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_revoke_user_sessions_by_google_id_sets_revocation_boundary() -> None:
+    revoked_at = datetime.now(UTC)
+    row = make_user_row() | {"auth_session_revoked_at": revoked_at}
+    cursor = FakeCursor(fetchone_results=[row])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await users_module.revoke_user_sessions_by_google_id(
+        cast(AsyncConnection, conn),
+        "google-user-1",
+    )
+
+    assert result == row
+    assert conn.cursor_row_factories == [dict_row]
+    assert cursor.execute_calls == [
+        (users_module._REVOKE_SESSIONS_BY_GOOGLE_ID_SQL, ("google-user-1",)),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_revoke_user_sessions_by_google_id_returns_none_when_unknown() -> None:
+    cursor = FakeCursor(fetchone_results=[None])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await users_module.revoke_user_sessions_by_google_id(
+        cast(AsyncConnection, conn),
+        "missing-id",
     )
 
     assert result is None

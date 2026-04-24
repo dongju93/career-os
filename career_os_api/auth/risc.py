@@ -29,6 +29,9 @@ EVENT_SESSIONS_REVOKED = (
 EVENT_TOKENS_REVOKED = (
     "https://schemas.openid.net/secevent/oauth/event-type/tokens-revoked"
 )
+EVENT_TOKEN_REVOKED = (
+    "https://schemas.openid.net/secevent/oauth/event-type/token-revoked"
+)
 EVENT_ACCOUNT_DISABLED = (
     "https://schemas.openid.net/secevent/risc/event-type/account-disabled"
 )
@@ -48,6 +51,7 @@ SUPPORTED_EVENT_TYPES: frozenset[str] = frozenset(
     {
         EVENT_SESSIONS_REVOKED,
         EVENT_TOKENS_REVOKED,
+        EVENT_TOKEN_REVOKED,
         EVENT_ACCOUNT_DISABLED,
         EVENT_ACCOUNT_ENABLED,
         EVENT_ACCOUNT_PURGED,
@@ -118,10 +122,17 @@ async def _find_signing_key(token: str) -> dict[str, Any]:
     if not isinstance(kid, str) or not kid:
         raise RiscVerificationError("JWT header missing 'kid'")
 
-    # First try the cached keys; if the kid is unknown the cache is stale by
-    # definition (Google rotated), so refresh once and try again.
-    for force_refresh in (False, True):
-        keys = await get_jwks(force_refresh=force_refresh)
+    keys = await get_jwks()
+    for key in keys:
+        if key.get("kid") == kid:
+            return key
+
+    # Unknown kids can be legitimate after key rotation, but this endpoint is
+    # unauthenticated. Only perform an extra refresh when the cached key set is
+    # old enough that rotation is plausible.
+    cache_age = time.monotonic() - _jwks_state["fetched_at"]
+    if cache_age > settings.google_risc_unknown_kid_refresh_cooldown_seconds:
+        keys = await get_jwks(force_refresh=True)
         for key in keys:
             if key.get("kid") == kid:
                 return key

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import TypedDict
 from uuid import UUID
 
@@ -12,16 +13,17 @@ class UserRow(TypedDict):
     name: str | None
     picture: str | None
     is_active: bool
+    auth_session_revoked_at: datetime | None
 
 
 _FIND_BY_GOOGLE_ID_SQL = """
-SELECT id, google_id, email, name, picture, is_active
+SELECT id, google_id, email, name, picture, is_active, auth_session_revoked_at
 FROM users
 WHERE google_id = %s
 """
 
 _FIND_BY_ID_SQL = """
-SELECT id, google_id, email, name, picture, is_active
+SELECT id, google_id, email, name, picture, is_active, auth_session_revoked_at
 FROM users
 WHERE id = %s
 """
@@ -33,21 +35,28 @@ ON CONFLICT (google_id) DO UPDATE
     SET email   = EXCLUDED.email,
         name    = EXCLUDED.name,
         picture = EXCLUDED.picture
-RETURNING id, google_id, email, name, picture, is_active
+RETURNING id, google_id, email, name, picture, is_active, auth_session_revoked_at
 """
 
 _UPDATE_NAME_SQL = """
 UPDATE users
 SET name = %s, updated_at = NOW()
 WHERE id = %s
-RETURNING id, google_id, email, name, picture, is_active
+RETURNING id, google_id, email, name, picture, is_active, auth_session_revoked_at
 """
 
 _SET_ACTIVE_BY_GOOGLE_ID_SQL = """
 UPDATE users
 SET is_active = %s, updated_at = NOW()
 WHERE google_id = %s
-RETURNING id, google_id, email, name, picture, is_active
+RETURNING id, google_id, email, name, picture, is_active, auth_session_revoked_at
+"""
+
+_REVOKE_SESSIONS_BY_GOOGLE_ID_SQL = """
+UPDATE users
+SET auth_session_revoked_at = NOW(), updated_at = NOW()
+WHERE google_id = %s
+RETURNING id, google_id, email, name, picture, is_active, auth_session_revoked_at
 """
 
 
@@ -92,4 +101,12 @@ async def set_user_active_by_google_id(
 ) -> UserRow | None:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_SET_ACTIVE_BY_GOOGLE_ID_SQL, (is_active, google_id))
+        return await cur.fetchone()  # type: ignore[return-value]
+
+
+async def revoke_user_sessions_by_google_id(
+    conn: AsyncConnection, google_id: str
+) -> UserRow | None:
+    async with conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(_REVOKE_SESSIONS_BY_GOOGLE_ID_SQL, (google_id,))
         return await cur.fetchone()  # type: ignore[return-value]

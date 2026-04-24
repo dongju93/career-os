@@ -7,8 +7,9 @@ from career_os_api.config import settings
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
-    expire = datetime.now(UTC) + timedelta(minutes=settings.jwt_expire_minutes)
-    to_encode.update({"exp": expire})
+    issued_at = datetime.now(UTC)
+    expire = issued_at + timedelta(minutes=settings.jwt_expire_minutes)
+    to_encode.update({"iat": int(issued_at.timestamp()), "exp": expire})
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.jwt_algorithm)
 
 

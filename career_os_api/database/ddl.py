@@ -63,12 +63,18 @@ CREATE TABLE IF NOT EXISTS users (
     name        VARCHAR(100),
     picture     VARCHAR(512),
     is_active   BOOLEAN       NOT NULL DEFAULT TRUE,
+    auth_session_revoked_at TIMESTAMPTZ,
     created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
 
     CONSTRAINT uq_users_google_id UNIQUE (google_id),
     CONSTRAINT uq_users_email     UNIQUE (email)
 );
+"""
+
+ALTER_USERS_TABLE = """
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS auth_session_revoked_at TIMESTAMPTZ;
 """
 
 CREATE_RISC_EVENTS_TABLE = """
@@ -142,6 +148,7 @@ COMMENT ON COLUMN job_postings.scraped_at  IS '데이터 수집 시각';
 COMMENT ON TABLE  users          IS 'Google OAuth로 가입한 사용자 계정';
 COMMENT ON COLUMN users.google_id IS 'Google sub claim (고유 사용자 식별자)';
 COMMENT ON COLUMN users.email     IS 'Google 계정 이메일';
+COMMENT ON COLUMN users.auth_session_revoked_at IS '이 시각 이전에 발급된 앱 세션/JWT를 거부하는 RISC 세션 폐기 경계';
 
 COMMENT ON TABLE  risc_events            IS 'Google RISC(Cross-Account Protection) Security Event Token 수신 이력';
 COMMENT ON COLUMN risc_events.jti        IS 'SET JWT의 jti 클레임 (중복 전송 방지용 고유 ID)';
@@ -158,6 +165,7 @@ COMMENT ON COLUMN risc_events.payload    IS '검증을 통과한 SET JWT의 원�
 
 async def _apply_schema(conn: AsyncConnection) -> None:
     await conn.execute(CREATE_USERS_TABLE)
+    await conn.execute(ALTER_USERS_TABLE)
     await conn.execute(CREATE_JOB_POSTINGS_TABLE)
     await conn.execute(CREATE_RISC_EVENTS_TABLE)
     await conn.execute(CREATE_INDEXES)

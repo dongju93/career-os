@@ -10,12 +10,16 @@ from career_os_api.auth.risc import (
     EVENT_ACCOUNT_PURGED,
     EVENT_CREDENTIAL_CHANGE_REQUIRED,
     EVENT_SESSIONS_REVOKED,
+    EVENT_TOKEN_REVOKED,
     EVENT_TOKENS_REVOKED,
     EVENT_VERIFICATION,
     RiscEvent,
 )
 from career_os_api.database.risc_events import record_risc_event
-from career_os_api.database.users import set_user_active_by_google_id
+from career_os_api.database.users import (
+    revoke_user_sessions_by_google_id,
+    set_user_active_by_google_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +31,14 @@ _DEACTIVATING_EVENTS = frozenset(
     }
 )
 
-_AUDIT_ONLY_EVENTS = frozenset(
+_SESSION_REVOKING_EVENTS = frozenset(
     {
         EVENT_SESSIONS_REVOKED,
         EVENT_TOKENS_REVOKED,
     }
 )
+
+_AUDIT_ONLY_EVENTS = frozenset({EVENT_TOKEN_REVOKED})
 
 
 async def apply_risc_event(conn: AsyncConnection, event: RiscEvent) -> None:
@@ -59,6 +65,16 @@ async def apply_risc_event(conn: AsyncConnection, event: RiscEvent) -> None:
         logger.info("RISC verification received state=%s", event.state)
         return
 
+    if event.event_type in _AUDIT_ONLY_EVENTS:
+        # The app does not store Google OAuth refresh tokens, so individual
+        # token revocations are recorded for audit only.
+        logger.info(
+            "RISC %s recorded for google_id=%s (audit-only)",
+            event.event_type,
+            event.google_id,
+        )
+        return
+
     if event.google_id is None:
         logger.warning(
             "RISC %s has no subject.sub; audit row stored, no user mutation",
@@ -78,6 +94,16 @@ async def apply_risc_event(conn: AsyncConnection, event: RiscEvent) -> None:
         )
         return
 
+    if event.event_type in _SESSION_REVOKING_EVENTS:
+        updated = await revoke_user_sessions_by_google_id(conn, event.google_id)
+        logger.info(
+            "RISC %s revoked sessions for google_id=%s matched=%s",
+            event.event_type,
+            event.google_id,
+            updated is not None,
+        )
+        return
+
     if event.event_type == EVENT_ACCOUNT_ENABLED:
         updated = await set_user_active_by_google_id(
             conn, event.google_id, is_active=True
@@ -87,17 +113,6 @@ async def apply_risc_event(conn: AsyncConnection, event: RiscEvent) -> None:
             event.event_type,
             event.google_id,
             updated is not None,
-        )
-        return
-
-    if event.event_type in _AUDIT_ONLY_EVENTS:
-        # The app issues short-lived JWTs signed with its own key and does not
-        # track per-session state, so these events are recorded for audit
-        # only. Wire refresh-token revocation here once that is introduced.
-        logger.info(
-            "RISC %s recorded for google_id=%s (audit-only)",
-            event.event_type,
-            event.google_id,
         )
         return
 

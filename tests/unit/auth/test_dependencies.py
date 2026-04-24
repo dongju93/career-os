@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -65,8 +66,10 @@ async def test_get_current_user_bearer_token():
         "name": "Test",
         "picture": None,
         "is_active": True,
+        "auth_session_revoked_at": None,
     }
     user = await get_current_user(_make_request(row), token)
+    assert user is not None
     assert user["id"] == user_id
     assert user["email"] == "test@example.com"
 
@@ -80,9 +83,17 @@ async def test_get_current_user_session_cookie():
         "name": "Test",
         "picture": None,
         "is_active": True,
+        "auth_session_revoked_at": None,
     }
-    request = _make_request(row, session={"user_id": str(user_id)})
+    request = _make_request(
+        row,
+        session={
+            "user_id": str(user_id),
+            "issued_at": int(datetime.now(UTC).timestamp()),
+        },
+    )
     user = await get_current_user(request, None)
+    assert user is not None
     assert user["id"] == user_id
 
 
@@ -95,10 +106,18 @@ async def test_get_current_user_session_takes_precedence_over_bearer():
         "name": "Session User",
         "picture": None,
         "is_active": True,
+        "auth_session_revoked_at": None,
     }
     token = create_access_token(data={"sub": str(uuid4())})
-    request = _make_request(row, session={"user_id": str(session_user_id)})
+    request = _make_request(
+        row,
+        session={
+            "user_id": str(session_user_id),
+            "issued_at": int(datetime.now(UTC).timestamp()),
+        },
+    )
     user = await get_current_user(request, token)
+    assert user is not None
     assert user["id"] == session_user_id
 
 
@@ -112,9 +131,11 @@ async def test_get_current_user_invalid_session_id_falls_back_to_bearer():
         "name": "Bearer User",
         "picture": None,
         "is_active": True,
+        "auth_session_revoked_at": None,
     }
     request = _make_request(row, session={"user_id": "not-a-uuid"})
     user = await get_current_user(request, token)
+    assert user is not None
     assert user["id"] == bearer_user_id
 
 
@@ -143,11 +164,68 @@ async def test_get_current_user_inactive_user():
         "name": "Inactive User",
         "picture": None,
         "is_active": False,
+        "auth_session_revoked_at": None,
     }
     request = _make_request(row)
     with pytest.raises(HTTPException) as exc_info:
         await get_current_user(request, token)
     assert exc_info.value.status_code == 401
+
+
+async def test_get_current_user_rejects_token_issued_before_session_revocation():
+    user_id = uuid4()
+    token = create_access_token(data={"sub": str(user_id)})
+    row = {
+        "id": user_id,
+        "google_id": "g-123",
+        "email": "revoked@example.com",
+        "name": "Revoked User",
+        "picture": None,
+        "is_active": True,
+        "auth_session_revoked_at": datetime.now(UTC) + timedelta(seconds=1),
+    }
+    request = _make_request(row)
+    with pytest.raises(HTTPException) as exc_info:
+        await get_current_user(request, token)
+    assert exc_info.value.status_code == 401
+
+
+async def test_get_current_user_rejects_session_without_issue_time_after_revocation():
+    user_id = uuid4()
+    row = {
+        "id": user_id,
+        "google_id": "g-123",
+        "email": "revoked@example.com",
+        "name": "Revoked User",
+        "picture": None,
+        "is_active": True,
+        "auth_session_revoked_at": datetime.now(UTC),
+    }
+    request = _make_request(row, session={"user_id": str(user_id)})
+    with pytest.raises(HTTPException) as exc_info:
+        await get_current_user(request, None)
+    assert exc_info.value.status_code == 401
+
+
+async def test_get_current_user_accepts_session_issued_after_revocation():
+    user_id = uuid4()
+    issued_at = int(datetime.now(UTC).timestamp())
+    row = {
+        "id": user_id,
+        "google_id": "g-123",
+        "email": "active@example.com",
+        "name": "Active User",
+        "picture": None,
+        "is_active": True,
+        "auth_session_revoked_at": datetime.fromtimestamp(issued_at - 10, UTC),
+    }
+    request = _make_request(
+        row,
+        session={"user_id": str(user_id), "issued_at": issued_at},
+    )
+    user = await get_current_user(request, None)
+    assert user is not None
+    assert user["id"] == user_id
 
 
 async def test_get_current_user_user_not_found():

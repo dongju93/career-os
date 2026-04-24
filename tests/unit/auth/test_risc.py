@@ -1,4 +1,5 @@
 import time
+from collections.abc import Generator
 from typing import Any
 
 import pytest
@@ -11,6 +12,7 @@ from jose.constants import ALGORITHMS
 import career_os_api.auth.risc as risc_module
 from career_os_api.auth.risc import (
     EVENT_ACCOUNT_DISABLED,
+    EVENT_TOKEN_REVOKED,
     EVENT_VERIFICATION,
     RiscVerificationError,
     verify_risc_set,
@@ -34,6 +36,7 @@ def _generate_keypair() -> tuple[str, dict[str, Any]]:
         )
         .decode("ascii")
     )
+    assert RSAKey is not None
     public_jwk = RSAKey(public_pem, ALGORITHMS.RS256).to_dict()
     public_jwk["kid"] = "test-kid-1"
     return private_pem, public_jwk
@@ -64,7 +67,9 @@ def _base_payload(event_type: str, body: dict[str, Any]) -> dict[str, Any]:
 
 
 @pytest.fixture
-def signing_pair(monkeypatch: pytest.MonkeyPatch) -> tuple[str, dict[str, Any]]:
+def signing_pair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Generator[tuple[str, dict[str, Any]]]:
     private_pem, public_jwk = _generate_keypair()
     risc_module._jwks_state["keys"] = [public_jwk]
     risc_module._jwks_state["fetched_at"] = time.monotonic()
@@ -110,6 +115,29 @@ async def test_verify_risc_set_accepts_verification_event_without_subject(
     assert event.event_type == EVENT_VERIFICATION
     assert event.google_id is None
     assert event.state == "check-123"
+
+
+async def test_verify_risc_set_accepts_token_revoked_event_without_subject(
+    signing_pair: tuple[str, dict[str, Any]],
+) -> None:
+    private_pem, _ = signing_pair
+    payload = _base_payload(
+        EVENT_TOKEN_REVOKED,
+        {
+            "subject": {
+                "subject_type": "oauth-token",
+                "token_type": "refresh_token",
+                "token_identifier_alg": "prefix",
+                "token": "a" * 16,
+            }
+        },
+    )
+    token = _sign(private_pem, payload)
+
+    event = await verify_risc_set(token)
+
+    assert event.event_type == EVENT_TOKEN_REVOKED
+    assert event.google_id is None
 
 
 async def test_verify_risc_set_rejects_wrong_issuer(
@@ -177,6 +205,53 @@ async def test_verify_risc_set_rejects_unknown_kid(
 
     with pytest.raises(RiscVerificationError, match="No JWKS key matches kid"):
         await verify_risc_set(token)
+
+
+async def test_verify_risc_set_does_not_force_refresh_for_fresh_unknown_kid(
+    signing_pair: tuple[str, dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    private_pem, _ = signing_pair
+
+    async def unexpected_fetch() -> list[dict[str, Any]]:
+        raise AssertionError("fresh unknown kid should not force JWKS refresh")
+
+    monkeypatch.setattr(risc_module, "_fetch_jwks", unexpected_fetch)
+    payload = _base_payload(
+        EVENT_ACCOUNT_DISABLED,
+        {"subject": {"sub": "user-1"}},
+    )
+    token = _sign(private_pem, payload, kid="unknown-kid")
+
+    with pytest.raises(RiscVerificationError, match="No JWKS key matches kid"):
+        await verify_risc_set(token)
+
+
+async def test_verify_risc_set_refreshes_stale_cache_for_unknown_kid(
+    signing_pair: tuple[str, dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, _ = signing_pair
+    private_pem, public_jwk = _generate_keypair()
+    public_jwk["kid"] = "rotated-kid"
+    risc_module._jwks_state["fetched_at"] = (
+        time.monotonic() - settings.google_risc_unknown_kid_refresh_cooldown_seconds - 1
+    )
+
+    async def fake_fetch() -> list[dict[str, Any]]:
+        return [public_jwk]
+
+    monkeypatch.setattr(risc_module, "_fetch_jwks", fake_fetch)
+    payload = _base_payload(
+        EVENT_ACCOUNT_DISABLED,
+        {"subject": {"sub": "user-1"}},
+    )
+    token = _sign(private_pem, payload, kid="rotated-kid")
+
+    event = await verify_risc_set(token)
+
+    assert event.event_type == EVENT_ACCOUNT_DISABLED
+    assert event.google_id == "user-1"
 
 
 async def test_verify_risc_set_rejects_future_iat(

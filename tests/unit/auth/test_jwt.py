@@ -6,6 +6,7 @@ def test_create_and_decode_token():
     payload = decode_access_token(token)
     assert payload is not None
     assert payload["sub"] == "test-user-id"
+    assert "iat" in payload
     assert "exp" in payload
 
 

@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     google_risc_issuer: str = "https://accounts.google.com"
     google_risc_jwks_uri: str = "https://www.googleapis.com/oauth2/v3/certs"
     google_risc_jwks_cache_ttl_seconds: int = 60 * 60  # 1 hour
+    google_risc_unknown_kid_refresh_cooldown_seconds: int = 60
     # Accept SETs whose `iat` is at most this far in the future (clock skew).
     google_risc_max_iat_skew_seconds: int = 60 * 5  # 5 minutes
     google_risc_http_timeout_seconds: float = 10.0
