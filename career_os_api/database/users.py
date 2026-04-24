@@ -43,6 +43,13 @@ WHERE id = %s
 RETURNING id, google_id, email, name, picture, is_active
 """
 
+_SET_ACTIVE_BY_GOOGLE_ID_SQL = """
+UPDATE users
+SET is_active = %s, updated_at = NOW()
+WHERE google_id = %s
+RETURNING id, google_id, email, name, picture, is_active
+"""
+
 
 async def find_user_by_google_id(
     conn: AsyncConnection, google_id: str
@@ -78,3 +85,11 @@ async def upsert_user(
         row = await cur.fetchone()
     assert row is not None
     return row  # type: ignore[return-value]
+
+
+async def set_user_active_by_google_id(
+    conn: AsyncConnection, google_id: str, *, is_active: bool
+) -> UserRow | None:
+    async with conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(_SET_ACTIVE_BY_GOOGLE_ID_SQL, (is_active, google_id))
+        return await cur.fetchone()  # type: ignore[return-value]

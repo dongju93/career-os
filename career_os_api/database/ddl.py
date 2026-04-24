@@ -71,6 +71,21 @@ CREATE TABLE IF NOT EXISTS users (
 );
 """
 
+CREATE_RISC_EVENTS_TABLE = """
+CREATE TABLE IF NOT EXISTS risc_events (
+    id          BIGINT        GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    jti         VARCHAR(255)  NOT NULL,
+    event_type  VARCHAR(255)  NOT NULL,
+    google_id   VARCHAR(255),
+    reason      VARCHAR(255),
+    issued_at   TIMESTAMPTZ   NOT NULL,
+    payload     JSONB         NOT NULL,
+    received_at TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_risc_events_jti UNIQUE (jti)
+);
+"""
+
 CREATE_INDEXES = """
 CREATE UNIQUE INDEX IF NOT EXISTS uq_job_postings_user_id
     ON job_postings (user_id, platform, posting_id);
@@ -104,6 +119,15 @@ CREATE INDEX IF NOT EXISTS idx_users_google_id
 
 CREATE INDEX IF NOT EXISTS idx_users_email
     ON users (email);
+
+CREATE INDEX IF NOT EXISTS idx_risc_events_google_id
+    ON risc_events (google_id);
+
+CREATE INDEX IF NOT EXISTS idx_risc_events_event_type
+    ON risc_events (event_type);
+
+CREATE INDEX IF NOT EXISTS idx_risc_events_received_at
+    ON risc_events (received_at DESC);
 """
 
 CREATE_COMMENTS = """
@@ -118,6 +142,13 @@ COMMENT ON COLUMN job_postings.scraped_at  IS '데이터 수집 시각';
 COMMENT ON TABLE  users          IS 'Google OAuth로 가입한 사용자 계정';
 COMMENT ON COLUMN users.google_id IS 'Google sub claim (고유 사용자 식별자)';
 COMMENT ON COLUMN users.email     IS 'Google 계정 이메일';
+
+COMMENT ON TABLE  risc_events            IS 'Google RISC(Cross-Account Protection) Security Event Token 수신 이력';
+COMMENT ON COLUMN risc_events.jti        IS 'SET JWT의 jti 클레임 (중복 전송 방지용 고유 ID)';
+COMMENT ON COLUMN risc_events.event_type IS 'RISC 이벤트 타입 URI';
+COMMENT ON COLUMN risc_events.google_id  IS '대상 Google 사용자 ID (subject.sub, verification 이벤트는 NULL)';
+COMMENT ON COLUMN risc_events.issued_at  IS 'SET JWT의 iat (발급 시각)';
+COMMENT ON COLUMN risc_events.payload    IS '검증을 통과한 SET JWT의 원본 클레임 전체';
 """
 
 # ---------------------------------------------------------------------------
@@ -128,6 +159,7 @@ COMMENT ON COLUMN users.email     IS 'Google 계정 이메일';
 async def _apply_schema(conn: AsyncConnection) -> None:
     await conn.execute(CREATE_USERS_TABLE)
     await conn.execute(CREATE_JOB_POSTINGS_TABLE)
+    await conn.execute(CREATE_RISC_EVENTS_TABLE)
     await conn.execute(CREATE_INDEXES)
     await conn.execute(CREATE_COMMENTS)
 

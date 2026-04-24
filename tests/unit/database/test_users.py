@@ -101,6 +101,39 @@ async def test_update_user_name_executes_sql_with_user_id_and_name() -> None:
 
 
 @pytest.mark.asyncio
+async def test_set_user_active_by_google_id_updates_and_returns_row() -> None:
+    row = make_user_row() | {"is_active": False}
+    cursor = FakeCursor(fetchone_results=[row])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await users_module.set_user_active_by_google_id(
+        cast(AsyncConnection, conn),
+        "google-user-1",
+        is_active=False,
+    )
+
+    assert result == row
+    assert conn.cursor_row_factories == [dict_row]
+    assert cursor.execute_calls == [
+        (users_module._SET_ACTIVE_BY_GOOGLE_ID_SQL, (False, "google-user-1")),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_set_user_active_by_google_id_returns_none_when_unknown() -> None:
+    cursor = FakeCursor(fetchone_results=[None])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await users_module.set_user_active_by_google_id(
+        cast(AsyncConnection, conn),
+        "missing-id",
+        is_active=True,
+    )
+
+    assert result is None
+
+
+@pytest.mark.asyncio
 async def test_upsert_user_executes_sql_and_returns_row() -> None:
     row = make_user_row()
     cursor = FakeCursor(fetchone_results=[row])

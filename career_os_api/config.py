@@ -35,6 +35,18 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
 
+    # Google RISC (Cross-Account Protection) — Security Event Token receiver
+    # The SET's `aud` claim must match this value. Google sets `aud` to the
+    # OAuth client ID of the project that registered the RISC stream, so this
+    # defaults to `google_client_id` when unset (see `risc_audience` property).
+    google_risc_audience: str | None = None
+    google_risc_issuer: str = "https://accounts.google.com"
+    google_risc_jwks_uri: str = "https://www.googleapis.com/oauth2/v3/certs"
+    google_risc_jwks_cache_ttl_seconds: int = 60 * 60  # 1 hour
+    # Accept SETs whose `iat` is at most this far in the future (clock skew).
+    google_risc_max_iat_skew_seconds: int = 60 * 5  # 5 minutes
+    google_risc_http_timeout_seconds: float = 10.0
+
     # HTTP client timeouts (seconds) — tunable per environment
     http_fetch_timeout: float = 30.0
     http_image_timeout: float = 10.0
@@ -45,6 +57,10 @@ class Settings(BaseSettings):
         "none", "minimal", "low", "medium", "high", "xhigh"
     ] = "medium"
     max_images: int = 10
+
+    @property
+    def risc_audience(self) -> str:
+        return self.google_risc_audience or self.google_client_id
 
 
 settings = Settings()
