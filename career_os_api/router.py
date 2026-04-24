@@ -187,6 +187,9 @@ async def logout_current_user(
     )
 
 
+_MAX_RISC_BODY_BYTES = 65_536
+
+
 @v1_router.post(
     "/auth/google/risc",
     tags=["auth"],
@@ -195,13 +198,25 @@ async def logout_current_user(
         202: {"description": "Security Event Token accepted"},
         400: {"description": "Malformed or unsupported Security Event Token"},
         401: {"description": "Signature or claim verification failed"},
+        413: {"description": "Request body too large"},
     },
 )
 async def receive_google_risc_event(request: Request) -> Response:
     # Google posts Security Event Tokens as a raw compact-serialized JWT with
     # Content-Type `application/secevent+jwt`. The body is the token itself
-    # — not JSON — so read it as bytes and decode ASCII.
-    raw = await request.body()
+    # — not JSON — so stream it with a hard size cap to prevent DoS on this
+    # unauthenticated endpoint.
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > _MAX_RISC_BODY_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Request body exceeds maximum allowed size",
+            )
+        chunks.append(chunk)
+    raw = b"".join(chunks)
     try:
         token = raw.decode("ascii").strip()
     except UnicodeDecodeError as exc:
