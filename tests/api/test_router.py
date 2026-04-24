@@ -16,6 +16,7 @@ from career_os_api.auth.risc import (
     EVENT_ACCOUNT_DISABLED,
     RiscEvent,
     RiscVerificationError,
+    RiscVerificationUnavailableError,
 )
 from career_os_api.constants import API_V1
 
@@ -698,6 +699,28 @@ def test_risc_endpoint_returns_401_for_invalid_signature(
 
     assert response.status_code == 401
     assert response.json()["detail"] == "bad sig"
+    apply.assert_not_awaited()
+
+
+def test_risc_endpoint_returns_503_when_verification_is_unavailable(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verify = AsyncMock(
+        side_effect=RiscVerificationUnavailableError("Failed to fetch JWKS")
+    )
+    apply = AsyncMock()
+    monkeypatch.setattr(app_module, "verify_risc_set", verify)
+    monkeypatch.setattr(app_module, "apply_risc_event", apply)
+
+    response = client.post(
+        f"{API_PREFIX}/auth/google/risc",
+        content=b"header.payload.signature",
+        headers={"Content-Type": "application/secevent+jwt"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "RISC verification is temporarily unavailable"
     apply.assert_not_awaited()
 
 

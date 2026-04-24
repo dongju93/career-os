@@ -15,6 +15,7 @@ from career_os_api.auth.risc import (
     EVENT_TOKEN_REVOKED,
     EVENT_VERIFICATION,
     RiscVerificationError,
+    RiscVerificationUnavailableError,
     verify_risc_set,
 )
 from career_os_api.config import settings
@@ -170,6 +171,21 @@ async def test_verify_risc_set_rejects_wrong_audience(
         await verify_risc_set(token)
 
 
+async def test_verify_risc_set_rejects_missing_audience(
+    signing_pair: tuple[str, dict[str, Any]],
+) -> None:
+    private_pem, _ = signing_pair
+    payload = _base_payload(
+        EVENT_ACCOUNT_DISABLED,
+        {"subject": {"sub": "user-1"}},
+    )
+    del payload["aud"]
+    token = _sign(private_pem, payload)
+
+    with pytest.raises(RiscVerificationError, match="aud"):
+        await verify_risc_set(token)
+
+
 async def test_verify_risc_set_rejects_bad_signature(
     signing_pair: tuple[str, dict[str, Any]],
 ) -> None:
@@ -304,7 +320,7 @@ async def test_verify_risc_set_rejects_malformed_jwt() -> None:
         await verify_risc_set("not-a-jwt")
 
 
-async def test_fetch_jwks_http_error_raises_verification_error(
+async def test_fetch_jwks_http_error_raises_verification_unavailable_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import httpx
@@ -324,5 +340,8 @@ async def test_fetch_jwks_http_error_raises_verification_error(
 
     monkeypatch.setattr(risc_module.httpx, "AsyncClient", _FailingClient)
 
-    with pytest.raises(RiscVerificationError, match="Failed to fetch JWKS"):
+    with pytest.raises(
+        RiscVerificationUnavailableError,
+        match="Failed to fetch JWKS",
+    ):
         await risc_module._fetch_jwks()
