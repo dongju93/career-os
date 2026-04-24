@@ -12,6 +12,12 @@ import career_os_api.database.retry as retry_module
 import career_os_api.router as app_module
 import main as main_module
 from career_os_api.auth.jwt import create_access_token
+from career_os_api.auth.risc import (
+    EVENT_ACCOUNT_DISABLED,
+    RiscEvent,
+    RiscVerificationError,
+    RiscVerificationUnavailableError,
+)
 from career_os_api.constants import API_V1
 
 API_PREFIX = f"/{API_V1}"
@@ -632,3 +638,155 @@ def test_db_health_endpoint_retries_transient_database_connection_failures(
     assert response.json() == {"database": "connected", "result": 1}
     assert fake_pool.connection_attempts == 5
     assert sleep.await_count == 4
+
+
+# ── Google RISC receiver ─────────────────────────────────────────────────────
+
+
+def _risc_event(
+    *,
+    event_type: str = EVENT_ACCOUNT_DISABLED,
+    google_id: str | None = "google-user-1",
+) -> RiscEvent:
+    return RiscEvent(
+        jti="jti-1",
+        event_type=event_type,
+        issued_at=1_700_000_000,
+        google_id=google_id,
+        reason=None,
+        state=None,
+        raw_payload={"jti": "jti-1", "events": {event_type: {}}},
+    )
+
+
+def test_risc_endpoint_accepts_valid_event_and_returns_202(
+    client: TestClient,
+    fake_pool: FakePool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event = _risc_event()
+    verify = AsyncMock(return_value=event)
+    apply = AsyncMock(return_value=None)
+    monkeypatch.setattr(app_module, "verify_risc_set", verify)
+    monkeypatch.setattr(app_module, "apply_risc_event", apply)
+
+    response = client.post(
+        f"{API_PREFIX}/auth/google/risc",
+        content=b"header.payload.signature",
+        headers={"Content-Type": "application/secevent+jwt"},
+    )
+
+    assert response.status_code == 202
+    assert response.content == b""
+    verify.assert_awaited_once_with("header.payload.signature")
+    apply.assert_awaited_once_with(fake_pool.connection_obj, event)
+
+
+def test_risc_endpoint_returns_401_for_invalid_signature(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verify = AsyncMock(side_effect=RiscVerificationError("bad sig"))
+    apply = AsyncMock()
+    monkeypatch.setattr(app_module, "verify_risc_set", verify)
+    monkeypatch.setattr(app_module, "apply_risc_event", apply)
+
+    response = client.post(
+        f"{API_PREFIX}/auth/google/risc",
+        content=b"broken.jwt.token",
+        headers={"Content-Type": "application/secevent+jwt"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "bad sig"
+    apply.assert_not_awaited()
+
+
+def test_risc_endpoint_returns_503_when_verification_is_unavailable(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verify = AsyncMock(
+        side_effect=RiscVerificationUnavailableError("Failed to fetch JWKS")
+    )
+    apply = AsyncMock()
+    monkeypatch.setattr(app_module, "verify_risc_set", verify)
+    monkeypatch.setattr(app_module, "apply_risc_event", apply)
+
+    response = client.post(
+        f"{API_PREFIX}/auth/google/risc",
+        content=b"header.payload.signature",
+        headers={"Content-Type": "application/secevent+jwt"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "RISC verification is temporarily unavailable"
+    apply.assert_not_awaited()
+
+
+def test_risc_endpoint_rejects_empty_body(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verify = AsyncMock()
+    monkeypatch.setattr(app_module, "verify_risc_set", verify)
+
+    response = client.post(
+        f"{API_PREFIX}/auth/google/risc",
+        content=b"",
+        headers={"Content-Type": "application/secevent+jwt"},
+    )
+
+    assert response.status_code == 400
+    verify.assert_not_awaited()
+
+
+def test_risc_endpoint_rejects_non_ascii_body(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verify = AsyncMock()
+    monkeypatch.setattr(app_module, "verify_risc_set", verify)
+
+    response = client.post(
+        f"{API_PREFIX}/auth/google/risc",
+        content="héader.payload.sig".encode(),
+        headers={"Content-Type": "application/secevent+jwt"},
+    )
+
+    assert response.status_code == 400
+    verify.assert_not_awaited()
+
+
+def test_risc_endpoint_rejects_unsupported_event_type(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event = _risc_event(event_type="https://example.com/custom-event")
+    verify = AsyncMock(return_value=event)
+    apply = AsyncMock()
+    monkeypatch.setattr(app_module, "verify_risc_set", verify)
+    monkeypatch.setattr(app_module, "apply_risc_event", apply)
+
+    response = client.post(
+        f"{API_PREFIX}/auth/google/risc",
+        content=b"header.payload.signature",
+        headers={"Content-Type": "application/secevent+jwt"},
+    )
+
+    assert response.status_code == 400
+    assert "Unsupported event type" in response.json()["detail"]
+    apply.assert_not_awaited()
+
+
+def test_risc_endpoint_is_not_authenticated(client: TestClient) -> None:
+    # Google posts SETs without Bearer auth; absence of a token must not
+    # trigger the 401 that protected endpoints return.
+    response = client.post(
+        f"{API_PREFIX}/auth/google/risc",
+        content=b"",
+        headers={"Content-Type": "application/secevent+jwt"},
+    )
+
+    # Empty body returns 400 (not 401), proving auth is not required.
+    assert response.status_code == 400

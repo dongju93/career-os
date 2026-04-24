@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 from urllib.parse import urlencode
 
@@ -7,6 +8,13 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from career_os_api.auth.dependencies import get_current_user
 from career_os_api.auth.jwt import create_access_token
+from career_os_api.auth.risc import (
+    SUPPORTED_EVENT_TYPES,
+    RiscVerificationError,
+    RiscVerificationUnavailableError,
+    verify_risc_set,
+)
+from career_os_api.auth.risc_handlers import apply_risc_event
 from career_os_api.config import settings
 from career_os_api.constants import API_V1
 from career_os_api.database.job_postings import (
@@ -123,6 +131,7 @@ async def google_callback(request: Request) -> RedirectResponse:
 
     request.session.clear()
     request.session["user_id"] = str(user["id"])
+    request.session["issued_at"] = int(datetime.now(UTC).timestamp())
     access_token = create_access_token(data={"sub": str(user["id"])})
 
     return RedirectResponse(f"{target}?{urlencode({'access_token': access_token})}")
@@ -177,6 +186,77 @@ async def logout_current_user(
         status_code=status.HTTP_200_OK,
         message="세션이 종료되었습니다. 토큰은 클라이언트에서 삭제해 주세요.",
     )
+
+
+_MAX_RISC_BODY_BYTES = 65_536
+
+
+@v1_router.post(
+    "/auth/google/risc",
+    tags=["auth"],
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        202: {"description": "Security Event Token accepted"},
+        400: {"description": "Malformed or unsupported Security Event Token"},
+        401: {"description": "Signature or claim verification failed"},
+        413: {"description": "Request body too large"},
+        503: {"description": "RISC verification temporarily unavailable"},
+    },
+)
+async def receive_google_risc_event(request: Request) -> Response:
+    # Google posts Security Event Tokens as a raw compact-serialized JWT with
+    # Content-Type `application/secevent+jwt`. The body is the token itself
+    # — not JSON — so stream it with a hard size cap to prevent DoS on this
+    # unauthenticated endpoint.
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > _MAX_RISC_BODY_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Request body exceeds maximum allowed size",
+            )
+        chunks.append(chunk)
+    raw = b"".join(chunks)
+    try:
+        token = raw.decode("ascii").strip()
+    except UnicodeDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Request body must be ASCII-encoded JWT",
+        ) from exc
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Empty request body",
+        )
+
+    try:
+        event = await verify_risc_set(token)
+    except RiscVerificationUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="RISC verification is temporarily unavailable",
+        ) from exc
+    except RiscVerificationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+        ) from exc
+
+    if event.event_type not in SUPPORTED_EVENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported event type: {event.event_type}",
+        )
+
+    async def operation(conn):
+        await apply_risc_event(conn, event)
+
+    await run_database_operation(request.app.state.pool, operation)
+    return Response(status_code=status.HTTP_202_ACCEPTED)
 
 
 # ── Job Postings ──────────────────────────────────────────────────────────────
