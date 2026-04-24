@@ -62,7 +62,11 @@ SUPPORTED_EVENT_TYPES: frozenset[str] = frozenset(
 
 
 class RiscVerificationError(Exception):
-    """Raised when a SET JWT fails signature or claim verification."""
+    """Raised when a SET JWT cannot be verified or fails claim checks."""
+
+
+class RiscVerificationUnavailableError(RiscVerificationError):
+    """Raised when SET verification cannot complete due to upstream key lookup."""
 
 
 @dataclass(frozen=True)
@@ -89,10 +93,14 @@ async def _fetch_jwks() -> list[dict[str, Any]]:
             response.raise_for_status()
             data = response.json()
     except httpx.HTTPError as exc:
-        raise RiscVerificationError(f"Failed to fetch JWKS: {exc}") from exc
+        raise RiscVerificationUnavailableError(f"Failed to fetch JWKS: {exc}") from exc
+    except ValueError as exc:
+        raise RiscVerificationUnavailableError("Malformed JWKS document") from exc
+    if not isinstance(data, dict):
+        raise RiscVerificationUnavailableError("Malformed JWKS document")
     keys = data.get("keys")
     if not isinstance(keys, list):
-        raise RiscVerificationError("Malformed JWKS document")
+        raise RiscVerificationUnavailableError("Malformed JWKS document")
     return keys
 
 
@@ -158,7 +166,7 @@ def _extract_event(payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 async def verify_risc_set(token: str, *, now: int | None = None) -> RiscEvent:
     """Verify a SET JWT against Google's JWKS and return the parsed event.
 
-    Raises `RiscVerificationError` on any signature or claim failure.
+    Raises `RiscVerificationError` on signature, claim, or key lookup failure.
     """
     key = await _find_signing_key(token)
 
@@ -170,7 +178,11 @@ async def verify_risc_set(token: str, *, now: int | None = None) -> RiscEvent:
             audience=settings.risc_audience,
             issuer=settings.google_risc_issuer,
             # SETs don't carry `exp`; skip that check explicitly.
-            options={"verify_exp": False, "verify_at_hash": False},
+            options={
+                "verify_exp": False,
+                "verify_at_hash": False,
+                "require_aud": True,
+            },
         )
     except JWTError as exc:
         raise RiscVerificationError(f"JWT verification failed: {exc}") from exc
