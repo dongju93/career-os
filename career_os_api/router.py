@@ -11,6 +11,7 @@ from career_os_api.auth.jwt import create_access_token
 from career_os_api.auth.risc import (
     SUPPORTED_EVENT_TYPES,
     RiscVerificationError,
+    RiscVerificationUnavailableError,
     verify_risc_set,
 )
 from career_os_api.auth.risc_handlers import apply_risc_event
@@ -199,6 +200,7 @@ _MAX_RISC_BODY_BYTES = 65_536
         400: {"description": "Malformed or unsupported Security Event Token"},
         401: {"description": "Signature or claim verification failed"},
         413: {"description": "Request body too large"},
+        503: {"description": "RISC verification temporarily unavailable"},
     },
 )
 async def receive_google_risc_event(request: Request) -> Response:
@@ -233,6 +235,11 @@ async def receive_google_risc_event(request: Request) -> Response:
 
     try:
         event = await verify_risc_set(token)
+    except RiscVerificationUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="RISC verification is temporarily unavailable",
+        ) from exc
     except RiscVerificationError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
