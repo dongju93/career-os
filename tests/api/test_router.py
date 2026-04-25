@@ -797,6 +797,33 @@ def test_risc_endpoint_rejects_non_ascii_body(
     verify.assert_not_awaited()
 
 
+@pytest.mark.parametrize(
+    "content_type",
+    [
+        "application/json",
+        "text/plain",
+        "",
+    ],
+)
+def test_risc_endpoint_rejects_wrong_content_type(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    content_type: str,
+) -> None:
+    verify = AsyncMock()
+    monkeypatch.setattr(app_module, "verify_risc_set", verify)
+
+    headers = {"Content-Type": content_type} if content_type else {}
+    response = client.post(
+        f"{API_PREFIX}/auth/google/risc",
+        content=b"header.payload.signature",
+        headers=headers,
+    )
+
+    assert response.status_code == 415
+    verify.assert_not_awaited()
+
+
 def test_risc_endpoint_rejects_unsupported_event_type(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,

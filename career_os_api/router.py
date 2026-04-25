@@ -229,6 +229,7 @@ _MAX_RISC_BODY_BYTES = 65_536
         400: {"description": "Malformed or unsupported Security Event Token"},
         401: {"description": "Signature or claim verification failed"},
         413: {"description": "Request body too large"},
+        415: {"description": "Content-Type must be application/secevent+jwt"},
         503: {"description": "RISC verification temporarily unavailable"},
     },
 )
@@ -237,6 +238,13 @@ async def receive_google_risc_event(request: Request) -> Response:
     # Content-Type `application/secevent+jwt`. The body is the token itself
     # — not JSON — so stream it with a hard size cap to prevent DoS on this
     # unauthenticated endpoint.
+    content_type = request.headers.get("content-type", "")
+    if content_type.split(";")[0].strip() != "application/secevent+jwt":
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Content-Type must be application/secevent+jwt",
+        )
+
     chunks: list[bytes] = []
     total = 0
     async for chunk in request.stream():
