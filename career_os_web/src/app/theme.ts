@@ -1,7 +1,7 @@
 import { createTheme } from '@mantine/core';
 
 export const appTheme = createTheme({
-  primaryColor: 'orange',
+  primaryColor: 'teal',
   defaultRadius: 'md',
   fontFamily:
     'IBM Plex Sans, Avenir Next, Segoe UI Variable, Segoe UI, sans-serif',

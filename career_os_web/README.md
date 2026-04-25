@@ -52,7 +52,7 @@ pnpm dev
 | **React 19**                 | UI 라이브러리            | 선언형 컴포넌트 기반 UI 작성. 생태계가 넓고 커뮤니티 지원이 활발해 프런트엔드 기반으로 적합                         |
 | **TypeScript 7**             | 정적 타입 시스템         | 컴포넌트 props·상태·API 응답 계약을 타입으로 검증해 리팩터링 안정성과 IDE 지원을 높임                               |
 | **Vite 8**                   | 개발 서버·번들러         | 빠른 HMR과 짧은 빌드 시간. ESM 네이티브 기반으로 개발 생산성이 높음                                                 |
-| **Mantine 9**                | UI 컴포넌트 라이브러리   | 버튼·폼·모달·카드 등 공통 UI를 일관되게 제공. 접근성과 커스터마이징이 잘 되어 있어 관리 비용이 낮음                 |
+| **Mantine 9**                | UI 컴포넌트 라이브러리   | Provider·테마 기반 의존성으로 유지. 실제 화면 primitive는 `src/components/ui/` 사용. 접근성과 커스터마이징 지원     |
 | **React Router 7**           | 클라이언트 사이드 라우팅 | URL 기반 화면 전환·레이아웃 분리·인증 리다이렉트를 체계적으로 관리                                                  |
 | **Zustand 5**                | 전역 상태 관리           | Context 대비 보일러플레이트가 적고 가벼움. `persist` 미들웨어로 인증 상태를 `localStorage`에 영속 저장              |
 | **Tailwind CSS 4**           | 유틸리티 퍼스트 CSS      | 반복 CSS 작성을 줄이고 토큰 기반 UI를 빠르게 조합. `@tailwindcss/vite` 플러그인으로 별도 설정 파일 없이 Vite에 연동 |
@@ -79,7 +79,7 @@ pnpm dev
 
 ```bash
 pnpm dev           # 개발 서버 (HMR)
-pnpm build         # tsc -b && vite build
+pnpm build         # tsgo -b && vite build
 pnpm preview       # 프로덕션 빌드 미리보기
 pnpm lint          # 린트 검사
 pnpm lint:fix      # 린트 자동 수정
