@@ -87,18 +87,42 @@ async def _collect_images_as_base64(
             absolute_srcs.append(src)
 
     data_urls: list[str] = []
+    total_b64_bytes = 0
     async with httpx.AsyncClient(
         follow_redirects=True, timeout=settings.http_image_timeout
     ) as client:
         for src in absolute_srcs[: settings.max_images]:
+            if total_b64_bytes >= settings.max_total_image_bytes:
+                break
             try:
-                resp = await client.get(src)
-                if resp.status_code == 200:
+                async with client.stream("GET", src) as resp:
+                    if resp.status_code != 200:
+                        continue
                     mime = resp.headers.get("content-type", "").split(";")[0].strip()
                     if mime not in _OPENAI_SUPPORTED_IMAGE_TYPES:
                         continue
-                    b64 = base64.b64encode(resp.content).decode()
-                    data_urls.append(f"data:{mime};base64,{b64}")
+                    # Skip before downloading when Content-Length already exceeds budget.
+                    content_length = resp.headers.get("content-length")
+                    if (
+                        content_length is not None
+                        and int(content_length) > settings.max_image_bytes
+                    ):
+                        continue
+                    chunks: list[bytes] = []
+                    raw_size = 0
+                    async for chunk in resp.aiter_bytes(chunk_size=65536):
+                        raw_size += len(chunk)
+                        if raw_size > settings.max_image_bytes:
+                            break
+                        chunks.append(chunk)
+                    else:
+                        # Only encode when the loop completed without hitting the cap.
+                        raw = b"".join(chunks)
+                        b64 = base64.b64encode(raw).decode()
+                        b64_size = len(b64)
+                        if total_b64_bytes + b64_size <= settings.max_total_image_bytes:
+                            data_urls.append(f"data:{mime};base64,{b64}")
+                            total_b64_bytes += b64_size
             except httpx.RequestError:
                 continue  # Skip unreachable images silently
 

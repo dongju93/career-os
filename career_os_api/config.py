@@ -58,6 +58,12 @@ class Settings(BaseSettings):
         "none", "minimal", "low", "medium", "high", "xhigh"
     ] = "medium"
     max_images: int = 10
+    # Per-image byte cap applied during streaming download (default 2 MB).
+    # Prevents a single large image from blowing up memory and OpenAI payload.
+    max_image_bytes: int = 2 * 1024 * 1024
+    # Total base64 payload cap across all collected images (default 10 MB).
+    # base64 expands raw bytes by ~33 %, so 10 MB ≈ 7.5 MB of raw image data.
+    max_total_image_bytes: int = 10 * 1024 * 1024
 
     @property
     def risc_audience(self) -> str:
