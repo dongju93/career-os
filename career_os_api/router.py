@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from typing import Annotated
 from urllib.parse import urlencode, urlparse
@@ -40,6 +41,8 @@ from career_os_api.service.job_posting.extractor import extract_job_posting
 from career_os_api.service.job_posting.fetch import fetch_url_content
 
 v1_router = APIRouter(prefix=f"/{API_V1}")
+
+_logger = logging.getLogger(__name__)
 
 oauth = OAuth()
 oauth.register(
@@ -129,9 +132,10 @@ async def google_callback(request: Request) -> RedirectResponse:
     try:
         token = await oauth.google.authorize_access_token(request)
     except Exception as exc:
+        _logger.exception("OAuth token exchange failed: %s", exc)
         request.session.clear()
         return RedirectResponse(
-            f"{target}?{urlencode({'error': f'Google 토큰 교환 실패: {exc}'})}"
+            f"{target}?{urlencode({'error': 'oauth_token_exchange_failed'})}"
         )
 
     user_info = token.get("userinfo")
