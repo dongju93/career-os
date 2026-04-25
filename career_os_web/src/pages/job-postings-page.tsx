@@ -2,6 +2,8 @@ import {
   AlertCircle,
   Briefcase,
   Building2,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   MapPin,
   PlusCircle,
@@ -9,7 +11,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -149,6 +151,8 @@ function JobPostingCard({ item }: { item: JobPostingListItem }) {
   );
 }
 
+const PAGE_SIZE = 50;
+
 const SKELETON_KEYS = ['sk-a', 'sk-b', 'sk-c', 'sk-d', 'sk-e', 'sk-f'];
 
 function LoadingCard() {
@@ -198,6 +202,9 @@ function JobPostingsErrorState({
 
 export function JobPostingsPage() {
   const token = useAuthStore((state) => state.token);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = Math.max(1, Number(searchParams.get('page') ?? '1'));
+
   const [items, setItems] = useState<JobPostingListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -206,13 +213,14 @@ export function JobPostingsPage() {
   const loadJobPostings = useCallback(() => {
     if (!token) return;
 
+    const offset = (page - 1) * PAGE_SIZE;
     setIsLoading(true);
     setError(null);
 
-    fetchJobPostings(token)
-      .then((page) => {
-        setItems(page.items);
-        setTotal(page.total);
+    fetchJobPostings(token, offset, PAGE_SIZE)
+      .then((pageData) => {
+        setItems(pageData.items);
+        setTotal(pageData.total);
       })
       .catch((err: unknown) => {
         setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
@@ -220,11 +228,24 @@ export function JobPostingsPage() {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [token]);
+  }, [token, page]);
 
   useEffect(() => {
     loadJobPostings();
   }, [loadJobPostings]);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const hasPrev = page > 1;
+  const hasNext = page < totalPages;
+
+  function goToPage(newPage: number) {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('page', String(newPage));
+      return next;
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -308,6 +329,32 @@ export function JobPostingsPage() {
           {items.map((item) => (
             <JobPostingCard key={item.id} item={item} />
           ))}
+        </div>
+      )}
+
+      {!isLoading && !error && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <Button
+            disabled={!hasPrev}
+            size="sm"
+            variant="outline"
+            onClick={() => goToPage(page - 1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            이전
+          </Button>
+          <span className="text-sm text-gray-600">
+            {page} / {totalPages}
+          </span>
+          <Button
+            disabled={!hasNext}
+            size="sm"
+            variant="outline"
+            onClick={() => goToPage(page + 1)}
+          >
+            다음
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
       )}
     </div>
