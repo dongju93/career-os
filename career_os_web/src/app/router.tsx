@@ -2,6 +2,7 @@ import { lazy } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router';
 import { AppLayout } from '../components/app-layout';
 import { ProtectedRoute } from '../components/protected-route';
+import { RouteErrorBoundary } from '../components/route-error-boundary';
 import { AuthCallbackPage } from '../pages/auth-callback-page';
 import { LoginPage } from '../pages/login-page';
 import { NotFoundPage } from '../pages/not-found-page';
@@ -34,9 +35,11 @@ export const appRoutes = [
   {
     path: '/',
     element: <ProtectedRoute />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         element: <AppLayout />,
+        errorElement: <RouteErrorBoundary />,
         children: [
           {
             index: true,
