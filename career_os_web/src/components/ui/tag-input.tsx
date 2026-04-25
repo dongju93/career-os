@@ -53,6 +53,7 @@ export function TagInput({
         <Badge key={tag} className="gap-1 pr-1" variant="glass">
           {tag}
           <button
+            aria-label={`${tag} 제거`}
             className="transition-colors hover:text-red-300"
             onClick={() => removeTag(tag)}
             type="button"
