@@ -29,6 +29,7 @@ import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { extractJobPosting, saveJobPosting } from '../services/job-postings';
 import { useAuthStore } from '../store/auth-store';
 import type { JobPostingExtracted, Platform } from '../types/job-posting';
+import { toSafeExternalUrl } from '../utils/url';
 
 interface FormState {
   company_name: string;
@@ -309,6 +310,8 @@ export function AddJobPostingPage() {
     );
   }
 
+  const safeMetaPostingUrl = toSafeExternalUrl(meta?.posting_url);
+
   return (
     <div className="mx-auto max-w-4xl animate-fade-in space-y-6">
       {/* Page header — transparent, floating on background */}
@@ -393,14 +396,16 @@ export function AddJobPostingPage() {
                   </CardDescription>
                 </div>
               </div>
-              <a
-                className="text-gray-600 hover:text-primary transition-colors"
-                href={meta.posting_url}
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </a>
+              {safeMetaPostingUrl && (
+                <a
+                  className="text-gray-600 hover:text-primary transition-colors"
+                  href={safeMetaPostingUrl}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              )}
             </div>
           </CardHeader>
 

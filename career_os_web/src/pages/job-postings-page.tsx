@@ -18,6 +18,7 @@ import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { fetchJobPostings } from '../services/job-postings';
 import { useAuthStore } from '../store/auth-store';
 import type { JobPostingListItem, Platform } from '../types/job-posting';
+import { toSafeExternalUrl } from '../utils/url';
 
 function formatRelativeDate(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -53,6 +54,7 @@ function JobPostingCard({ item }: { item: JobPostingListItem }) {
   const hasDetails = Boolean(
     item.location || item.experience_req || item.deadline || item.salary,
   );
+  const safePostingUrl = toSafeExternalUrl(item.posting_url);
 
   return (
     <Card className="group glass-hover relative overflow-hidden has-focus-visible:ring-2 has-focus-visible:ring-primary has-focus-visible:ring-offset-2">
@@ -65,16 +67,18 @@ function JobPostingCard({ item }: { item: JobPostingListItem }) {
             <span className="text-xs font-medium text-gray-600">
               {formatRelativeDate(item.created_at)}
             </span>
-            <a
-              className="relative z-10 flex h-6 w-6 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-accent hover:text-primary"
-              href={item.posting_url}
-              rel="noreferrer"
-              target="_blank"
-              title="원본 공고 열기"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              <span className="sr-only">원본 공고 열기</span>
-            </a>
+            {safePostingUrl && (
+              <a
+                className="relative z-10 flex h-6 w-6 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-accent hover:text-primary"
+                href={safePostingUrl}
+                rel="noreferrer"
+                target="_blank"
+                title="원본 공고 열기"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                <span className="sr-only">원본 공고 열기</span>
+              </a>
+            )}
           </div>
         </div>
 

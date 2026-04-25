@@ -29,6 +29,7 @@ import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { fetchJobPosting } from '../services/job-postings';
 import { useAuthStore } from '../store/auth-store';
 import type { JobPostingDetail, Platform } from '../types/job-posting';
+import { toSafeExternalUrl } from '../utils/url';
 
 function formatRelativeDate(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -167,6 +168,9 @@ export function JobPostingDetailPage() {
 
   if (!detail) return null;
 
+  const safePostingUrl = toSafeExternalUrl(detail.posting_url);
+  const safeHomepage = toSafeExternalUrl(detail.homepage);
+
   const hasMetadata = Boolean(
     detail.location ||
       detail.experience_req ||
@@ -222,12 +226,14 @@ export function JobPostingDetailPage() {
           <span className="text-sm text-gray-500">
             {formatRelativeDate(detail.created_at)}
           </span>
-          <Button className="sm:ml-2" variant="outline" size="sm" asChild>
-            <a href={detail.posting_url} rel="noreferrer" target="_blank">
-              <ExternalLink className="h-4 w-4" />
-              원본 공고 보기
-            </a>
-          </Button>
+          {safePostingUrl && (
+            <Button className="sm:ml-2" variant="outline" size="sm" asChild>
+              <a href={safePostingUrl} rel="noreferrer" target="_blank">
+                <ExternalLink className="h-4 w-4" />
+                원본 공고 보기
+              </a>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -326,13 +332,13 @@ export function JobPostingDetailPage() {
       )}
 
       {/* Homepage */}
-      {detail.homepage && (
+      {safeHomepage && (
         <Card>
           <CardContent className="p-5">
             <SectionHeading icon={Globe} title="홈페이지" />
             <a
               className="mt-3 flex items-center gap-1.5 text-sm text-primary hover:underline"
-              href={detail.homepage}
+              href={safeHomepage}
               rel="noreferrer"
               target="_blank"
             >
