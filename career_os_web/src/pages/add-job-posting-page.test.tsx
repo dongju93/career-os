@@ -91,7 +91,7 @@ describe('AddJobPostingPage', () => {
     renderRoute('/job-postings/new');
 
     await user.type(
-      screen.getByPlaceholderText('https://www.saramin.co.kr/...'),
+      await screen.findByPlaceholderText('https://www.saramin.co.kr/...'),
       postingUrl,
     );
     await user.click(screen.getByRole('button', { name: /불러오기/ }));
@@ -163,7 +163,7 @@ describe('AddJobPostingPage', () => {
 
     renderRoute('/job-postings/new');
 
-    const urlInput = screen.getByPlaceholderText(
+    const urlInput = await screen.findByPlaceholderText(
       'https://www.saramin.co.kr/...',
     );
     await user.type(urlInput, postingUrl);
