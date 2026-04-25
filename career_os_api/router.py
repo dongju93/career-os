@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from career_os_api.auth.dependencies import get_current_user
-from career_os_api.auth.jwt import create_access_token
 from career_os_api.auth.risc import (
     SUPPORTED_EVENT_TYPES,
     RiscVerificationError,
@@ -163,9 +162,8 @@ async def google_callback(request: Request) -> RedirectResponse:
     request.session.clear()
     request.session["user_id"] = str(user["id"])
     request.session["issued_at"] = int(datetime.now(UTC).timestamp())
-    access_token = create_access_token(data={"sub": str(user["id"])})
 
-    return RedirectResponse(f"{target}?{urlencode({'access_token': access_token})}")
+    return RedirectResponse(target)
 
 
 @v1_router.get("/auth/me", tags=["auth"])
