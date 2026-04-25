@@ -55,6 +55,7 @@ export async function saveJobPosting(
       body: JSON.stringify(data),
     },
     '저장에 실패했습니다.',
+    { retryable: true }, // POST /v1/job-postings is a server-side upsert
   );
   return response.status;
 }
