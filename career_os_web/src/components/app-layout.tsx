@@ -6,11 +6,11 @@ import {
   PlusCircle,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { cn } from '@/lib/utils';
 import { logoutUser } from '../services/auth';
-import { useAuthStore } from '../store/auth-store';
+import { resetAuthStore, useAuthStore } from '../store/auth-store';
 import { AvatarFallback, AvatarImage, AvatarRoot } from './ui/avatar';
 import { Button } from './ui/button';
 
@@ -38,13 +38,12 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
-  const clearAuth = useAuthStore((state) => state.clearAuth);
 
   async function handleLogout() {
     if (token) {
       await logoutUser(token).catch(() => {});
     }
-    clearAuth();
+    resetAuthStore();
     navigate('/login', { replace: true });
   }
 
@@ -235,7 +234,15 @@ export function AppLayout() {
       {/* Main content — pages float on the vibrant background */}
       <main className="relative md:pl-64">
         <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
-          <Outlet />
+          <Suspense
+            fallback={
+              <div className="flex h-64 items-center justify-center text-sm text-gray-500">
+                로딩 중…
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
         </div>
       </main>
     </div>

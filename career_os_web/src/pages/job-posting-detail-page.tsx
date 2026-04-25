@@ -29,6 +29,7 @@ import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { fetchJobPosting } from '../services/job-postings';
 import { useAuthStore } from '../store/auth-store';
 import type { JobPostingDetail, Platform } from '../types/job-posting';
+import { toSafeExternalUrl } from '../utils/url';
 
 function formatRelativeDate(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -120,22 +121,30 @@ export function JobPostingDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<UserFacingError | null>(null);
 
-  const loadDetail = useCallback(() => {
-    if (!token || !id) return;
+  const loadDetail = useCallback(
+    (signal?: AbortSignal) => {
+      if (!token || !id) return;
 
-    setIsLoading(true);
-    setError(null);
+      setIsLoading(true);
+      setError(null);
 
-    fetchJobPosting(token, Number(id))
-      .then(setDetail)
-      .catch((err: unknown) => {
-        setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
-      })
-      .finally(() => setIsLoading(false));
-  }, [token, id]);
+      fetchJobPosting(token, Number(id), signal)
+        .then(setDetail)
+        .catch((err: unknown) => {
+          if (err instanceof Error && err.name === 'AbortError') return;
+          setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
+        })
+        .finally(() => {
+          if (!signal?.aborted) setIsLoading(false);
+        });
+    },
+    [token, id],
+  );
 
   useEffect(() => {
-    loadDetail();
+    const controller = new AbortController();
+    loadDetail(controller.signal);
+    return () => controller.abort();
   }, [loadDetail]);
 
   const backLink = (
@@ -166,6 +175,9 @@ export function JobPostingDetailPage() {
   }
 
   if (!detail) return null;
+
+  const safePostingUrl = toSafeExternalUrl(detail.posting_url);
+  const safeHomepage = toSafeExternalUrl(detail.homepage);
 
   const hasMetadata = Boolean(
     detail.location ||
@@ -222,12 +234,14 @@ export function JobPostingDetailPage() {
           <span className="text-sm text-gray-500">
             {formatRelativeDate(detail.created_at)}
           </span>
-          <Button className="sm:ml-2" variant="outline" size="sm" asChild>
-            <a href={detail.posting_url} rel="noreferrer" target="_blank">
-              <ExternalLink className="h-4 w-4" />
-              원본 공고 보기
-            </a>
-          </Button>
+          {safePostingUrl && (
+            <Button className="sm:ml-2" variant="outline" size="sm" asChild>
+              <a href={safePostingUrl} rel="noreferrer" target="_blank">
+                <ExternalLink className="h-4 w-4" />
+                원본 공고 보기
+              </a>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -326,13 +340,13 @@ export function JobPostingDetailPage() {
       )}
 
       {/* Homepage */}
-      {detail.homepage && (
+      {safeHomepage && (
         <Card>
           <CardContent className="p-5">
             <SectionHeading icon={Globe} title="홈페이지" />
             <a
               className="mt-3 flex items-center gap-1.5 text-sm text-primary hover:underline"
-              href={detail.homepage}
+              href={safeHomepage}
               rel="noreferrer"
               target="_blank"
             >
