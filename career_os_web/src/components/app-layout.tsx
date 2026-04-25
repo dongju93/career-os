@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { cn } from '@/lib/utils';
 import { logoutUser } from '../services/auth';
-import { useAuthStore } from '../store/auth-store';
+import { resetAuthStore, useAuthStore } from '../store/auth-store';
 import { AvatarFallback, AvatarImage, AvatarRoot } from './ui/avatar';
 import { Button } from './ui/button';
 
@@ -38,13 +38,12 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
-  const clearAuth = useAuthStore((state) => state.clearAuth);
 
   async function handleLogout() {
     if (token) {
       await logoutUser(token).catch(() => {});
     }
-    clearAuth();
+    resetAuthStore();
     navigate('/login', { replace: true });
   }
 
