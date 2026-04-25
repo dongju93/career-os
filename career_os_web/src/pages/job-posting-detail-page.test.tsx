@@ -121,9 +121,9 @@ describe('JobPostingDetailPage', () => {
     ).toHaveAttribute('href', 'https://career-os.example.com');
     expect(fetchMock).toHaveBeenCalledWith(
       `${API_BASE_URL}/v1/job-postings/1`,
-      {
+      expect.objectContaining({
         headers: { Authorization: 'Bearer test-token' },
-      },
+      }),
     );
   });
 
@@ -156,9 +156,9 @@ describe('JobPostingDetailPage', () => {
     ).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       `${API_BASE_URL}/v1/job-postings/1`,
-      {
+      expect.objectContaining({
         headers: { Authorization: 'Bearer test-token' },
-      },
+      }),
     );
   });
 

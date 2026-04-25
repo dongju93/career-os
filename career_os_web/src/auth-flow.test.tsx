@@ -52,9 +52,9 @@ describe('authentication flow', () => {
     expect(router.state.location.pathname).toBe('/job-postings');
     expect(fetchMock).toHaveBeenCalledWith(
       'https://career-os.fastapicloud.dev/v1/job-postings?offset=0&limit=50',
-      {
+      expect.objectContaining({
         headers: { Authorization: 'Bearer test-token' },
-      },
+      }),
     );
   });
 
@@ -114,9 +114,9 @@ describe('authentication flow', () => {
     );
     expect(fetchMock).toHaveBeenCalledWith(
       'https://career-os.fastapicloud.dev/v1/job-postings?offset=0&limit=50',
-      {
+      expect.objectContaining({
         headers: { Authorization: 'Bearer test-token' },
-      },
+      }),
     );
     expect(router.state.location.pathname).toBe('/job-postings');
     expect(useAuthStore.getState().token).toBe('test-token');

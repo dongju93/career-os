@@ -30,10 +30,11 @@ function assertContractMatch<T>(
 export async function extractJobPosting(
   token: string,
   url: string,
+  signal?: AbortSignal,
 ): Promise<JobPostingExtracted> {
   const response = await fetchWithApiRetry(
     `${API_BASE_URL}/v1/job-postings/extraction?url=${encodeURIComponent(url)}`,
-    { headers: { Authorization: `Bearer ${token}` } },
+    { headers: { Authorization: `Bearer ${token}` }, signal },
     '채용공고 정보를 가져오지 못했습니다.',
   );
   const raw = await response.json();
@@ -63,10 +64,11 @@ export async function saveJobPosting(
 export async function fetchJobPosting(
   token: string,
   id: number,
+  signal?: AbortSignal,
 ): Promise<JobPostingDetail> {
   const response = await fetchWithApiRetry(
     `${API_BASE_URL}/v1/job-postings/${id}`,
-    { headers: { Authorization: `Bearer ${token}` } },
+    { headers: { Authorization: `Bearer ${token}` }, signal },
     '채용공고를 불러오지 못했습니다.',
   );
   const raw = await response.json();
@@ -77,11 +79,12 @@ export async function fetchJobPostings(
   token: string,
   offset = 0,
   limit = 50,
+  signal?: AbortSignal,
 ): Promise<JobPostingPage> {
   const url = `${API_BASE_URL}/v1/job-postings?offset=${offset}&limit=${limit}`;
   const response = await fetchWithApiRetry(
     url,
-    { headers: { Authorization: `Bearer ${token}` } },
+    { headers: { Authorization: `Bearer ${token}` }, signal },
     '채용공고 목록을 불러오지 못했습니다.',
   );
   const raw = await response.json();

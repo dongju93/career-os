@@ -8,7 +8,7 @@ import {
   Search,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -190,6 +190,7 @@ export function AddJobPostingPage() {
   const [extractError, setExtractError] = useState<UserFacingError | null>(
     null,
   );
+  const extractControllerRef = useRef<AbortController | null>(null);
 
   const [meta, setMeta] = useState<ExtractedMeta | null>(null);
   const [formData, setFormData] = useState<FormState | null>(null);
@@ -211,6 +212,11 @@ export function AddJobPostingPage() {
 
   async function handleExtract() {
     if (!token || !url.trim()) return;
+
+    extractControllerRef.current?.abort();
+    const controller = new AbortController();
+    extractControllerRef.current = controller;
+
     setIsExtracting(true);
     setExtractError(null);
     setSavedInfo(null);
@@ -219,7 +225,11 @@ export function AddJobPostingPage() {
     setFormErrors({});
     setSaveError(null);
     try {
-      const data = await extractJobPosting(token, url.trim());
+      const data = await extractJobPosting(
+        token,
+        url.trim(),
+        controller.signal,
+      );
       setMeta({
         platform: data.platform,
         posting_id: data.posting_id,
@@ -227,11 +237,14 @@ export function AddJobPostingPage() {
       });
       setFormData(toFormState(data));
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
       setExtractError(
         toUserFacingError(err, '채용공고 정보를 불러오지 못했습니다.'),
       );
     } finally {
-      setIsExtracting(false);
+      if (extractControllerRef.current === controller) {
+        setIsExtracting(false);
+      }
     }
   }
 

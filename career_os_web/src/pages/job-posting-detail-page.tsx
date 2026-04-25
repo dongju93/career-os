@@ -121,22 +121,30 @@ export function JobPostingDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<UserFacingError | null>(null);
 
-  const loadDetail = useCallback(() => {
-    if (!token || !id) return;
+  const loadDetail = useCallback(
+    (signal?: AbortSignal) => {
+      if (!token || !id) return;
 
-    setIsLoading(true);
-    setError(null);
+      setIsLoading(true);
+      setError(null);
 
-    fetchJobPosting(token, Number(id))
-      .then(setDetail)
-      .catch((err: unknown) => {
-        setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
-      })
-      .finally(() => setIsLoading(false));
-  }, [token, id]);
+      fetchJobPosting(token, Number(id), signal)
+        .then(setDetail)
+        .catch((err: unknown) => {
+          if (err instanceof Error && err.name === 'AbortError') return;
+          setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
+        })
+        .finally(() => {
+          if (!signal?.aborted) setIsLoading(false);
+        });
+    },
+    [token, id],
+  );
 
   useEffect(() => {
-    loadDetail();
+    const controller = new AbortController();
+    loadDetail(controller.signal);
+    return () => controller.abort();
   }, [loadDetail]);
 
   const backLink = (

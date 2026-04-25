@@ -210,28 +210,34 @@ export function JobPostingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<UserFacingError | null>(null);
 
-  const loadJobPostings = useCallback(() => {
-    if (!token) return;
+  const loadJobPostings = useCallback(
+    (signal?: AbortSignal) => {
+      if (!token) return;
 
-    const offset = (page - 1) * PAGE_SIZE;
-    setIsLoading(true);
-    setError(null);
+      const offset = (page - 1) * PAGE_SIZE;
+      setIsLoading(true);
+      setError(null);
 
-    fetchJobPostings(token, offset, PAGE_SIZE)
-      .then((pageData) => {
-        setItems(pageData.items);
-        setTotal(pageData.total);
-      })
-      .catch((err: unknown) => {
-        setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  }, [token, page]);
+      fetchJobPostings(token, offset, PAGE_SIZE, signal)
+        .then((pageData) => {
+          setItems(pageData.items);
+          setTotal(pageData.total);
+        })
+        .catch((err: unknown) => {
+          if (err instanceof Error && err.name === 'AbortError') return;
+          setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
+        })
+        .finally(() => {
+          if (!signal?.aborted) setIsLoading(false);
+        });
+    },
+    [token, page],
+  );
 
   useEffect(() => {
-    loadJobPostings();
+    const controller = new AbortController();
+    loadJobPostings(controller.signal);
+    return () => controller.abort();
   }, [loadJobPostings]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
