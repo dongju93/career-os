@@ -2,9 +2,8 @@ import { Loader2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Card, CardContent } from '@/components/ui/card';
-import { API_BASE_URL } from '../services/api-base-url';
-import { fetchWithApiRetry } from '../services/api-client';
 import { toUserFacingError } from '../services/api-error';
+import { fetchAuthMe } from '../services/auth';
 import { useAuthStore } from '../store/auth-store';
 import {
   buildLoginPath,
@@ -42,21 +41,14 @@ export function AuthCallbackPage() {
       return;
     }
 
-    fetchWithApiRetry(
-      `${API_BASE_URL}/v1/auth/me`,
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      },
-      '로그인 완료에 실패했습니다. 다시 시도해주세요.',
-    )
-      .then((res) => res.json())
+    fetchAuthMe(accessToken)
       .then((data) => {
         setAuth(
           {
             id: data.user_id,
             email: data.email,
-            name: data.name ?? null,
-            picture: data.picture ?? null,
+            name: data.name,
+            picture: data.picture,
           },
           accessToken,
         );
