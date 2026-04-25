@@ -18,6 +18,7 @@ from typing import Any
 import httpx
 from jose import JWTError, jwt
 
+from career_os_api._types import AsyncHttpClient
 from career_os_api.config import settings
 
 logger = logging.getLogger(__name__)
@@ -84,14 +85,11 @@ class RiscEvent:
 _jwks_state: dict[str, Any] = {"keys": [], "fetched_at": 0.0}
 
 
-async def _fetch_jwks() -> list[dict[str, Any]]:
+async def _fetch_jwks(http_client: AsyncHttpClient) -> list[dict[str, Any]]:
     try:
-        async with httpx.AsyncClient(
-            timeout=settings.google_risc_http_timeout_seconds
-        ) as client:
-            response = await client.get(settings.google_risc_jwks_uri)
-            response.raise_for_status()
-            data = response.json()
+        response = await http_client.get(settings.google_risc_jwks_uri)
+        response.raise_for_status()
+        data = response.json()
     except httpx.HTTPError as exc:
         raise RiscVerificationUnavailableError(f"Failed to fetch JWKS: {exc}") from exc
     except ValueError as exc:
@@ -104,7 +102,9 @@ async def _fetch_jwks() -> list[dict[str, Any]]:
     return keys
 
 
-async def get_jwks(*, force_refresh: bool = False) -> list[dict[str, Any]]:
+async def get_jwks(
+    http_client: AsyncHttpClient, *, force_refresh: bool = False
+) -> list[dict[str, Any]]:
     now = time.monotonic()
     fresh = (
         not force_refresh
@@ -113,7 +113,7 @@ async def get_jwks(*, force_refresh: bool = False) -> list[dict[str, Any]]:
         <= settings.google_risc_jwks_cache_ttl_seconds
     )
     if not fresh:
-        _jwks_state["keys"] = await _fetch_jwks()
+        _jwks_state["keys"] = await _fetch_jwks(http_client)
         _jwks_state["fetched_at"] = now
     return list(_jwks_state["keys"])
 
@@ -123,7 +123,7 @@ def invalidate_jwks_cache() -> None:
     _jwks_state["fetched_at"] = 0.0
 
 
-async def _find_signing_key(token: str) -> dict[str, Any]:
+async def _find_signing_key(token: str, http_client: AsyncHttpClient) -> dict[str, Any]:
     try:
         header = jwt.get_unverified_header(token)
     except JWTError as exc:
@@ -133,7 +133,7 @@ async def _find_signing_key(token: str) -> dict[str, Any]:
     if not isinstance(kid, str) or not kid:
         raise RiscVerificationError("JWT header missing 'kid'")
 
-    keys = await get_jwks()
+    keys = await get_jwks(http_client)
     for key in keys:
         if key.get("kid") == kid:
             return key
@@ -143,7 +143,7 @@ async def _find_signing_key(token: str) -> dict[str, Any]:
     # old enough that rotation is plausible.
     cache_age = time.monotonic() - _jwks_state["fetched_at"]
     if cache_age > settings.google_risc_unknown_kid_refresh_cooldown_seconds:
-        keys = await get_jwks(force_refresh=True)
+        keys = await get_jwks(http_client, force_refresh=True)
         for key in keys:
             if key.get("kid") == kid:
                 return key
@@ -163,12 +163,14 @@ def _extract_event(payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     return event_type, body
 
 
-async def verify_risc_set(token: str, *, now: int | None = None) -> RiscEvent:
+async def verify_risc_set(
+    token: str, http_client: AsyncHttpClient, *, now: int | None = None
+) -> RiscEvent:
     """Verify a SET JWT against Google's JWKS and return the parsed event.
 
     Raises `RiscVerificationError` on signature, claim, or key lookup failure.
     """
-    key = await _find_signing_key(token)
+    key = await _find_signing_key(token, http_client)
 
     try:
         payload = jwt.decode(

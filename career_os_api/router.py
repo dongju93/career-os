@@ -271,7 +271,7 @@ async def receive_google_risc_event(request: Request) -> Response:
         )
 
     try:
-        event = await verify_risc_set(token)
+        event = await verify_risc_set(token, request.app.state.risc_http_client)
     except RiscVerificationUnavailableError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -340,10 +340,16 @@ async def list_job_postings(
 )
 async def get_job_posting_extraction(
     url: Annotated[str, Query(description="Job posting URL")],
+    request: Request,
     _current_user: _CurrentUser,
 ) -> JobPostingExtracted:
-    content, _ = await fetch_url_content(url)
-    return await extract_job_posting(html_content=content, source_url=url)
+    content, _ = await fetch_url_content(url, request.app.state.http_client)
+    return await extract_job_posting(
+        html_content=content,
+        source_url=url,
+        image_client=request.app.state.image_http_client,
+        openai_client=request.app.state.openai_client,
+    )
 
 
 @v1_router.post(

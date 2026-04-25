@@ -14,6 +14,7 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 
+from career_os_api._types import AsyncHttpClient
 from career_os_api.config import settings
 from career_os_api.constants import EXTRACTION_SYSTEM_PROMPT, HTML_PARSER
 from career_os_api.schemas import JobPostingExtracted
@@ -56,7 +57,7 @@ def _annotate_headings(soup: BeautifulSoup) -> None:
 
 
 async def _fetch_one_image(
-    client: httpx.AsyncClient,
+    client: AsyncHttpClient,
     src: str,
     sem: asyncio.Semaphore,
 ) -> tuple[str, bytes] | None:
@@ -96,6 +97,7 @@ async def _fetch_one_image(
 async def _collect_images_as_base64(
     soup: BeautifulSoup,
     domain_base: str,
+    image_client: AsyncHttpClient,
 ) -> list[str]:
     """
     Find all <img> elements in the soup, fetch up to MAX_IMAGES of them
@@ -138,16 +140,13 @@ async def _collect_images_as_base64(
         return []
 
     sem = asyncio.Semaphore(_IMAGE_CONCURRENCY)
-    async with httpx.AsyncClient(
-        follow_redirects=True, timeout=settings.http_image_timeout
-    ) as client:
-        try:
-            async with asyncio.timeout(settings.http_image_total_timeout):
-                raw_results: list[tuple[str, bytes] | None] = await asyncio.gather(
-                    *[_fetch_one_image(client, src, sem) for src in candidates]
-                )
-        except TimeoutError:
-            raw_results = []
+    try:
+        async with asyncio.timeout(settings.http_image_total_timeout):
+            raw_results: list[tuple[str, bytes] | None] = await asyncio.gather(
+                *[_fetch_one_image(image_client, src, sem) for src in candidates]
+            )
+    except TimeoutError:
+        raw_results = []
 
     # Apply cumulative byte budget after all fetches complete. Results are
     # ordered identically to candidates so earlier images retain priority.
@@ -254,6 +253,8 @@ def _build_messages(
 async def extract_job_posting(
     html_content: bytes,
     source_url: str,
+    image_client: AsyncHttpClient,
+    openai_client: AsyncOpenAI,
 ) -> JobPostingExtracted:
     """
     Parse a fetched job posting page into structured data.
@@ -278,7 +279,7 @@ async def extract_job_posting(
     _annotate_headings(soup)
     text_content = soup.get_text(separator="\n", strip=True)
     posting_id = extract_posting_id(source_url, platform)
-    image_data_urls = await _collect_images_as_base64(soup, domain_base)
+    image_data_urls = await _collect_images_as_base64(soup, domain_base, image_client)
 
     messages = _build_messages(
         text_content=text_content,
@@ -288,9 +289,7 @@ async def extract_job_posting(
         image_data_urls=image_data_urls,
     )
 
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
-
-    result = await client.chat.completions.parse(
+    result = await openai_client.chat.completions.parse(
         model=settings.openai_model,
         messages=messages,
         response_format=JobPostingExtracted,

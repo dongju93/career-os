@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -22,8 +22,10 @@ async def test_fetch_url_content_delegates_saramin_urls(
         fetch_saramin_job_posting,
     )
 
+    client = MagicMock()
     content, content_type = await fetch_module.fetch_url_content(
-        "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930"
+        "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930",
+        client,
     )
 
     assert content == b"<html>saramin</html>"
@@ -46,8 +48,10 @@ async def test_fetch_url_content_delegates_wanted_urls(
         fetch_wanted_job_posting,
     )
 
+    client = MagicMock()
     content, content_type = await fetch_module.fetch_url_content(
-        "https://www.wanted.co.kr/wd/349998"
+        "https://www.wanted.co.kr/wd/349998",
+        client,
     )
 
     assert content == b"<html>wanted</html>"
@@ -61,18 +65,21 @@ async def test_fetch_url_content_rejects_unsupported_domains_before_request(
 ) -> None:
     monkeypatch.setattr(fetch_module, "is_saramin_url", lambda url: False)
 
-    class UnexpectedAsyncClient:
-        def __init__(self, **kwargs) -> None:
-            raise AssertionError("http client should not be constructed")
+    class _NeverCalled:
+        async def get(self, *_args, **_kwargs):
+            raise AssertionError(
+                "http client should not be called for unsupported domains"
+            )
 
-    monkeypatch.setattr(
-        fetch_module.httpx,
-        "AsyncClient",
-        UnexpectedAsyncClient,
-    )
+        def stream(self, *_args, **_kwargs):
+            raise AssertionError(
+                "http client should not be called for unsupported domains"
+            )
 
     with pytest.raises(HTTPException) as exc_info:
-        await fetch_module.fetch_url_content("https://example.com/jobs/1")
+        await fetch_module.fetch_url_content(
+            "https://example.com/jobs/1", _NeverCalled()
+        )
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Unsupported job board domain: example.com"
@@ -94,10 +101,10 @@ async def test_fetch_url_content_returns_response_body_and_content_type(
 
     monkeypatch.setattr(fetch_module, "detect_platform", lambda url: None)
     monkeypatch.setattr(fetch_module, "is_saramin_url", lambda url: False)
-    monkeypatch.setattr(fetch_module.httpx, "AsyncClient", lambda **kwargs: client)
 
     content, content_type = await fetch_module.fetch_url_content(
-        "https://example.com/jobs/1"
+        "https://example.com/jobs/1",
+        client,
     )
 
     assert content == b"<html>external</html>"
@@ -113,10 +120,9 @@ async def test_fetch_url_content_maps_invalid_url_to_bad_request(
 
     monkeypatch.setattr(fetch_module, "detect_platform", lambda url: None)
     monkeypatch.setattr(fetch_module, "is_saramin_url", lambda url: False)
-    monkeypatch.setattr(fetch_module.httpx, "AsyncClient", lambda **kwargs: client)
 
     with pytest.raises(HTTPException) as exc_info:
-        await fetch_module.fetch_url_content("bad url")
+        await fetch_module.fetch_url_content("bad url", client)
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Invalid URL provided"
@@ -132,10 +138,9 @@ async def test_fetch_url_content_maps_upstream_status_code(
 
     monkeypatch.setattr(fetch_module, "detect_platform", lambda url: None)
     monkeypatch.setattr(fetch_module, "is_saramin_url", lambda url: False)
-    monkeypatch.setattr(fetch_module.httpx, "AsyncClient", lambda **kwargs: client)
 
     with pytest.raises(HTTPException) as exc_info:
-        await fetch_module.fetch_url_content("https://example.com/jobs/1")
+        await fetch_module.fetch_url_content("https://example.com/jobs/1", client)
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Upstream server returned 404"
@@ -156,10 +161,9 @@ async def test_fetch_url_content_maps_request_errors_to_bad_gateway(
 
     monkeypatch.setattr(fetch_module, "detect_platform", lambda url: None)
     monkeypatch.setattr(fetch_module, "is_saramin_url", lambda url: False)
-    monkeypatch.setattr(fetch_module.httpx, "AsyncClient", lambda **kwargs: client)
 
     with pytest.raises(HTTPException) as exc_info:
-        await fetch_module.fetch_url_content("https://example.com/jobs/1")
+        await fetch_module.fetch_url_content("https://example.com/jobs/1", client)
 
     assert exc_info.value.status_code == 502
     assert exc_info.value.detail == "Failed to reach the requested URL"

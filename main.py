@@ -1,9 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from openai import AsyncOpenAI
 from starlette.middleware.sessions import SessionMiddleware
 
 from career_os_api.config import settings
@@ -19,9 +21,25 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with create_postgres_pool() as pool:
+    async with (
+        create_postgres_pool() as pool,
+        httpx.AsyncClient(
+            follow_redirects=True, timeout=settings.http_fetch_timeout
+        ) as http_client,
+        httpx.AsyncClient(
+            follow_redirects=True, timeout=settings.http_image_timeout
+        ) as image_http_client,
+        httpx.AsyncClient(
+            timeout=settings.google_risc_http_timeout_seconds
+        ) as risc_http_client,
+        AsyncOpenAI(api_key=settings.openai_api_key) as openai_client,
+    ):
         await init_schema(pool)
         app.state.pool = pool
+        app.state.http_client = http_client
+        app.state.image_http_client = image_http_client
+        app.state.risc_http_client = risc_http_client
+        app.state.openai_client = openai_client
         yield
 
 

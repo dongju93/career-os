@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import httpx
 import pytest
 from fastapi import HTTPException
@@ -7,9 +9,7 @@ from tests.httpx_stubs import SequenceAsyncClient, make_http_status_error, make_
 
 
 @pytest.mark.asyncio
-async def test_fetch_saramin_job_posting_extracts_only_job_posting_sections(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_fetch_saramin_job_posting_extracts_only_job_posting_sections() -> None:
     ajax_html = b"""
     <html>
       <body>
@@ -48,14 +48,9 @@ async def test_fetch_saramin_job_posting_extracts_only_job_posting_sections(
         ]
     )
 
-    monkeypatch.setattr(
-        saramin_module.httpx,
-        "AsyncClient",
-        lambda **kwargs: client,
-    )
-
     content = await saramin_module.fetch_saramin_job_posting(
-        "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930"
+        "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930",
+        client,
     )
     html = content.decode("utf-8")
 
@@ -64,10 +59,8 @@ async def test_fetch_saramin_job_posting_extracts_only_job_posting_sections(
     assert "Detailed job description" in html
     assert "Apply online" in html
     assert "Do not include me" not in html
-    assert client.calls[0] == (
-        saramin_module.SARAMIN_JOB_AJAX_URL,
-        {"params": {"rec_idx": "4930", "rec_seq": "0"}},
-    )
+    assert client.calls[0][0] == saramin_module.SARAMIN_JOB_AJAX_URL
+    assert client.calls[0][1].get("params") == {"rec_idx": "4930", "rec_seq": "0"}
     assert client.calls[1][0] == (
         "https://www.saramin.co.kr/zf_user/jobs/view-detail?rec_idx=4930"
     )
@@ -77,7 +70,8 @@ async def test_fetch_saramin_job_posting_extracts_only_job_posting_sections(
 async def test_fetch_saramin_job_posting_requires_rec_idx() -> None:
     with pytest.raises(HTTPException) as exc_info:
         await saramin_module.fetch_saramin_job_posting(
-            "https://www.saramin.co.kr/zf_user/jobs/relay/view"
+            "https://www.saramin.co.kr/zf_user/jobs/relay/view",
+            MagicMock(),
         )
 
     assert exc_info.value.status_code == 400
@@ -85,22 +79,15 @@ async def test_fetch_saramin_job_posting_requires_rec_idx() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fetch_saramin_job_posting_maps_upstream_status(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_fetch_saramin_job_posting_maps_upstream_status() -> None:
     client = SequenceAsyncClient(
         [make_http_status_error(saramin_module.SARAMIN_JOB_AJAX_URL, 503)]
     )
 
-    monkeypatch.setattr(
-        saramin_module.httpx,
-        "AsyncClient",
-        lambda **kwargs: client,
-    )
-
     with pytest.raises(HTTPException) as exc_info:
         await saramin_module.fetch_saramin_job_posting(
-            "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930"
+            "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930",
+            client,
         )
 
     assert exc_info.value.status_code == 503
@@ -108,9 +95,7 @@ async def test_fetch_saramin_job_posting_maps_upstream_status(
 
 
 @pytest.mark.asyncio
-async def test_fetch_saramin_job_posting_maps_request_errors(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_fetch_saramin_job_posting_maps_request_errors() -> None:
     client = SequenceAsyncClient(
         [
             httpx.RequestError(
@@ -120,15 +105,10 @@ async def test_fetch_saramin_job_posting_maps_request_errors(
         ]
     )
 
-    monkeypatch.setattr(
-        saramin_module.httpx,
-        "AsyncClient",
-        lambda **kwargs: client,
-    )
-
     with pytest.raises(HTTPException) as exc_info:
         await saramin_module.fetch_saramin_job_posting(
-            "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930"
+            "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930",
+            client,
         )
 
     assert exc_info.value.status_code == 502

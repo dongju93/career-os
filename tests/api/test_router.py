@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator, Generator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock
+from unittest.mock import ANY, AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -282,10 +282,12 @@ def test_job_posting_extraction_endpoint_returns_extracted_payload(
     assert response.status_code == 200
     assert response.json()["posting_id"] == sample_job_posting.posting_id
     assert response.json()["company_name"] == sample_job_posting.company_name
-    fetch_url_content.assert_awaited_once_with(sample_job_posting.posting_url)
+    fetch_url_content.assert_awaited_once_with(sample_job_posting.posting_url, ANY)
     extract_job_posting.assert_awaited_once_with(
         html_content=b"<html><body>Backend Engineer</body></html>",
         source_url=sample_job_posting.posting_url,
+        image_client=ANY,
+        openai_client=ANY,
     )
 
 
@@ -717,7 +719,7 @@ def test_risc_endpoint_accepts_valid_event_and_returns_202(
 
     assert response.status_code == 202
     assert response.content == b""
-    verify.assert_awaited_once_with("header.payload.signature")
+    verify.assert_awaited_once_with("header.payload.signature", ANY)
     apply.assert_awaited_once_with(fake_pool.connection_obj, event)
 
 

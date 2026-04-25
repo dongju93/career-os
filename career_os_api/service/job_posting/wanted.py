@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import HTTPException, status
 
-from career_os_api.config import settings
+from career_os_api._types import AsyncHttpClient
 from career_os_api.constants import WANTED_USER_AGENT
 from career_os_api.service.job_posting.platform import Platform, validate_posting_id
 
@@ -29,7 +29,7 @@ def is_wanted_url(url: str) -> bool:
     return host == WANTED_DOMAIN or host.endswith(f".{WANTED_DOMAIN}")
 
 
-async def fetch_wanted_job_posting(url: str) -> bytes:
+async def fetch_wanted_job_posting(url: str, client: AsyncHttpClient) -> bytes:
     """
     Fetch only the current job posting from a Wanted /wd/{id} URL.
 
@@ -63,22 +63,19 @@ async def fetch_wanted_job_posting(url: str) -> bytes:
         "Referer": url,
     }
 
-    async with httpx.AsyncClient(
-        follow_redirects=True, timeout=settings.http_fetch_timeout, headers=headers
-    ) as client:
-        try:
-            resp = await client.get(f"{WANTED_JOB_API_URL}/{posting_id}")
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as e:
-            raise HTTPException(
-                status_code=e.response.status_code,
-                detail=f"Wanted returned {e.response.status_code}",
-            ) from e
-        except httpx.RequestError:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Failed to reach Wanted",
-            ) from None
+    try:
+        resp = await client.get(f"{WANTED_JOB_API_URL}/{posting_id}", headers=headers)
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"Wanted returned {e.response.status_code}",
+        ) from e
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to reach Wanted",
+        ) from None
 
     return _build_posting_html(resp.json())
 
