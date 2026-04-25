@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from typing import Annotated
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -53,6 +53,29 @@ oauth.register(
 _CurrentUser = Annotated[dict, Depends(get_current_user)]
 
 
+def _resolve_callback_url(
+    callback_url: str, allowed_origins: list[str], frontend_url: str
+) -> str | None:
+    """Return a safe redirect URL or None when callback_url fails validation.
+
+    Accepts:
+    - path-only inputs (e.g. "/dashboard") — prefixed with frontend_url
+    - full URLs whose origin is explicitly listed in allowed_origins
+
+    Rejects everything else (foreign hosts, relative paths without a leading
+    slash) so the OAuth access token cannot be leaked to an attacker's domain.
+    """
+    parsed = urlparse(callback_url)
+    if not parsed.scheme and not parsed.netloc:
+        if parsed.path.startswith("/"):
+            return frontend_url.rstrip("/") + callback_url
+        return None
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    if origin in allowed_origins:
+        return callback_url
+    return None
+
+
 # ── System ────────────────────────────────────────────────────────────────────
 
 
@@ -83,7 +106,11 @@ async def google_login(
     callback_url: Annotated[str | None, Query()] = None,
 ):
     if callback_url:
-        request.session["callback_url"] = callback_url
+        safe_url = _resolve_callback_url(
+            callback_url, settings.allowed_origins, settings.frontend_url
+        )
+        if safe_url:
+            request.session["callback_url"] = safe_url
     return await oauth.google.authorize_redirect(request, settings.redirect_uri)
 
 
