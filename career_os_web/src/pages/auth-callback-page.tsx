@@ -30,6 +30,8 @@ export function AuthCallbackPage() {
       rawNext ? getSafeRedirectPath(rawNext) : '/job-postings',
     );
 
+    window.history.replaceState({}, '', window.location.pathname);
+
     setLoading(true);
 
     if (oauthError || !accessToken) {
