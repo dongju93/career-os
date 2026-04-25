@@ -147,7 +147,7 @@ describe('JobPostingDetailPage', () => {
     const { router } = renderRoute('/job-postings');
 
     await user.click(
-      await screen.findByRole('heading', { name: 'Frontend Engineer' }),
+      await screen.findByRole('link', { name: 'Frontend Engineer' }),
     );
 
     expect(router.state.location.pathname).toBe('/job-postings/1');
@@ -160,6 +160,34 @@ describe('JobPostingDetailPage', () => {
         headers: { Authorization: 'Bearer test-token' },
       },
     );
+  });
+
+  it('opens detail view when the card link is activated by keyboard', async () => {
+    const user = userEvent.setup();
+    const detail = buildJobPostingDetail();
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === `${API_BASE_URL}/v1/job-postings?offset=0&limit=50`) {
+        return jsonResponse(buildJobPostingPage(detail));
+      }
+
+      if (input === `${API_BASE_URL}/v1/job-postings/1`) {
+        return jsonResponse(detail);
+      }
+
+      throw new Error(`Unexpected fetch request: ${input}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { router } = renderRoute('/job-postings');
+
+    const cardLink = await screen.findByRole('link', {
+      name: 'Frontend Engineer',
+    });
+    cardLink.focus();
+    await user.keyboard('{Enter}');
+
+    expect(router.state.location.pathname).toBe('/job-postings/1');
   });
 
   it('shows a structured API error and retries the same detail request', async () => {

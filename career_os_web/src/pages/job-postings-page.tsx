@@ -9,7 +9,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -50,18 +50,13 @@ function SummaryChip({ label, value }: { label: string; value: string }) {
 }
 
 function JobPostingCard({ item }: { item: JobPostingListItem }) {
-  const navigate = useNavigate();
   const hasDetails = Boolean(
     item.location || item.experience_req || item.deadline || item.salary,
   );
 
   return (
-    <Card
-      className="group overflow-hidden"
-      interactive
-      onClick={() => navigate(`/job-postings/${item.id}`)}
-    >
-      <CardContent className="relative p-5">
+    <Card className="group glass-hover relative overflow-hidden has-focus-visible:ring-2 has-focus-visible:ring-primary has-focus-visible:ring-offset-2">
+      <CardContent className="p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <Badge variant={platformVariant(item.platform)}>
             {item.platform}
@@ -71,12 +66,11 @@ function JobPostingCard({ item }: { item: JobPostingListItem }) {
               {formatRelativeDate(item.created_at)}
             </span>
             <a
-              className="flex h-6 w-6 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-accent hover:text-primary"
+              className="relative z-10 flex h-6 w-6 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-accent hover:text-primary"
               href={item.posting_url}
               rel="noreferrer"
               target="_blank"
               title="원본 공고 열기"
-              onClick={(e) => e.stopPropagation()}
             >
               <ExternalLink className="h-3.5 w-3.5" />
               <span className="sr-only">원본 공고 열기</span>
@@ -92,7 +86,12 @@ function JobPostingCard({ item }: { item: JobPostingListItem }) {
         </div>
 
         <h3 className="line-clamp-2 text-lg font-bold leading-tight tracking-tight transition-colors group-hover:text-primary">
-          {item.job_title}
+          <Link
+            to={`/job-postings/${item.id}`}
+            className="focus-visible:outline-none after:absolute after:inset-0 after:content-['']"
+          >
+            {item.job_title}
+          </Link>
         </h3>
 
         {hasDetails && (
