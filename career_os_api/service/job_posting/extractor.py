@@ -1,3 +1,4 @@
+import asyncio
 import base64
 from urllib.parse import urlparse
 
@@ -28,6 +29,10 @@ _OPENAI_SUPPORTED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/
 _H1_PREFIX = "[채용공고 제목]"
 _H2_PREFIX = "[섹션]"
 
+# Maximum number of images fetched concurrently. Keeps peak socket usage bounded
+# while still parallelising the bulk of the latency.
+_IMAGE_CONCURRENCY = 5
+
 
 def _annotate_headings(soup: BeautifulSoup) -> None:
     """
@@ -50,17 +55,59 @@ def _annotate_headings(soup: BeautifulSoup) -> None:
             h2.append(f"{_H2_PREFIX} {text}")
 
 
+async def _fetch_one_image(
+    client: httpx.AsyncClient,
+    src: str,
+    sem: asyncio.Semaphore,
+) -> tuple[str, bytes] | None:
+    """
+    Fetch a single image under the semaphore gate.
+
+    Returns (mime, raw_bytes) on success, None on any failure or policy
+    rejection. Never raises — callers can unconditionally await and check None.
+    """
+    async with sem:
+        try:
+            async with client.stream("GET", src) as resp:
+                if resp.status_code != 200:
+                    return None
+                mime = resp.headers.get("content-type", "").split(";")[0].strip()
+                if mime not in _OPENAI_SUPPORTED_IMAGE_TYPES:
+                    return None
+                # Skip before downloading when Content-Length already exceeds budget.
+                content_length = resp.headers.get("content-length")
+                if (
+                    content_length is not None
+                    and int(content_length) > settings.max_image_bytes
+                ):
+                    return None
+                chunks: list[bytes] = []
+                raw_size = 0
+                async for chunk in resp.aiter_bytes(chunk_size=65536):
+                    raw_size += len(chunk)
+                    if raw_size > settings.max_image_bytes:
+                        return None
+                    chunks.append(chunk)
+                return mime, b"".join(chunks)
+        except httpx.RequestError:
+            return None
+
+
 async def _collect_images_as_base64(
     soup: BeautifulSoup,
     domain_base: str,
 ) -> list[str]:
     """
-    Find all <img> elements in the soup, fetch up to MAX_IMAGES of them,
-    and return a list of base64-encoded data URLs.
+    Find all <img> elements in the soup, fetch up to MAX_IMAGES of them
+    concurrently, and return a list of base64-encoded data URLs.
 
     Images embedded in the job description are commonly used by Korean job
     boards to display formatted text — passing them to the vision model ensures
     that content is not silently dropped.
+
+    Concurrency is bounded by _IMAGE_CONCURRENCY via asyncio.Semaphore. An
+    overall deadline (http_image_total_timeout) is layered on top of the
+    per-image httpx timeout so the entire gather cannot block indefinitely.
     """
     # Derive the effective root domain from domain_base (e.g. "www.saramin.co.kr"
     # → "saramin.co.kr") so that CDN subdomains (cdn.*, img.*) are also allowed
@@ -86,45 +133,36 @@ async def _collect_images_as_base64(
                 continue
             absolute_srcs.append(src)
 
-    data_urls: list[str] = []
-    total_b64_bytes = 0
+    candidates = absolute_srcs[: settings.max_images]
+    if not candidates:
+        return []
+
+    sem = asyncio.Semaphore(_IMAGE_CONCURRENCY)
     async with httpx.AsyncClient(
         follow_redirects=True, timeout=settings.http_image_timeout
     ) as client:
-        for src in absolute_srcs[: settings.max_images]:
-            if total_b64_bytes >= settings.max_total_image_bytes:
-                break
-            try:
-                async with client.stream("GET", src) as resp:
-                    if resp.status_code != 200:
-                        continue
-                    mime = resp.headers.get("content-type", "").split(";")[0].strip()
-                    if mime not in _OPENAI_SUPPORTED_IMAGE_TYPES:
-                        continue
-                    # Skip before downloading when Content-Length already exceeds budget.
-                    content_length = resp.headers.get("content-length")
-                    if (
-                        content_length is not None
-                        and int(content_length) > settings.max_image_bytes
-                    ):
-                        continue
-                    chunks: list[bytes] = []
-                    raw_size = 0
-                    async for chunk in resp.aiter_bytes(chunk_size=65536):
-                        raw_size += len(chunk)
-                        if raw_size > settings.max_image_bytes:
-                            break
-                        chunks.append(chunk)
-                    else:
-                        # Only encode when the loop completed without hitting the cap.
-                        raw = b"".join(chunks)
-                        b64 = base64.b64encode(raw).decode()
-                        b64_size = len(b64)
-                        if total_b64_bytes + b64_size <= settings.max_total_image_bytes:
-                            data_urls.append(f"data:{mime};base64,{b64}")
-                            total_b64_bytes += b64_size
-            except httpx.RequestError:
-                continue  # Skip unreachable images silently
+        try:
+            async with asyncio.timeout(settings.http_image_total_timeout):
+                raw_results: list[tuple[str, bytes] | None] = await asyncio.gather(
+                    *[_fetch_one_image(client, src, sem) for src in candidates]
+                )
+        except TimeoutError:
+            raw_results = []
+
+    # Apply cumulative byte budget after all fetches complete. Results are
+    # ordered identically to candidates so earlier images retain priority.
+    data_urls: list[str] = []
+    total_b64_bytes = 0
+    for result in raw_results:
+        if result is None:
+            continue
+        mime, raw = result
+        b64 = base64.b64encode(raw).decode()
+        b64_size = len(b64)
+        if total_b64_bytes + b64_size > settings.max_total_image_bytes:
+            break
+        data_urls.append(f"data:{mime};base64,{b64}")
+        total_b64_bytes += b64_size
 
     return data_urls
 

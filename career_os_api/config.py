@@ -50,7 +50,11 @@ class Settings(BaseSettings):
 
     # HTTP client timeouts (seconds) — tunable per environment
     http_fetch_timeout: float = 30.0
+    # Per-image connect+read timeout passed to the httpx client.
     http_image_timeout: float = 10.0
+    # Overall deadline for the entire concurrent image-fetch gather.
+    # Prevents a large batch of slow images from blocking extraction indefinitely.
+    http_image_total_timeout: float = 30.0
 
     # OpenAI extraction — tunable per environment
     openai_model: str = "gpt-5.4-mini"
