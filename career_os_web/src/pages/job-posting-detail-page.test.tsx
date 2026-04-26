@@ -14,6 +14,14 @@ function jsonResponse(body: unknown, status = 200) {
   };
 }
 
+function apiResponse<T>(data: T, status = 200) {
+  return {
+    status,
+    message: 'ok',
+    data,
+  };
+}
+
 function buildJobPostingDetail(
   overrides: Partial<JobPostingDetail> = {},
 ): JobPostingDetail {
@@ -96,7 +104,9 @@ describe('JobPostingDetailPage', () => {
 
   it('loads a stored posting detail with the bearer token and renders all populated sections', async () => {
     const detail = buildJobPostingDetail();
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(detail));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(apiResponse(detail)));
 
     vi.stubGlobal('fetch', fetchMock);
 
@@ -132,11 +142,11 @@ describe('JobPostingDetailPage', () => {
     const detail = buildJobPostingDetail();
     const fetchMock = vi.fn(async (input: string) => {
       if (input === `${API_BASE_URL}/v1/job-postings?offset=0&limit=50`) {
-        return jsonResponse(buildJobPostingPage(detail));
+        return jsonResponse(apiResponse(buildJobPostingPage(detail)));
       }
 
       if (input === `${API_BASE_URL}/v1/job-postings/1`) {
-        return jsonResponse(detail);
+        return jsonResponse(apiResponse(detail));
       }
 
       throw new Error(`Unexpected fetch request: ${input}`);
@@ -167,11 +177,11 @@ describe('JobPostingDetailPage', () => {
     const detail = buildJobPostingDetail();
     const fetchMock = vi.fn(async (input: string) => {
       if (input === `${API_BASE_URL}/v1/job-postings?offset=0&limit=50`) {
-        return jsonResponse(buildJobPostingPage(detail));
+        return jsonResponse(apiResponse(buildJobPostingPage(detail)));
       }
 
       if (input === `${API_BASE_URL}/v1/job-postings/1`) {
-        return jsonResponse(detail);
+        return jsonResponse(apiResponse(detail));
       }
 
       throw new Error(`Unexpected fetch request: ${input}`);
@@ -204,16 +214,17 @@ describe('JobPostingDetailPage', () => {
       if (detailRequestCount === 1) {
         return jsonResponse(
           {
-            detail: {
-              code: 'JOB_POSTING_NOT_FOUND',
-              message: '저장된 채용공고를 찾을 수 없습니다.',
-            },
+            type: 'about:blank',
+            title: 'Not Found',
+            status: 404,
+            detail: '저장된 채용공고를 찾을 수 없습니다.',
+            instance: '/v1/job-postings/1',
           },
           404,
         );
       }
 
-      return jsonResponse(detail);
+      return jsonResponse(apiResponse(detail));
     });
 
     vi.stubGlobal('fetch', fetchMock);
@@ -228,7 +239,7 @@ describe('JobPostingDetailPage', () => {
     expect(
       screen.getByText('저장된 채용공고를 찾을 수 없습니다.'),
     ).toBeInTheDocument();
-    expect(screen.getByText('JOB_POSTING_NOT_FOUND')).toBeInTheDocument();
+    expect(screen.getByText('UNKNOWN_API_ERROR')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /다시 시도/i }));
 

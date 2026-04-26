@@ -11,6 +11,14 @@ const emptyJobPostingPage = {
   limit: 50,
 };
 
+function apiResponse<T>(data: T, status = 200) {
+  return {
+    status,
+    message: 'ok',
+    data,
+  };
+}
+
 describe('authentication flow', () => {
   it('redirects unauthenticated visitors to the login page with the original path', async () => {
     const { router } = renderRoute('/job-postings?tab=filters');
@@ -27,7 +35,7 @@ describe('authentication flow', () => {
   it('redirects authenticated users away from the login page', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => emptyJobPostingPage,
+      json: async () => apiResponse(emptyJobPostingPage),
     });
 
     vi.stubGlobal('fetch', fetchMock);
@@ -74,12 +82,13 @@ describe('authentication flow', () => {
       if (input === 'https://career-os.fastapicloud.dev/v1/auth/me') {
         return {
           ok: true,
-          json: async () => ({
-            user_id: 'user-1',
-            email: 'user@example.com',
-            name: 'Career OS User',
-            picture: null,
-          }),
+          json: async () =>
+            apiResponse({
+              user_id: 'user-1',
+              email: 'user@example.com',
+              name: 'Career OS User',
+              picture: null,
+            }),
         };
       }
 
@@ -89,7 +98,7 @@ describe('authentication flow', () => {
       ) {
         return {
           ok: true,
-          json: async () => emptyJobPostingPage,
+          json: async () => apiResponse(emptyJobPostingPage),
         };
       }
 

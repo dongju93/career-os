@@ -17,6 +17,14 @@ function jsonResponse(body: unknown, status = 200) {
   };
 }
 
+function apiResponse<T>(data: T, status = 200) {
+  return {
+    status,
+    message: 'ok',
+    data,
+  };
+}
+
 function buildExtractedPosting(
   overrides: Partial<JobPostingExtracted> = {},
 ): JobPostingExtracted {
@@ -74,7 +82,7 @@ describe('AddJobPostingPage', () => {
         input ===
         `${API_BASE_URL}/v1/job-postings/extraction?url=${encodeURIComponent(postingUrl)}`
       ) {
-        return jsonResponse(extractedPosting);
+        return jsonResponse(apiResponse(extractedPosting));
       }
 
       if (input === `${API_BASE_URL}/v1/job-postings`) {
@@ -142,17 +150,18 @@ describe('AddJobPostingPage', () => {
         extractionCalls += 1;
 
         if (extractionCalls === 1) {
-          return jsonResponse(buildExtractedPosting());
+          return jsonResponse(apiResponse(buildExtractedPosting()));
         }
 
         return jsonResponse(
           {
-            detail: {
-              code: 'UNSUPPORTED_PLATFORM',
-              message: '지원하지 않는 채용공고 URL입니다.',
-            },
+            type: 'about:blank',
+            title: 'Bad Request',
+            status: 400,
+            detail: '지원하지 않는 채용공고 URL입니다.',
+            instance: '/v1/job-postings/extraction',
           },
-          422,
+          400,
         );
       }
 
@@ -178,7 +187,7 @@ describe('AddJobPostingPage', () => {
     expect(
       await screen.findByText('지원하지 않는 채용공고 URL입니다.'),
     ).toBeInTheDocument();
-    expect(screen.getByText('UNSUPPORTED_PLATFORM')).toBeInTheDocument();
+    expect(screen.getByText('UNKNOWN_API_ERROR')).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByDisplayValue('Career OS')).not.toBeInTheDocument();
     });

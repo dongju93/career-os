@@ -78,3 +78,24 @@ export const authMeResponseSchema = z.object({
   name: z.string().nullable(),
   picture: z.string().nullable(),
 });
+
+function apiResponseSchema<T extends z.ZodType>(dataSchema: T) {
+  return z.object({
+    status: z.number(),
+    message: z.string(),
+    data: dataSchema,
+  });
+}
+
+export const jobPostingExtractedApiResponseSchema = apiResponseSchema(
+  jobPostingExtractedSchema,
+);
+
+export const jobPostingDetailApiResponseSchema = apiResponseSchema(
+  jobPostingDetailSchema,
+);
+
+export const jobPostingPageApiResponseSchema =
+  apiResponseSchema(jobPostingPageSchema);
+
+export const authMeApiResponseSchema = apiResponseSchema(authMeResponseSchema);
