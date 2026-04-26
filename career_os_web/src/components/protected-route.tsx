@@ -19,6 +19,8 @@ export function ProtectedRoute() {
       return;
     }
 
+    if (hasCheckedSession) return;
+
     let isActive = true;
 
     fetchAuthMe()
@@ -41,7 +43,7 @@ export function ProtectedRoute() {
     return () => {
       isActive = false;
     };
-  }, [user, setAuth, clearAuth]);
+  }, [user, setAuth, clearAuth, hasCheckedSession]);
 
   if (!user && !hasCheckedSession) {
     return null;

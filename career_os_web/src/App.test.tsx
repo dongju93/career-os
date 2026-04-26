@@ -169,5 +169,9 @@ describe('Career OS Web app shell', () => {
       },
     );
     expect(useAuthStore.getState().user).toBeNull();
+    const meCalls = fetchMock.mock.calls.filter((args) =>
+      args[0].includes('/v1/auth/me'),
+    );
+    expect(meCalls).toHaveLength(0);
   });
 });
