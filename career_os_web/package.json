@@ -7,10 +7,10 @@
   "contributors": [
     "SoEun99 (https://github.com/SoEun99)"
   ],
-  "homepage": "https://vercel.com/dongju93s-projects/career-os",
+  "homepage": "https://career-os-sigma.vercel.app/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dongju93/career-os.git",
+    "url": "https://github.com/dongju93/career-os",
     "directory": "career_os_web"
   },
   "bugs": {
