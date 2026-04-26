@@ -22,10 +22,7 @@ from career_os_api.database.job_postings import (
     get_job_postings,
     upsert_job_posting,
 )
-from career_os_api.database.retry import (
-    DatabaseUnavailableError,
-    run_database_operation,
-)
+from career_os_api.database.retry import run_database_operation
 from career_os_api.database.users import update_user_name, upsert_user
 from career_os_api.responses import ApiResponse
 from career_os_api.schemas import (
@@ -124,7 +121,7 @@ async def google_login(
 @v1_router.get(
     "/auth/google/callback",
     tags=["auth"],
-    responses={400: {"description": "Google 로그인 실패"}},
+    status_code=status.HTTP_303_SEE_OTHER,
 )
 async def google_callback(request: Request) -> RedirectResponse:
     # Always redirect back to the frontend. Returning JSON here caused mobile
@@ -139,14 +136,16 @@ async def google_callback(request: Request) -> RedirectResponse:
         _logger.exception("OAuth token exchange failed: %s", exc)
         request.session.clear()
         return RedirectResponse(
-            f"{target}?{urlencode({'error': 'oauth_token_exchange_failed'})}"
+            f"{target}?{urlencode({'error': 'oauth_token_exchange_failed'})}",
+            status_code=status.HTTP_303_SEE_OTHER,
         )
 
     user_info = token.get("userinfo")
     if not user_info or not user_info.get("sub"):
         request.session.clear()
         return RedirectResponse(
-            f"{target}?{urlencode({'error': 'Google 사용자 정보를 가져올 수 없습니다'})}"
+            f"{target}?{urlencode({'error': 'Google 사용자 정보를 가져올 수 없습니다'})}",
+            status_code=status.HTTP_303_SEE_OTHER,
         )
 
     google_id: str = user_info["sub"]
@@ -157,18 +156,13 @@ async def google_callback(request: Request) -> RedirectResponse:
     async def operation(conn):
         return await upsert_user(conn, google_id, email, name, picture)
 
-    try:
-        user = await run_database_operation(request.app.state.pool, operation)
-    except DatabaseUnavailableError:
-        return RedirectResponse(
-            f"{target}?{urlencode({'error': '데이터베이스 연결이 불안정합니다. 잠시 후 다시 시도해주세요.'})}"
-        )
+    user = await run_database_operation(request.app.state.pool, operation)
 
     request.session.clear()
     request.session["user_id"] = str(user["id"])
     request.session["issued_at"] = int(datetime.now(UTC).timestamp())
 
-    return RedirectResponse(target)
+    return RedirectResponse(target, status_code=status.HTTP_302_FOUND)
 
 
 @v1_router.get("/auth/me", tags=["auth"])
