@@ -3,12 +3,11 @@ import { fetchWithApiRetry } from './api-client';
 import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
 import { authMeApiResponseSchema } from './schemas';
 
-export async function logoutUser(token: string): Promise<void> {
+export async function logoutUser(): Promise<void> {
   await fetchWithApiRetry(
     `${API_BASE_URL}/v1/auth/logout`,
     {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
     },
     '로그아웃에 실패했습니다.',
   );
@@ -21,10 +20,10 @@ export interface AuthMeResult {
   picture: string | null;
 }
 
-export async function fetchAuthMe(token: string): Promise<AuthMeResult> {
+export async function fetchAuthMe(): Promise<AuthMeResult> {
   const response = await fetchWithApiRetry(
     `${API_BASE_URL}/v1/auth/me`,
-    { headers: { Authorization: `Bearer ${token}` } },
+    undefined,
     '로그인 완료에 실패했습니다. 다시 시도해주세요.',
   );
   const raw = await response.json();

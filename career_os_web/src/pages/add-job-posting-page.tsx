@@ -21,7 +21,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { toUserFacingError } from '../services/api-error';
 import { extractJobPosting, saveJobPosting } from '../services/job-postings';
-import { useAuthStore } from '../store/auth-store';
 import { JobPostingFormFields } from './job-posting-form-fields';
 import {
   type AddJobPostingPhase,
@@ -34,7 +33,6 @@ import {
 const IDLE: AddJobPostingPhase = { phase: 'idle' };
 
 export function AddJobPostingPage() {
-  const token = useAuthStore((state) => state.token);
   const navigate = useNavigate();
 
   const [url, setUrl] = useState('');
@@ -42,7 +40,7 @@ export function AddJobPostingPage() {
   const extractControllerRef = useRef<AbortController | null>(null);
 
   async function handleExtract() {
-    if (!token || !url.trim()) return;
+    if (!url.trim()) return;
 
     extractControllerRef.current?.abort();
     const controller = new AbortController();
@@ -50,11 +48,7 @@ export function AddJobPostingPage() {
 
     setPagePhase({ phase: 'extracting' });
     try {
-      const data = await extractJobPosting(
-        token,
-        url.trim(),
-        controller.signal,
-      );
+      const data = await extractJobPosting(url.trim(), controller.signal);
       setPagePhase({
         phase: 'editing',
         meta: {
@@ -87,7 +81,7 @@ export function AddJobPostingPage() {
   }
 
   async function handleSave() {
-    if (!token || pagePhase.phase !== 'editing') return;
+    if (pagePhase.phase !== 'editing') return;
     const { meta, form } = pagePhase;
 
     const errors = validateForm(form);
@@ -98,7 +92,7 @@ export function AddJobPostingPage() {
 
     setPagePhase({ phase: 'saving', meta, form });
     try {
-      await saveJobPosting(token, toExtracted(form, meta));
+      await saveJobPosting(toExtracted(form, meta));
       setPagePhase({
         phase: 'saved',
         company_name: form.company_name,

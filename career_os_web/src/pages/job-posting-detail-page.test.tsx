@@ -91,18 +91,15 @@ function buildJobPostingPage(detail = buildJobPostingDetail()): JobPostingPage {
 
 describe('JobPostingDetailPage', () => {
   beforeEach(() => {
-    useAuthStore.getState().setAuth(
-      {
-        id: 'user-1',
-        email: 'user@example.com',
-        name: 'Career OS User',
-        picture: null,
-      },
-      'test-token',
-    );
+    useAuthStore.getState().setAuth({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'Career OS User',
+      picture: null,
+    });
   });
 
-  it('loads a stored posting detail with the bearer token and renders all populated sections', async () => {
+  it('loads a stored posting detail with the session cookie and renders all populated sections', async () => {
     const detail = buildJobPostingDetail();
     const fetchMock = vi
       .fn()
@@ -132,7 +129,8 @@ describe('JobPostingDetailPage', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       `${API_BASE_URL}/v1/job-postings/1`,
       expect.objectContaining({
-        headers: { Authorization: 'Bearer test-token' },
+        credentials: 'include',
+        headers: { 'X-Career-OS-Client': 'web' },
       }),
     );
   });
@@ -167,7 +165,8 @@ describe('JobPostingDetailPage', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       `${API_BASE_URL}/v1/job-postings/1`,
       expect.objectContaining({
-        headers: { Authorization: 'Bearer test-token' },
+        credentials: 'include',
+        headers: { 'X-Career-OS-Client': 'web' },
       }),
     );
   });

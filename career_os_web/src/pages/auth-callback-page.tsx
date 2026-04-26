@@ -22,7 +22,6 @@ export function AuthCallbackPage() {
     if (didRun.current) return;
     didRun.current = true;
 
-    const accessToken = searchParams.get('access_token');
     const oauthError = searchParams.get('error');
     const rawNext = searchParams.get('next');
     const nextPath = readStoredRedirectPath(
@@ -33,7 +32,7 @@ export function AuthCallbackPage() {
 
     setLoading(true);
 
-    if (oauthError || !accessToken) {
+    if (oauthError) {
       setError('Google 로그인에 실패했습니다. 다시 시도해주세요.');
       navigate(buildLoginPath(nextPath, { error: 'auth_failed' }), {
         replace: true,
@@ -41,17 +40,14 @@ export function AuthCallbackPage() {
       return;
     }
 
-    fetchAuthMe(accessToken)
+    fetchAuthMe()
       .then((data) => {
-        setAuth(
-          {
-            id: data.user_id,
-            email: data.email,
-            name: data.name,
-            picture: data.picture,
-          },
-          accessToken,
-        );
+        setAuth({
+          id: data.user_id,
+          email: data.email,
+          name: data.name,
+          picture: data.picture,
+        });
         navigate(consumeStoredRedirectPath(nextPath), { replace: true });
       })
       .catch((error: unknown) => {

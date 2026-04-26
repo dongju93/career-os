@@ -18,7 +18,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { fetchJobPostings } from '../services/job-postings';
-import { useAuthStore } from '../store/auth-store';
 import type { JobPostingListItem } from '../types/job-posting';
 import {
   formatRelativeDate,
@@ -188,7 +187,6 @@ function JobPostingsErrorState({
 }
 
 export function JobPostingsPage() {
-  const token = useAuthStore((state) => state.token);
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Math.max(1, Number(searchParams.get('page') ?? '1'));
 
@@ -199,13 +197,11 @@ export function JobPostingsPage() {
 
   const loadJobPostings = useCallback(
     (signal?: AbortSignal) => {
-      if (!token) return;
-
       const offset = (page - 1) * PAGE_SIZE;
       setIsLoading(true);
       setError(null);
 
-      fetchJobPostings(token, offset, PAGE_SIZE, signal)
+      fetchJobPostings(offset, PAGE_SIZE, signal)
         .then((pageData) => {
           setItems(pageData.items);
           setTotal(pageData.total);
@@ -218,7 +214,7 @@ export function JobPostingsPage() {
           if (!signal?.aborted) setIsLoading(false);
         });
     },
-    [token, page],
+    [page],
   );
 
   useEffect(() => {

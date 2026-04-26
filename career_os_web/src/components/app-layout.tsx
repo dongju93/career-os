@@ -37,12 +37,9 @@ function UserInitials(name: string | null, email: string | null): string {
 function SidebarContent({ onClose }: { onClose?: () => void }) {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
-  const token = useAuthStore((state) => state.token);
 
   async function handleLogout() {
-    if (token) {
-      await logoutUser(token).catch(() => {});
-    }
+    await logoutUser().catch(() => {});
     resetAuthStore();
     navigate('/login', { replace: true });
   }

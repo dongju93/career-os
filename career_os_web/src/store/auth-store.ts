@@ -14,10 +14,9 @@ export interface AuthUser {
 
 interface AuthState {
   user: AuthUser | null;
-  token: string | null;
   isLoading: boolean;
   error: string | null;
-  setAuth: (user: AuthUser, token: string) => void;
+  setAuth: (user: AuthUser) => void;
   clearAuth: () => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -26,7 +25,6 @@ interface AuthState {
 function createInitialState() {
   return {
     user: null,
-    token: null,
     isLoading: false,
     error: null,
   };
@@ -78,16 +76,20 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       ...createInitialState(),
-      setAuth: (user, token) =>
-        set({ user, token, error: null, isLoading: false }),
+      setAuth: (user) => set({ user, error: null, isLoading: false }),
       clearAuth: () => set(createInitialState()),
       setLoading: (isLoading) => set({ isLoading }),
       setError: (error) => set({ error, isLoading: false }),
     }),
     {
       name: 'career-os-auth',
-      partialize: (state) => ({ user: state.user, token: state.token }),
+      partialize: (state) => ({ user: state.user }),
       storage: createJSONStorage(getAuthStorage),
+      version: 1,
+      migrate: (persisted) => {
+        const state = persisted as Partial<Pick<AuthState, 'user'>>;
+        return { user: state.user ?? null };
+      },
     },
   ),
 );

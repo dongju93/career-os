@@ -21,6 +21,19 @@ function apiResponse<T>(data: T, status = 200) {
 
 describe('authentication flow', () => {
   it('redirects unauthenticated visitors to the login page with the original path', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        type: 'about:blank',
+        title: 'Unauthorized',
+        status: 401,
+        detail: '인증이 필요합니다',
+        instance: '/v1/auth/me',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
     const { router } = renderRoute('/job-postings?tab=filters');
 
     expect(
@@ -29,6 +42,13 @@ describe('authentication flow', () => {
     expect(router.state.location.pathname).toBe('/login');
     expect(router.state.location.search).toBe(
       '?next=%2Fjob-postings%3Ftab%3Dfilters',
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://career-os.fastapicloud.dev/v1/auth/me',
+      {
+        credentials: 'include',
+        headers: { 'X-Career-OS-Client': 'web' },
+      },
     );
   });
 
@@ -40,15 +60,12 @@ describe('authentication flow', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    useAuthStore.getState().setAuth(
-      {
-        id: 'user-1',
-        email: 'user@example.com',
-        name: 'Career OS User',
-        picture: null,
-      },
-      'test-token',
-    );
+    useAuthStore.getState().setAuth({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'Career OS User',
+      picture: null,
+    });
 
     const { router } = renderRoute('/login?next=%2Fjob-postings');
 
@@ -61,7 +78,8 @@ describe('authentication flow', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'https://career-os.fastapicloud.dev/v1/job-postings?offset=0&limit=50',
       expect.objectContaining({
-        headers: { Authorization: 'Bearer test-token' },
+        credentials: 'include',
+        headers: { 'X-Career-OS-Client': 'web' },
       }),
     );
   });
@@ -108,7 +126,7 @@ describe('authentication flow', () => {
     vi.stubGlobal('fetch', fetchMock);
     window.sessionStorage.setItem('career-os-auth-return-to', '/job-postings');
 
-    const { router } = renderRoute('/auth/callback?access_token=test-token');
+    const { router } = renderRoute('/auth/callback');
 
     expect(
       await screen.findByRole('heading', {
@@ -118,17 +136,19 @@ describe('authentication flow', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'https://career-os.fastapicloud.dev/v1/auth/me',
       {
-        headers: { Authorization: 'Bearer test-token' },
+        credentials: 'include',
+        headers: { 'X-Career-OS-Client': 'web' },
       },
     );
     expect(fetchMock).toHaveBeenCalledWith(
       'https://career-os.fastapicloud.dev/v1/job-postings?offset=0&limit=50',
       expect.objectContaining({
-        headers: { Authorization: 'Bearer test-token' },
+        credentials: 'include',
+        headers: { 'X-Career-OS-Client': 'web' },
       }),
     );
     expect(router.state.location.pathname).toBe('/job-postings');
-    expect(useAuthStore.getState().token).toBe('test-token');
+    expect(useAuthStore.getState().user?.id).toBe('user-1');
     expect(
       window.sessionStorage.getItem('career-os-auth-return-to'),
     ).toBeNull();

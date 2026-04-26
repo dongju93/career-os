@@ -69,7 +69,7 @@ function getLoginErrorMessage(errorCode: string | null): string | null {
 }
 
 export function LoginPage() {
-  const token = useAuthStore((state) => state.token);
+  const user = useAuthStore((state) => state.user);
   const error = useAuthStore((state) => state.error);
   const isLoading = useAuthStore((state) => state.isLoading);
   const setError = useAuthStore((state) => state.setError);
@@ -82,7 +82,7 @@ export function LoginPage() {
     setError(getLoginErrorMessage(errorParam));
   }, [errorParam, setError]);
 
-  if (token) {
+  if (user) {
     return (
       <Navigate replace to={nextPath === '/' ? '/job-postings' : nextPath} />
     );

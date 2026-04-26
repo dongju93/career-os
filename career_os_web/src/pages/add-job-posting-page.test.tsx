@@ -60,15 +60,12 @@ function buildExtractedPosting(
 
 describe('AddJobPostingPage', () => {
   beforeEach(() => {
-    useAuthStore.getState().setAuth(
-      {
-        id: 'user-1',
-        email: 'user@example.com',
-        name: 'Career OS User',
-        picture: null,
-      },
-      'test-token',
-    );
+    useAuthStore.getState().setAuth({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'Career OS User',
+      picture: null,
+    });
   });
 
   it('extracts a posting, lets the user edit it, and saves the normalized payload', async () => {
@@ -123,8 +120,9 @@ describe('AddJobPostingPage', () => {
     ).toBeInTheDocument();
     expect(saveInit).toMatchObject({
       method: 'POST',
+      credentials: 'include',
       headers: {
-        Authorization: 'Bearer test-token',
+        'X-Career-OS-Client': 'web',
         'Content-Type': 'application/json',
       },
     });

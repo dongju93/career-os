@@ -56,15 +56,12 @@ async function advanceRetryBackoffTimers() {
 
 describe('Career OS Web app shell', () => {
   beforeEach(() => {
-    useAuthStore.getState().setAuth(
-      {
-        id: 'user-1',
-        email: 'user@example.com',
-        name: 'Career OS User',
-        picture: null,
-      },
-      'test-token',
-    );
+    useAuthStore.getState().setAuth({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'Career OS User',
+      picture: null,
+    });
   });
 
   it('redirects the root route to saved job postings and loads the page data', async () => {
@@ -93,7 +90,8 @@ describe('Career OS Web app shell', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'https://career-os.fastapicloud.dev/v1/job-postings?offset=0&limit=50',
       expect.objectContaining({
-        headers: { Authorization: 'Bearer test-token' },
+        credentials: 'include',
+        headers: { 'X-Career-OS-Client': 'web' },
       }),
     );
   });
@@ -166,9 +164,10 @@ describe('Career OS Web app shell', () => {
       'https://career-os.fastapicloud.dev/v1/auth/logout',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer test-token' },
+        credentials: 'include',
+        headers: { 'X-Career-OS-Client': 'web' },
       },
     );
-    expect(useAuthStore.getState().token).toBeNull();
+    expect(useAuthStore.getState().user).toBeNull();
   });
 });

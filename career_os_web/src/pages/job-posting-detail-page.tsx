@@ -27,7 +27,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { fetchJobPosting } from '../services/job-postings';
-import { useAuthStore } from '../store/auth-store';
 import type { JobPostingDetail } from '../types/job-posting';
 import {
   formatRelativeDate,
@@ -103,19 +102,18 @@ function DetailErrorState({
 
 export function JobPostingDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const token = useAuthStore((state) => state.token);
   const [detail, setDetail] = useState<JobPostingDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<UserFacingError | null>(null);
 
   const loadDetail = useCallback(
     (signal?: AbortSignal) => {
-      if (!token || !id) return;
+      if (!id) return;
 
       setIsLoading(true);
       setError(null);
 
-      fetchJobPosting(token, Number(id), signal)
+      fetchJobPosting(Number(id), signal)
         .then(setDetail)
         .catch((err: unknown) => {
           if (err instanceof Error && err.name === 'AbortError') return;
@@ -125,7 +123,7 @@ export function JobPostingDetailPage() {
           if (!signal?.aborted) setIsLoading(false);
         });
     },
-    [token, id],
+    [id],
   );
 
   useEffect(() => {
