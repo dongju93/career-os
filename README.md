@@ -83,18 +83,18 @@ API 문서: `http://localhost:8000/v1/docs`
 
 ## 기술 스택
 
-| 라이브러리                          | 용도                    | 선정 이유                                                                                                                                                                                    |
-| ----------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **FastAPI**                         | ASGI 웹 프레임워크      | `async/await` 네이티브 지원, Pydantic 기반 자동 검증·OpenAPI 문서 생성. 동일 기능을 Flask/Django로 구현할 때 필요한 보일러플레이트 대부분을 제거함                                           |
-| **psycopg 3 + psycopg-pool**        | PostgreSQL 드라이버     | psycopg 3는 `async/await`를 네이티브 지원하는 공식 차세대 드라이버. `AsyncConnectionPool`로 연결 재사용 비용을 줄임. SQLAlchemy ORM을 배제하고 raw SQL을 직접 사용해 쿼리 의도를 명확히 유지 |
-| **Pydantic v2 + pydantic-settings** | 스키마 검증·설정 관리   | FastAPI 내장 검증 레이어. `pydantic-settings`는 `.env` 파일과 환경 변수를 타입 안전하게 로드하며, 필수 변수 누락 시 import 단계에서 즉시 실패해 런타임 오류를 예방함                         |
-| **Authlib**                         | Google OAuth 클라이언트 | Starlette/FastAPI용 OAuth 2.0 / OpenID Connect 통합을 제공. Google OIDC discovery document를 자동으로 처리해 직접 구현 대비 코드량을 크게 줄임                                               |
-| **python-jose**                     | JWT 발급·검증           | 경량 JWT 라이브러리. `SECRET_KEY` 기반 `HS256` 서명으로 내부 access token 생성·검증을 담당. Authlib의 OAuth 레이어와 분리해 토큰 수명 주기를 앱이 직접 제어함                                |
-| **Beautiful Soup 4**                | HTML 파싱               | 사람인 공고 섹션 추출(불필요한 추천 영역 제거)과 원티드 API JSON → HTML 재구성에 사용. `lxml` 파서 대신 `html.parser`를 채택해 추가 C 의존성 없이 동작                                       |
-| **OpenAI Python SDK**               | 구조화 데이터 추출      | `chat.completions.parse()`의 `response_format` 파라미터로 `JobPostingExtracted` Pydantic 모델을 직접 지정. 이미지(base64)를 함께 전달해 한국 채용 공고에 빈번한 이미지 내 텍스트도 추출      |
-| **Ruff**                            | 린터·포매터             | Rust 기반. `flake8 + isort + Black` 세 도구를 단일 바이너리로 대체. CI에서 포매팅 검사와 린트를 같은 명령어로 실행                                                                           |
-| **Pyrefly**                         | 타입 검사               | Meta가 개발한 Rust 기반 타입 체커. `pyright`·`mypy` 대비 빠른 응답 속도, `pyproject.toml` 내 설정 통합                                                                                       |
-| **pytest + pytest-asyncio**         | 테스트                  | `asyncio_mode = "auto"` 설정으로 `@pytest.mark.asyncio` 없이 async 테스트 작성 가능. `pytest-cov`로 커버리지 리포트 통합                                                                     |
+| 라이브러리                               | 용도                    | 선정 이유                                                                                                                                                                        |
+| ---------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **FastAPI**                              | ASGI 웹 프레임워크      | 타입 힌트 기반 검증, async 지원, OpenAPI 자동 문서화가 기본 제공되어 API 서버 개발 생산성과 계약 명확성이 높음. Flask보다 보일러플레이트가 적고 Django보다 경량                  |
+| **psycopg 3 + psycopg-pool**             | PostgreSQL 드라이버     | PostgreSQL에 직접 접근하면서 async I/O와 커넥션 풀을 함께 제공. 단순한 데이터 접근 계층에서는 ORM보다 의존성과 추상화 비용이 낮고 SQL 제어권을 유지하기 쉬움                     |
+| **Pydantic v2 + pydantic-settings**      | 스키마 검증·설정 관리   | 런타임 검증, 직렬화, JSON Schema 생성을 타입 힌트 중심으로 통합. 설정값도 같은 검증 모델로 관리할 수 있어 환경 변수 누락이나 타입 오류를 초기에 발견하기 좋음                    |
+| **Authlib**                              | Google OAuth 클라이언트 | OAuth 2.0·OpenID Connect처럼 보안 민감도가 높은 표준 플로우를 검증된 라이브러리에 맡길 수 있음. 직접 구현 대비 인증 취약점과 유지보수 부담을 줄임                                |
+| **python-jose**                          | JWT 발급·검증           | JWT/JWS 처리를 위한 가벼운 JOSE 구현체. 내부 access token 서명·검증 요구사항에는 충분하면서, OAuth 클라이언트 라이브러리와 토큰 책임을 분리하기 쉬움                             |
+| **Beautiful Soup 4**                     | HTML 파싱               | 실제 웹 페이지처럼 구조가 일정하지 않은 HTML에서도 탐색·검색 API가 안정적이고 단순함. 브라우저 자동화나 무거운 파서 없이 서버 사이드 텍스트 추출 요구를 충족                     |
+| **OpenAI Python SDK**                    | 구조화 데이터 추출      | OpenAI API의 공식 SDK라 모델·파라미터 변화에 대한 호환성이 가장 높음. async client, 멀티모달 입력, 구조화 출력 지원을 직접 HTTP 래퍼로 관리하지 않아도 됨                        |
+| **Ruff**                                 | 린터·포매터             | 린트, 포맷, import 정리, pyupgrade 계열 규칙을 단일 Rust 기반 도구로 처리해 빠르고 설정이 단순함. 여러 Python 품질 도구를 조합하는 비용을 줄임                                   |
+| **Pyrefly**                              | 타입 검사               | 빠른 정적 타입 검사와 언어 서버 기능을 제공해 피드백 루프가 짧음. Python 타입 적용 범위를 점진적으로 넓히기 좋고, CI와 IDE 양쪽에서 같은 타입 품질 기준을 유지하기 쉬움          |
+| **pytest + pytest-asyncio + pytest-cov** | 테스트                  | pytest의 fixture·plugin 생태계가 넓어 API, 서비스, DB 경계 테스트를 확장하기 좋음. async 테스트와 커버리지 측정을 표준 플러그인으로 붙일 수 있어 별도 테스트 프레임워크가 불필요 |
 
 ---
 
