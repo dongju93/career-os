@@ -90,7 +90,7 @@ async def test_fetch_saramin_job_posting_maps_upstream_status() -> None:
             client,
         )
 
-    assert exc_info.value.status_code == 503
+    assert exc_info.value.status_code == 502
     assert exc_info.value.detail == "Saramin returned 503"
 
 

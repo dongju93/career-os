@@ -162,7 +162,7 @@ def test_root_endpoint_returns_hello_world(client: TestClient) -> None:
     response = client.get(f"{API_PREFIX}/")
 
     assert response.status_code == 200
-    assert response.json() == {"message": "Hello, World!"}
+    assert response.json() == {"status": 200, "message": "Hello, World!", "data": None}
 
 
 def test_google_callback_does_not_include_token_in_redirect_url(
@@ -225,31 +225,35 @@ def test_list_job_postings_endpoint_returns_paginated_results(
 
     assert response.status_code == 200
     assert response.json() == {
-        "items": [
-            {
-                "id": 7,
-                "platform": "saramin",
-                "posting_id": sample_job_posting.posting_id,
-                "posting_url": sample_job_posting.posting_url,
-                "company_name": sample_job_posting.company_name,
-                "job_title": sample_job_posting.job_title,
-                "experience_req": sample_job_posting.experience_req,
-                "deadline": sample_job_posting.deadline,
-                "location": sample_job_posting.location,
-                "employment_type": sample_job_posting.employment_type,
-                "salary": sample_job_posting.salary,
-                "tech_stack": sample_job_posting.tech_stack,
-                "tags": sample_job_posting.tags,
-                "job_category": sample_job_posting.job_category,
-                "industry": sample_job_posting.industry,
-                "scraped_at": to_api_datetime(rows[0]["scraped_at"]),
-                "created_at": to_api_datetime(rows[0]["created_at"]),
-                "updated_at": to_api_datetime(rows[0]["updated_at"]),
-            }
-        ],
-        "total": 1,
-        "offset": 5,
-        "limit": 10,
+        "status": 200,
+        "message": "채용공고 목록을 조회했습니다.",
+        "data": {
+            "items": [
+                {
+                    "id": 7,
+                    "platform": "saramin",
+                    "posting_id": sample_job_posting.posting_id,
+                    "posting_url": sample_job_posting.posting_url,
+                    "company_name": sample_job_posting.company_name,
+                    "job_title": sample_job_posting.job_title,
+                    "experience_req": sample_job_posting.experience_req,
+                    "deadline": sample_job_posting.deadline,
+                    "location": sample_job_posting.location,
+                    "employment_type": sample_job_posting.employment_type,
+                    "salary": sample_job_posting.salary,
+                    "tech_stack": sample_job_posting.tech_stack,
+                    "tags": sample_job_posting.tags,
+                    "job_category": sample_job_posting.job_category,
+                    "industry": sample_job_posting.industry,
+                    "scraped_at": to_api_datetime(rows[0]["scraped_at"]),
+                    "created_at": to_api_datetime(rows[0]["created_at"]),
+                    "updated_at": to_api_datetime(rows[0]["updated_at"]),
+                }
+            ],
+            "total": 1,
+            "offset": 5,
+            "limit": 10,
+        },
     }
     get_job_postings.assert_awaited_once_with(
         fake_pool.connection_obj,
@@ -280,8 +284,8 @@ def test_job_posting_extraction_endpoint_returns_extracted_payload(
     )
 
     assert response.status_code == 200
-    assert response.json()["posting_id"] == sample_job_posting.posting_id
-    assert response.json()["company_name"] == sample_job_posting.company_name
+    assert response.json()["data"]["posting_id"] == sample_job_posting.posting_id
+    assert response.json()["data"]["company_name"] == sample_job_posting.company_name
     fetch_url_content.assert_awaited_once_with(sample_job_posting.posting_url, ANY)
     extract_job_posting.assert_awaited_once_with(
         html_content=b"<html><body>Backend Engineer</body></html>",
@@ -356,11 +360,15 @@ def test_create_job_posting_endpoint_returns_created_record(
 
     assert response.status_code == 201
     assert response.json() == {
-        "id": 11,
-        **sample_job_posting.model_dump(mode="json"),
-        "scraped_at": to_api_datetime(stored["scraped_at"]),
-        "created_at": to_api_datetime(stored["created_at"]),
-        "updated_at": to_api_datetime(stored["updated_at"]),
+        "status": 201,
+        "message": "채용공고가 저장되었습니다.",
+        "data": {
+            "id": 11,
+            **sample_job_posting.model_dump(mode="json"),
+            "scraped_at": to_api_datetime(stored["scraped_at"]),
+            "created_at": to_api_datetime(stored["created_at"]),
+            "updated_at": to_api_datetime(stored["updated_at"]),
+        },
     }
     assert upsert_job_posting.await_count == 1
     await_args = upsert_job_posting.await_args
@@ -398,7 +406,7 @@ def test_create_job_posting_endpoint_returns_200_for_updates(
     )
 
     assert response.status_code == 200
-    assert response.json()["id"] == 11
+    assert response.json()["data"]["id"] == 11
 
 
 def test_create_job_posting_endpoint_rejects_blank_posting_id(
@@ -420,7 +428,7 @@ def test_create_job_posting_endpoint_rejects_blank_posting_id(
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"][0]["loc"] == ["body", "posting_id"]
+    assert response.json()["errors"][0]["loc"] == ["body", "posting_id"]
     assert upsert_job_posting.await_count == 0
 
 
@@ -441,11 +449,15 @@ def test_get_job_posting_detail_endpoint_returns_stored_record(
 
     assert response.status_code == 200
     assert response.json() == {
-        "id": 19,
-        **sample_job_posting.model_dump(mode="json"),
-        "scraped_at": to_api_datetime(stored["scraped_at"]),
-        "created_at": to_api_datetime(stored["created_at"]),
-        "updated_at": to_api_datetime(stored["updated_at"]),
+        "status": 200,
+        "message": "채용공고 정보를 조회했습니다.",
+        "data": {
+            "id": 19,
+            **sample_job_posting.model_dump(mode="json"),
+            "scraped_at": to_api_datetime(stored["scraped_at"]),
+            "created_at": to_api_datetime(stored["created_at"]),
+            "updated_at": to_api_datetime(stored["updated_at"]),
+        },
     }
     get_job_posting.assert_awaited_once_with(
         fake_pool.connection_obj,
@@ -468,7 +480,13 @@ def test_get_job_posting_detail_endpoint_returns_404_when_missing(
     response = client.get(f"{API_PREFIX}/job-postings/404", headers=auth_headers)
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Job posting 404 not found"}
+    assert response.json() == {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "Job posting 404 not found",
+        "instance": f"{API_PREFIX}/job-postings/404",
+    }
 
 
 def test_read_current_user_returns_user_info(
@@ -480,10 +498,14 @@ def test_read_current_user_returns_user_info(
 
     assert response.status_code == 200
     assert response.json() == {
-        "user_id": str(current_user["id"]),
-        "email": current_user["email"],
-        "name": current_user["name"],
-        "picture": current_user["picture"],
+        "status": 200,
+        "message": "사용자 정보를 조회했습니다.",
+        "data": {
+            "user_id": str(current_user["id"]),
+            "email": current_user["email"],
+            "name": current_user["name"],
+            "picture": current_user["picture"],
+        },
     }
 
 
@@ -502,7 +524,7 @@ def test_read_current_user_retries_transient_database_connection_failures(
     response = client.get(f"{API_PREFIX}/auth/me", headers=auth_headers)
 
     assert response.status_code == 200
-    assert response.json()["user_id"] == str(current_user["id"])
+    assert response.json()["data"]["user_id"] == str(current_user["id"])
     assert fake_pool.connection_attempts == 5
     assert sleep.await_count == 4
 
@@ -522,8 +544,11 @@ def test_read_current_user_returns_structured_database_error_after_retries(
 
     assert response.status_code == 503
     assert response.json() == {
-        "code": "DATABASE_UNAVAILABLE",
-        "message": "데이터베이스 연결이 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
+        "type": "about:blank",
+        "title": "Service Unavailable",
+        "status": 503,
+        "detail": "데이터베이스 연결이 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
+        "instance": f"{API_PREFIX}/auth/me",
     }
     assert "Internal Server Error" not in response.text
     assert fake_pool.connection_attempts == 5
@@ -554,7 +579,7 @@ def test_update_current_user_returns_updated_name(
     )
 
     assert response.status_code == 200
-    assert response.json()["name"] == "New Name"
+    assert response.json()["data"]["name"] == "New Name"
     update_user_name_mock.assert_awaited_once_with(
         fake_pool.connection_obj,
         current_user["id"],
@@ -579,7 +604,13 @@ def test_update_current_user_returns_404_when_user_disappears(
     )
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "사용자를 찾을 수 없습니다"}
+    assert response.json() == {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "사용자를 찾을 수 없습니다",
+        "instance": f"{API_PREFIX}/auth/me",
+    }
     update_user_name_mock.assert_awaited_once_with(
         fake_pool.connection_obj,
         current_user["id"],
@@ -640,7 +671,9 @@ def test_logout_returns_200_with_message(
 
     assert response.status_code == 200
     assert response.json() == {
-        "message": "세션이 종료되었습니다. 토큰은 클라이언트에서 삭제해 주세요."
+        "status": 200,
+        "message": "세션이 종료되었습니다. 토큰은 클라이언트에서 삭제해 주세요.",
+        "data": None,
     }
 
 
@@ -657,7 +690,11 @@ def test_db_health_endpoint_uses_app_pool(
     response = client.get(f"{API_PREFIX}/health/db")
 
     assert response.status_code == 200
-    assert response.json() == {"database": "connected", "result": 1}
+    assert response.json() == {
+        "status": 200,
+        "message": "DB connected",
+        "data": {"database": "connected", "result": 1},
+    }
     # init_schema also runs at startup through the same FakeConnection, so
     # verify the health endpoint's query is present rather than exclusive.
     assert "SELECT 1" in fake_pool.connection_obj.executed_queries
@@ -676,7 +713,11 @@ def test_db_health_endpoint_retries_transient_database_connection_failures(
     response = client.get(f"{API_PREFIX}/health/db")
 
     assert response.status_code == 200
-    assert response.json() == {"database": "connected", "result": 1}
+    assert response.json() == {
+        "status": 200,
+        "message": "DB connected",
+        "data": {"database": "connected", "result": 1},
+    }
     assert fake_pool.connection_attempts == 5
     assert sleep.await_count == 4
 

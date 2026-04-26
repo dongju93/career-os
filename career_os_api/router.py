@@ -27,7 +27,7 @@ from career_os_api.database.retry import (
     run_database_operation,
 )
 from career_os_api.database.users import update_user_name, upsert_user
-from career_os_api.responses import api_response
+from career_os_api.responses import ApiResponse
 from career_os_api.schemas import (
     CurrentUserResponse,
     JobPostingExtracted,
@@ -82,8 +82,8 @@ def _resolve_callback_url(
 
 
 @v1_router.get("/", tags=["system"])
-def root() -> JSONResponse:
-    return api_response(status_code=status.HTTP_200_OK, message="Hello, World!")
+def root() -> ApiResponse[None]:
+    return ApiResponse(status=status.HTTP_200_OK, message="Hello, World!")
 
 
 @v1_router.get("/health/db", tags=["system"])
@@ -94,8 +94,13 @@ async def db_health(request: Request) -> JSONResponse:
         return row[0]
 
     result = await run_database_operation(request.app.state.pool, operation)
-    return api_response(
-        status_code=status.HTTP_200_OK, database="connected", result=result
+    return JSONResponse(
+        content={
+            "status": status.HTTP_200_OK,
+            "message": "DB connected",
+            "data": {"database": "connected", "result": result},
+        },
+        status_code=status.HTTP_200_OK,
     )
 
 
@@ -167,12 +172,18 @@ async def google_callback(request: Request) -> RedirectResponse:
 
 
 @v1_router.get("/auth/me", tags=["auth"])
-async def read_current_user(current_user: _CurrentUser) -> CurrentUserResponse:
-    return CurrentUserResponse(
-        user_id=current_user["id"],
-        email=current_user["email"],
-        name=current_user["name"],
-        picture=current_user["picture"],
+async def read_current_user(
+    current_user: _CurrentUser,
+) -> ApiResponse[CurrentUserResponse]:
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="사용자 정보를 조회했습니다.",
+        data=CurrentUserResponse(
+            user_id=current_user["id"],
+            email=current_user["email"],
+            name=current_user["name"],
+            picture=current_user["picture"],
+        ),
     )
 
 
@@ -188,7 +199,7 @@ async def update_current_user(
     data: UpdateCurrentUserRequest,
     request: Request,
     current_user: _CurrentUser,
-) -> CurrentUserResponse:
+) -> ApiResponse[CurrentUserResponse]:
     async def operation(conn):
         return await update_user_name(conn, current_user["id"], data.name)
 
@@ -198,21 +209,25 @@ async def update_current_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="사용자를 찾을 수 없습니다",
         )
-    return CurrentUserResponse(
-        user_id=user["id"],
-        email=user["email"],
-        name=user["name"],
-        picture=user["picture"],
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="사용자 정보를 수정했습니다.",
+        data=CurrentUserResponse(
+            user_id=user["id"],
+            email=user["email"],
+            name=user["name"],
+            picture=user["picture"],
+        ),
     )
 
 
 @v1_router.post("/auth/logout", tags=["auth"])
 async def logout_current_user(
     request: Request, current_user: _CurrentUser
-) -> JSONResponse:
+) -> ApiResponse[None]:
     request.session.clear()
-    return api_response(
-        status_code=status.HTTP_200_OK,
+    return ApiResponse(
+        status=status.HTTP_200_OK,
         message="세션이 종료되었습니다. 토큰은 클라이언트에서 삭제해 주세요.",
     )
 
@@ -307,7 +322,7 @@ async def list_job_postings(
     limit: Annotated[
         int, Query(ge=1, le=100, description="Max records to return")
     ] = 20,
-) -> JobPostingPage:
+) -> ApiResponse[JobPostingPage]:
     async def operation(conn):
         return await get_job_postings(
             conn,
@@ -317,11 +332,15 @@ async def list_job_postings(
         )
 
     rows, total = await run_database_operation(request.app.state.pool, operation)
-    return JobPostingPage(
-        items=[JobPostingListItem(**row) for row in rows],
-        total=total,
-        offset=offset,
-        limit=limit,
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="채용공고 목록을 조회했습니다.",
+        data=JobPostingPage(
+            items=[JobPostingListItem(**row) for row in rows],
+            total=total,
+            offset=offset,
+            limit=limit,
+        ),
     )
 
 
@@ -342,13 +361,18 @@ async def get_job_posting_extraction(
     url: Annotated[str, Query(description="Job posting URL")],
     request: Request,
     _current_user: _CurrentUser,
-) -> JobPostingExtracted:
+) -> ApiResponse[JobPostingExtracted]:
     content, _ = await fetch_url_content(url, request.app.state.http_client)
-    return await extract_job_posting(
+    extracted = await extract_job_posting(
         html_content=content,
         source_url=url,
         image_client=request.app.state.image_http_client,
         openai_client=request.app.state.openai_client,
+    )
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="채용공고 정보를 추출했습니다.",
+        data=extracted,
     )
 
 
@@ -361,7 +385,7 @@ async def get_job_posting_extraction(
         # matching the 201 body. Without it the 200 entry has no content schema and
         # generated clients treat successful updates as empty responses.
         200: {
-            "model": JobPostingStored,
+            "model": ApiResponse[JobPostingStored],
             "description": "Job posting updated (existing record)",
         },
         201: {"description": "Job posting created"},
@@ -372,20 +396,26 @@ async def create_job_posting(
     request: Request,
     response: Response,
     current_user: _CurrentUser,
-) -> JobPostingStored:
+) -> ApiResponse[JobPostingStored]:
     async def operation(conn):
         return await upsert_job_posting(conn, data, user_id=current_user["id"])
 
     row = await run_database_operation(request.app.state.pool, operation)
-    if not row["inserted"]:
-        response.status_code = status.HTTP_200_OK
-    return JobPostingStored(
+    stored = JobPostingStored(
         id=row["id"],
         scraped_at=row["scraped_at"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         **data.model_dump(),
     )
+    http_status = status.HTTP_201_CREATED if row["inserted"] else status.HTTP_200_OK
+    response.status_code = http_status
+    message = (
+        "채용공고가 저장되었습니다."
+        if row["inserted"]
+        else "채용공고가 업데이트되었습니다."
+    )
+    return ApiResponse(status=http_status, message=message, data=stored)
 
 
 @v1_router.get(
@@ -397,7 +427,7 @@ async def get_job_posting_detail(
     job_id: int,
     request: Request,
     current_user: _CurrentUser,
-) -> JobPostingStored:
+) -> ApiResponse[JobPostingStored]:
     async def operation(conn):
         return await get_job_posting(conn, job_id, user_id=current_user["id"])
 
@@ -407,4 +437,8 @@ async def get_job_posting_detail(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Job posting {job_id} not found",
         )
-    return JobPostingStored(**row)
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="채용공고 정보를 조회했습니다.",
+        data=JobPostingStored(**row),
+    )

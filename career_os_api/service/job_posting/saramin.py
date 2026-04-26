@@ -67,9 +67,15 @@ async def fetch_saramin_job_posting(url: str, client: AsyncHttpClient) -> bytes:
         )
         ajax_resp.raise_for_status()
     except httpx.HTTPStatusError as e:
+        upstream_status = e.response.status_code
+        if upstream_status == status.HTTP_404_NOT_FOUND:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Saramin returned 404",
+            ) from e
         raise HTTPException(
-            status_code=e.response.status_code,
-            detail=f"Saramin returned {e.response.status_code}",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Saramin returned {upstream_status}",
         ) from e
     except httpx.RequestError:
         raise HTTPException(

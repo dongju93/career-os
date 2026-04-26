@@ -38,9 +38,15 @@ async def fetch_url_content(
             detail="Invalid URL provided",
         ) from None
     except httpx.HTTPStatusError as e:
+        upstream_status = e.response.status_code
+        if upstream_status == status.HTTP_404_NOT_FOUND:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Upstream server returned 404",
+            ) from e
         raise HTTPException(
-            status_code=e.response.status_code,
-            detail=f"Upstream server returned {e.response.status_code}",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Upstream server returned {upstream_status}",
         ) from e
     except httpx.RequestError:
         raise HTTPException(

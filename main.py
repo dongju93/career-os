@@ -2,7 +2,8 @@ import logging
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from openai import AsyncOpenAI
@@ -13,7 +14,7 @@ from career_os_api.constants import API_V1
 from career_os_api.database.ddl import init_schema
 from career_os_api.database.pool import create_postgres_pool
 from career_os_api.database.retry import DatabaseUnavailableError
-from career_os_api.responses import ApiErrorCode, api_error_response
+from career_os_api.responses import api_error_response, api_validation_error_response
 from career_os_api.router import v1_router
 
 logger = logging.getLogger(__name__)
@@ -66,21 +67,44 @@ career_os.add_middleware(
 )
 
 
+@career_os.exception_handler(HTTPException)
+async def http_exception_handler(
+    request: Request,
+    exc: HTTPException,
+) -> JSONResponse:
+    return api_error_response(
+        status_code=exc.status_code,
+        detail=str(exc.detail),
+        instance=str(request.url.path),
+    )
+
+
+@career_os.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+) -> JSONResponse:
+    return api_validation_error_response(
+        errors=exc.errors(),
+        instance=str(request.url.path),
+    )
+
+
 @career_os.exception_handler(DatabaseUnavailableError)
 async def database_unavailable_exception_handler(
-    _request: Request,
+    request: Request,
     _exc: DatabaseUnavailableError,
 ) -> JSONResponse:
     return api_error_response(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        code=ApiErrorCode.DATABASE_UNAVAILABLE,
-        message="데이터베이스 연결이 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
+        detail="데이터베이스 연결이 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
+        instance=str(request.url.path),
     )
 
 
 @career_os.exception_handler(Exception)
 async def unhandled_exception_handler(
-    _request: Request,
+    request: Request,
     exc: Exception,
 ) -> JSONResponse:
     logger.error(
@@ -89,8 +113,8 @@ async def unhandled_exception_handler(
     )
     return api_error_response(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        code=ApiErrorCode.INTERNAL_SERVER_ERROR,
-        message="서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        detail="서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        instance=str(request.url.path),
     )
 
 
