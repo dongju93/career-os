@@ -76,7 +76,7 @@ pnpm dev
 | **Vite 8**                   | 개발 서버·번들러         | 빠른 HMR과 짧은 빌드 시간. ESM 네이티브 기반으로 개발 생산성이 높음                                                 |
 | **Mantine 9**                | UI 컴포넌트 라이브러리   | Provider·테마 기반 의존성으로 유지. 실제 화면 primitive는 `src/components/ui/` 사용. 접근성과 커스터마이징 지원     |
 | **React Router 7**           | 클라이언트 사이드 라우팅 | URL 기반 화면 전환·레이아웃 분리·인증 리다이렉트를 체계적으로 관리                                                  |
-| **Zustand 5**                | 전역 상태 관리           | Context 대비 보일러플레이트가 적고 가벼움. `persist` 미들웨어로 현재 사용자 정보를 `localStorage`에 영속 저장        |
+| **Zustand 5**                | 전역 상태 관리           | Context 대비 보일러플레이트가 적고 가벼움. `persist` 미들웨어로 현재 사용자 정보를 `localStorage`에 영속 저장       |
 | **Tailwind CSS 4**           | 유틸리티 퍼스트 CSS      | 반복 CSS 작성을 줄이고 토큰 기반 UI를 빠르게 조합. `@tailwindcss/vite` 플러그인으로 별도 설정 파일 없이 Vite에 연동 |
 | **React Compiler**           | 빌드 타임 최적화         | `babel-plugin-react-compiler`가 컴파일 단계에서 메모이제이션을 자동 처리해 수동 `useMemo`/`useCallback` 부담을 줄임 |
 | **Biome**                    | 린터·포매터              | 포매팅과 정적 분석을 단일 도구로 처리. Rust 기반으로 속도가 빠르고 설정이 단순함                                    |
@@ -116,11 +116,3 @@ Playwright 브라우저가 없다면 최초 1회 실행:
 ```bash
 pnpm exec playwright install chromium
 ```
-
----
-
-## 배포
-
-| 구성 요소  | 플랫폼 |
-| ---------- | ------ |
-| 프론트엔드 | Vercel |

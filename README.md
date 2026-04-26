@@ -53,7 +53,7 @@
 ### 설치
 
 ```bash
-uv sync --dev
+uv sync
 ```
 
 ### 환경 변수
@@ -74,7 +74,7 @@ REDIRECT_URI=http://localhost:8000/v1/auth/google/callback
 ### 실행
 
 ```bash
-uv run fastapi dev main.py
+uv run fastapi dev
 ```
 
 API 문서: `http://localhost:8000/v1/docs`
@@ -158,12 +158,3 @@ uvx pyrefly check                    # 타입 검사
 2. `career_os_api/service/job_posting/<platform>.py` — 플랫폼 전용 fetch 함수 구현
 3. `career_os_api/service/job_posting/fetch.py` — 디스패치 분기 추가
 4. `career_os_api/database/ddl.py` — `CHECK (platform IN (...))` 제약 확장
-
----
-
-## 배포
-
-| 구성 요소    | 플랫폼                     |
-| ------------ | -------------------------- |
-| API 서버     | FastAPI Cloud (SaaS)       |
-| 데이터베이스 | Neon (서버리스 PostgreSQL) |
