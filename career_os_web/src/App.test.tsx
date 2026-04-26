@@ -32,6 +32,14 @@ const jobPostingPage = {
   limit: 50,
 };
 
+function apiResponse<T>(data: T, status = 200) {
+  return {
+    status,
+    message: 'ok',
+    data,
+  };
+}
+
 async function advanceRetryBackoffTimers() {
   await act(async () => {
     await Promise.resolve();
@@ -62,7 +70,7 @@ describe('Career OS Web app shell', () => {
   it('redirects the root route to saved job postings and loads the page data', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => jobPostingPage,
+      json: async () => apiResponse(jobPostingPage),
     });
 
     vi.stubGlobal('fetch', fetchMock);
@@ -96,8 +104,11 @@ describe('Career OS Web app shell', () => {
       ok: false,
       status: 503,
       json: async () => ({
-        code: 'DATABASE_UNAVAILABLE',
-        message: '데이터베이스 연결이 일시적으로 불안정합니다.',
+        type: 'about:blank',
+        title: 'Service Unavailable',
+        status: 503,
+        detail: '데이터베이스 연결이 일시적으로 불안정합니다.',
+        instance: '/v1/job-postings',
       }),
     });
 
@@ -113,7 +124,7 @@ describe('Career OS Web app shell', () => {
           name: /채용공고를 불러오지 못했습니다/i,
         }),
       ).toBeInTheDocument();
-      expect(screen.getByText('DATABASE_UNAVAILABLE')).toBeInTheDocument();
+      expect(screen.getByText('INTERNAL_SERVER_ERROR')).toBeInTheDocument();
       expect(
         screen.queryByText(/Internal Server Error/i),
       ).not.toBeInTheDocument();
@@ -135,7 +146,7 @@ describe('Career OS Web app shell', () => {
 
       return {
         ok: true,
-        json: async () => jobPostingPage,
+        json: async () => apiResponse(jobPostingPage),
       };
     });
 

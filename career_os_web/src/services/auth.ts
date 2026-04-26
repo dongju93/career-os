@@ -1,7 +1,7 @@
 import { API_BASE_URL } from './api-base-url';
 import { fetchWithApiRetry } from './api-client';
 import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
-import { authMeResponseSchema } from './schemas';
+import { authMeApiResponseSchema } from './schemas';
 
 export async function logoutUser(token: string): Promise<void> {
   await fetchWithApiRetry(
@@ -28,7 +28,7 @@ export async function fetchAuthMe(token: string): Promise<AuthMeResult> {
     '로그인 완료에 실패했습니다. 다시 시도해주세요.',
   );
   const raw = await response.json();
-  const result = authMeResponseSchema.safeParse(raw);
+  const result = authMeApiResponseSchema.safeParse(raw);
   if (!result.success) {
     throw new ApiError({
       code: CLIENT_CONTRACT_MISMATCH,
@@ -36,5 +36,5 @@ export async function fetchAuthMe(token: string): Promise<AuthMeResult> {
       status: 0,
     });
   }
-  return result.data;
+  return result.data.data;
 }

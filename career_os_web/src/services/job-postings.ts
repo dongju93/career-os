@@ -7,9 +7,9 @@ import { API_BASE_URL } from './api-base-url';
 import { fetchWithApiRetry } from './api-client';
 import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
 import {
-  jobPostingDetailSchema,
-  jobPostingExtractedSchema,
-  jobPostingPageSchema,
+  jobPostingDetailApiResponseSchema,
+  jobPostingExtractedApiResponseSchema,
+  jobPostingPageApiResponseSchema,
 } from './schemas';
 
 const CONTRACT_ERROR_MESSAGE = '서버 응답 형식이 올바르지 않습니다.';
@@ -38,7 +38,9 @@ export async function extractJobPosting(
     '채용공고 정보를 가져오지 못했습니다.',
   );
   const raw = await response.json();
-  return assertContractMatch(jobPostingExtractedSchema.safeParse(raw));
+  return assertContractMatch(
+    jobPostingExtractedApiResponseSchema.safeParse(raw),
+  ).data;
 }
 
 export async function saveJobPosting(
@@ -72,7 +74,8 @@ export async function fetchJobPosting(
     '채용공고를 불러오지 못했습니다.',
   );
   const raw = await response.json();
-  return assertContractMatch(jobPostingDetailSchema.safeParse(raw));
+  return assertContractMatch(jobPostingDetailApiResponseSchema.safeParse(raw))
+    .data;
 }
 
 export async function fetchJobPostings(
@@ -88,5 +91,6 @@ export async function fetchJobPostings(
     '채용공고 목록을 불러오지 못했습니다.',
   );
   const raw = await response.json();
-  return assertContractMatch(jobPostingPageSchema.safeParse(raw));
+  return assertContractMatch(jobPostingPageApiResponseSchema.safeParse(raw))
+    .data;
 }

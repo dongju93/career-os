@@ -4,7 +4,7 @@ import httpx
 from bs4 import BeautifulSoup
 from fastapi import HTTPException, status
 
-from career_os_api.config import settings
+from career_os_api._types import AsyncHttpClient
 from career_os_api.constants import HTML_PARSER, SARAMIN_USER_AGENT
 
 SARAMIN_DOMAIN = "saramin.co.kr"
@@ -28,7 +28,7 @@ def is_saramin_url(url: str) -> bool:
     return host == SARAMIN_DOMAIN or host.endswith(f".{SARAMIN_DOMAIN}")
 
 
-async def fetch_saramin_job_posting(url: str) -> bytes:
+async def fetch_saramin_job_posting(url: str, client: AsyncHttpClient) -> bytes:
     """
     Fetch only the current job posting from a Saramin relay/view URL.
 
@@ -59,34 +59,38 @@ async def fetch_saramin_job_posting(url: str) -> bytes:
         "Referer": url,
     }
 
-    async with httpx.AsyncClient(
-        follow_redirects=True, timeout=settings.http_fetch_timeout, headers=headers
-    ) as client:
-        try:
-            ajax_resp = await client.get(
-                SARAMIN_JOB_AJAX_URL,
-                params={"rec_idx": rec_idx, "rec_seq": "0"},
-            )
-            ajax_resp.raise_for_status()
-        except httpx.HTTPStatusError as e:
+    try:
+        ajax_resp = await client.get(
+            SARAMIN_JOB_AJAX_URL,
+            params={"rec_idx": rec_idx, "rec_seq": "0"},
+            headers=headers,
+        )
+        ajax_resp.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        upstream_status = e.response.status_code
+        if upstream_status == status.HTTP_404_NOT_FOUND:
             raise HTTPException(
-                status_code=e.response.status_code,
-                detail=f"Saramin returned {e.response.status_code}",
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Saramin returned 404",
             ) from e
-        except httpx.RequestError:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Failed to reach Saramin",
-            ) from None
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Saramin returned {upstream_status}",
+        ) from e
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to reach Saramin",
+        ) from None
 
-        soup = BeautifulSoup(ajax_resp.content, HTML_PARSER)
-        await _inline_iframe_content(client, soup)
+    soup = BeautifulSoup(ajax_resp.content, HTML_PARSER)
+    await _inline_iframe_content(client, soup, headers)
 
     return _extract_posting_sections(soup)
 
 
 async def _inline_iframe_content(
-    client: httpx.AsyncClient, soup: BeautifulSoup
+    client: AsyncHttpClient, soup: BeautifulSoup, headers: dict[str, str]
 ) -> None:
     """Replace the detail iframe with its .user_content, if accessible."""
     iframe = soup.select_one(".jv_cont.jv_detail iframe.iframe_content")
@@ -108,7 +112,7 @@ async def _inline_iframe_content(
         return
 
     try:
-        detail_resp = await client.get(iframe_src)
+        detail_resp = await client.get(iframe_src, headers=headers)
         if detail_resp.status_code == 200:
             detail_soup = BeautifulSoup(detail_resp.content, HTML_PARSER)
             user_content = detail_soup.select_one(".user_content")

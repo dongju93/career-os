@@ -1,22 +1,70 @@
-from enum import StrEnum
+import json
+from collections.abc import Sequence
+from http import HTTPStatus
 from typing import Any
 
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 
-class ApiErrorCode(StrEnum):
-    DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
-    INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR"
+class ApiResponse[T](BaseModel):
+    status: int
+    message: str
+    data: T | None = None
 
 
-def api_response(*, status_code: int, **payload: Any) -> JSONResponse:
-    return JSONResponse(content=payload, status_code=status_code)
+class ProblemDetail(BaseModel):
+    type: str = "about:blank"
+    title: str
+    status: int
+    detail: str
+    instance: str | None = None
+
+
+class ValidationProblemDetail(ProblemDetail):
+    errors: list[dict[str, Any]]
 
 
 def api_error_response(
     *,
     status_code: int,
-    code: ApiErrorCode,
-    message: str,
+    detail: str,
+    instance: str | None = None,
 ) -> JSONResponse:
-    return api_response(status_code=status_code, code=code.value, message=message)
+    try:
+        title = HTTPStatus(status_code).phrase
+    except ValueError:
+        title = "Error"
+    body = ProblemDetail(
+        title=title,
+        status=status_code,
+        detail=detail,
+        instance=instance,
+    )
+    return JSONResponse(
+        content=body.model_dump(exclude_none=True),
+        status_code=status_code,
+        media_type="application/problem+json",
+    )
+
+
+def api_validation_error_response(
+    *,
+    errors: Sequence[Any],
+    instance: str | None = None,
+) -> JSONResponse:
+    # Pydantic v2 may include live Exception instances in ctx["error"].
+    # Round-trip through JSON with str() fallback to get a fully serializable list.
+    safe_errors = json.loads(json.dumps(errors, default=str))
+    body = ValidationProblemDetail(
+        title="Unprocessable Entity",
+        status=422,
+        detail="Request validation failed",
+        instance=instance,
+        errors=safe_errors,
+    )
+    return JSONResponse(
+        content=body.model_dump(exclude_none=True),
+        status_code=422,
+        media_type="application/problem+json",
+    )

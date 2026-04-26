@@ -1,7 +1,7 @@
 import base64
 from types import SimpleNamespace
 from typing import TypedDict, cast
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -84,9 +84,7 @@ def test_build_messages_includes_required_context_and_images() -> None:
 
 
 @pytest.mark.asyncio
-async def test_collect_images_as_base64_normalizes_sources_and_skips_failures(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_collect_images_as_base64_normalizes_sources_and_skips_failures() -> None:
     # Off-domain URL must be silently dropped; saramin subdomains are allowed.
     soup = BeautifulSoup(
         """
@@ -119,15 +117,10 @@ async def test_collect_images_as_base64_normalizes_sources_and_skips_failures(
         ]
     )
 
-    monkeypatch.setattr(
-        extractor_module.httpx,
-        "AsyncClient",
-        lambda **kwargs: client,
-    )
-
     data_urls = await extractor_module._collect_images_as_base64(
         soup,
         "https://www.saramin.co.kr",
+        client,
     )
 
     assert data_urls == [
@@ -184,12 +177,7 @@ async def test_extract_job_posting_returns_parsed_model(
             )
         ]
     )
-    holder: dict[str, FakeAsyncOpenAI] = {}
-
-    def fake_openai_factory(api_key: str) -> FakeAsyncOpenAI:
-        client = FakeAsyncOpenAI(api_key=api_key, response=response)
-        holder["client"] = client
-        return client
+    fake_openai = FakeAsyncOpenAI(api_key=settings.openai_api_key, response=response)
 
     monkeypatch.setattr(
         extractor_module, "detect_platform", lambda url: Platform.saramin
@@ -204,17 +192,18 @@ async def test_extract_job_posting_returns_parsed_model(
         "_collect_images_as_base64",
         collect_images,
     )
-    monkeypatch.setattr(extractor_module, "AsyncOpenAI", fake_openai_factory)
 
     result = await extractor_module.extract_job_posting(
         b"<html><body><h1>Backend Engineer</h1></body></html>",
         sample_job_posting.posting_url,
+        image_client=MagicMock(),
+        openai_client=fake_openai,  # type: ignore[arg-type]
     )
 
     assert result.model_dump() == sample_job_posting.model_dump()
     collect_images.assert_awaited_once()
-    parse_kwargs = holder["client"].completions.calls[0]
-    assert holder["client"].api_key == "test-openai-api-key"
+    parse_kwargs = fake_openai.completions.calls[0]
+    assert fake_openai.api_key == "test-openai-api-key"
     assert parse_kwargs["model"] == settings.openai_model
     assert parse_kwargs["response_format"] is JobPostingExtracted
     content = _require_user_content(parse_kwargs["messages"][1])
@@ -233,6 +222,7 @@ async def test_extract_job_posting_maps_model_refusal_to_http_error(
             )
         ]
     )
+    fake_openai = FakeAsyncOpenAI(api_key=settings.openai_api_key, response=response)
 
     monkeypatch.setattr(
         extractor_module, "detect_platform", lambda url: Platform.saramin
@@ -247,16 +237,13 @@ async def test_extract_job_posting_maps_model_refusal_to_http_error(
         "_collect_images_as_base64",
         AsyncMock(return_value=[]),
     )
-    monkeypatch.setattr(
-        extractor_module,
-        "AsyncOpenAI",
-        lambda api_key: FakeAsyncOpenAI(api_key=api_key, response=response),
-    )
 
     with pytest.raises(HTTPException) as exc_info:
         await extractor_module.extract_job_posting(
             b"<html><body><h1>Backend Engineer</h1></body></html>",
             sample_job_posting.posting_url,
+            image_client=MagicMock(),
+            openai_client=fake_openai,  # type: ignore[arg-type]
         )
 
     assert exc_info.value.status_code == 422

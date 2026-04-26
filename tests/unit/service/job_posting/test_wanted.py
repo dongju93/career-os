@@ -63,9 +63,7 @@ def test_is_wanted_url_rejects_other_domains() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fetch_wanted_job_posting_builds_html_from_api_response(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_fetch_wanted_job_posting_builds_html_from_api_response() -> None:
     client = SequenceAsyncClient(
         [
             make_response(
@@ -75,10 +73,10 @@ async def test_fetch_wanted_job_posting_builds_html_from_api_response(
             ),
         ]
     )
-    monkeypatch.setattr(wanted_module.httpx, "AsyncClient", lambda **kwargs: client)
 
     content = await wanted_module.fetch_wanted_job_posting(
-        "https://www.wanted.co.kr/wd/349998"
+        "https://www.wanted.co.kr/wd/349998",
+        client,
     )
     html = content.decode("utf-8")
 
@@ -117,7 +115,6 @@ async def test_fetch_wanted_job_posting_builds_html_from_api_response(
     ],
 )
 async def test_fetch_wanted_job_posting_omits_salary_when_range_is_open_ended(
-    monkeypatch: pytest.MonkeyPatch,
     annual_from: int | None,
     annual_to: int | None,
 ) -> None:
@@ -134,10 +131,10 @@ async def test_fetch_wanted_job_posting_omits_salary_when_range_is_open_ended(
             ),
         ]
     )
-    monkeypatch.setattr(wanted_module.httpx, "AsyncClient", lambda **kwargs: client)
 
     content = await wanted_module.fetch_wanted_job_posting(
-        "https://www.wanted.co.kr/wd/349998"
+        "https://www.wanted.co.kr/wd/349998",
+        client,
     )
     html = content.decode("utf-8")
 
@@ -147,9 +144,7 @@ async def test_fetch_wanted_job_posting_omits_salary_when_range_is_open_ended(
 
 
 @pytest.mark.asyncio
-async def test_fetch_wanted_job_posting_hits_api_with_posting_id(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_fetch_wanted_job_posting_hits_api_with_posting_id() -> None:
     client = SequenceAsyncClient(
         [
             make_response(
@@ -159,9 +154,11 @@ async def test_fetch_wanted_job_posting_hits_api_with_posting_id(
             ),
         ]
     )
-    monkeypatch.setattr(wanted_module.httpx, "AsyncClient", lambda **kwargs: client)
 
-    await wanted_module.fetch_wanted_job_posting("https://www.wanted.co.kr/wd/349998")
+    await wanted_module.fetch_wanted_job_posting(
+        "https://www.wanted.co.kr/wd/349998",
+        client,
+    )
 
     assert client.calls[0][0] == f"{wanted_module.WANTED_JOB_API_URL}/349998"
 
@@ -173,9 +170,12 @@ async def test_fetch_wanted_job_posting_hits_api_with_posting_id(
 
 @pytest.mark.asyncio
 async def test_fetch_wanted_job_posting_requires_wd_path() -> None:
+    from unittest.mock import MagicMock
+
     with pytest.raises(HTTPException) as exc_info:
         await wanted_module.fetch_wanted_job_posting(
-            "https://www.wanted.co.kr/company/123"
+            "https://www.wanted.co.kr/company/123",
+            MagicMock(),
         )
     assert exc_info.value.status_code == 400
     assert "/wd/{id}" in exc_info.value.detail
@@ -183,8 +183,13 @@ async def test_fetch_wanted_job_posting_requires_wd_path() -> None:
 
 @pytest.mark.asyncio
 async def test_fetch_wanted_job_posting_requires_nonempty_id() -> None:
+    from unittest.mock import MagicMock
+
     with pytest.raises(HTTPException) as exc_info:
-        await wanted_module.fetch_wanted_job_posting("https://www.wanted.co.kr/wd/")
+        await wanted_module.fetch_wanted_job_posting(
+            "https://www.wanted.co.kr/wd/",
+            MagicMock(),
+        )
     assert exc_info.value.status_code == 400
 
 
@@ -194,17 +199,15 @@ async def test_fetch_wanted_job_posting_requires_nonempty_id() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fetch_wanted_job_posting_maps_upstream_status(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_fetch_wanted_job_posting_maps_upstream_status() -> None:
     client = SequenceAsyncClient(
         [make_http_status_error(f"{wanted_module.WANTED_JOB_API_URL}/349998", 404)]
     )
-    monkeypatch.setattr(wanted_module.httpx, "AsyncClient", lambda **kwargs: client)
 
     with pytest.raises(HTTPException) as exc_info:
         await wanted_module.fetch_wanted_job_posting(
-            "https://www.wanted.co.kr/wd/349998"
+            "https://www.wanted.co.kr/wd/349998",
+            client,
         )
 
     assert exc_info.value.status_code == 404
@@ -212,9 +215,7 @@ async def test_fetch_wanted_job_posting_maps_upstream_status(
 
 
 @pytest.mark.asyncio
-async def test_fetch_wanted_job_posting_maps_request_errors(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_fetch_wanted_job_posting_maps_request_errors() -> None:
     client = SequenceAsyncClient(
         [
             httpx.RequestError(
@@ -225,11 +226,11 @@ async def test_fetch_wanted_job_posting_maps_request_errors(
             )
         ]
     )
-    monkeypatch.setattr(wanted_module.httpx, "AsyncClient", lambda **kwargs: client)
 
     with pytest.raises(HTTPException) as exc_info:
         await wanted_module.fetch_wanted_job_posting(
-            "https://www.wanted.co.kr/wd/349998"
+            "https://www.wanted.co.kr/wd/349998",
+            client,
         )
 
     assert exc_info.value.status_code == 502

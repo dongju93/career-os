@@ -1,7 +1,9 @@
 import time
 from collections.abc import Generator
 from typing import Any
+from unittest.mock import MagicMock
 
+import httpx
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -95,7 +97,7 @@ async def test_verify_risc_set_accepts_valid_account_disabled_event(
     )
     token = _sign(private_pem, payload)
 
-    event = await verify_risc_set(token)
+    event = await verify_risc_set(token, MagicMock())
 
     assert event.event_type == EVENT_ACCOUNT_DISABLED
     assert event.google_id == "google-user-xyz"
@@ -111,7 +113,7 @@ async def test_verify_risc_set_accepts_verification_event_without_subject(
     payload = _base_payload(EVENT_VERIFICATION, {"state": "check-123"})
     token = _sign(private_pem, payload)
 
-    event = await verify_risc_set(token)
+    event = await verify_risc_set(token, MagicMock())
 
     assert event.event_type == EVENT_VERIFICATION
     assert event.google_id is None
@@ -135,7 +137,7 @@ async def test_verify_risc_set_accepts_token_revoked_event_without_subject(
     )
     token = _sign(private_pem, payload)
 
-    event = await verify_risc_set(token)
+    event = await verify_risc_set(token, MagicMock())
 
     assert event.event_type == EVENT_TOKEN_REVOKED
     assert event.google_id is None
@@ -153,7 +155,7 @@ async def test_verify_risc_set_rejects_wrong_issuer(
     token = _sign(private_pem, payload)
 
     with pytest.raises(RiscVerificationError):
-        await verify_risc_set(token)
+        await verify_risc_set(token, MagicMock())
 
 
 async def test_verify_risc_set_rejects_wrong_audience(
@@ -168,7 +170,7 @@ async def test_verify_risc_set_rejects_wrong_audience(
     token = _sign(private_pem, payload)
 
     with pytest.raises(RiscVerificationError):
-        await verify_risc_set(token)
+        await verify_risc_set(token, MagicMock())
 
 
 async def test_verify_risc_set_rejects_missing_audience(
@@ -183,7 +185,7 @@ async def test_verify_risc_set_rejects_missing_audience(
     token = _sign(private_pem, payload)
 
     with pytest.raises(RiscVerificationError, match="aud"):
-        await verify_risc_set(token)
+        await verify_risc_set(token, MagicMock())
 
 
 async def test_verify_risc_set_rejects_bad_signature(
@@ -199,7 +201,7 @@ async def test_verify_risc_set_rejects_bad_signature(
     token = _sign(other_private_pem, payload)
 
     with pytest.raises(RiscVerificationError):
-        await verify_risc_set(token)
+        await verify_risc_set(token, MagicMock())
 
 
 async def test_verify_risc_set_rejects_unknown_kid(
@@ -209,7 +211,7 @@ async def test_verify_risc_set_rejects_unknown_kid(
     private_pem, _ = signing_pair
     # Simulate a forced-refresh that still does not return a matching key.
 
-    async def fake_fetch() -> list[dict[str, Any]]:
+    async def fake_fetch(_client: httpx.AsyncClient) -> list[dict[str, Any]]:
         return []
 
     monkeypatch.setattr(risc_module, "_fetch_jwks", fake_fetch)
@@ -220,7 +222,7 @@ async def test_verify_risc_set_rejects_unknown_kid(
     token = _sign(private_pem, payload, kid="unknown-kid")
 
     with pytest.raises(RiscVerificationError, match="No JWKS key matches kid"):
-        await verify_risc_set(token)
+        await verify_risc_set(token, MagicMock())
 
 
 async def test_verify_risc_set_does_not_force_refresh_for_fresh_unknown_kid(
@@ -229,7 +231,7 @@ async def test_verify_risc_set_does_not_force_refresh_for_fresh_unknown_kid(
 ) -> None:
     private_pem, _ = signing_pair
 
-    async def unexpected_fetch() -> list[dict[str, Any]]:
+    async def unexpected_fetch(_client: httpx.AsyncClient) -> list[dict[str, Any]]:
         raise AssertionError("fresh unknown kid should not force JWKS refresh")
 
     monkeypatch.setattr(risc_module, "_fetch_jwks", unexpected_fetch)
@@ -240,7 +242,7 @@ async def test_verify_risc_set_does_not_force_refresh_for_fresh_unknown_kid(
     token = _sign(private_pem, payload, kid="unknown-kid")
 
     with pytest.raises(RiscVerificationError, match="No JWKS key matches kid"):
-        await verify_risc_set(token)
+        await verify_risc_set(token, MagicMock())
 
 
 async def test_verify_risc_set_refreshes_stale_cache_for_unknown_kid(
@@ -254,7 +256,7 @@ async def test_verify_risc_set_refreshes_stale_cache_for_unknown_kid(
         time.monotonic() - settings.google_risc_unknown_kid_refresh_cooldown_seconds - 1
     )
 
-    async def fake_fetch() -> list[dict[str, Any]]:
+    async def fake_fetch(_client: httpx.AsyncClient) -> list[dict[str, Any]]:
         return [public_jwk]
 
     monkeypatch.setattr(risc_module, "_fetch_jwks", fake_fetch)
@@ -264,7 +266,7 @@ async def test_verify_risc_set_refreshes_stale_cache_for_unknown_kid(
     )
     token = _sign(private_pem, payload, kid="rotated-kid")
 
-    event = await verify_risc_set(token)
+    event = await verify_risc_set(token, MagicMock())
 
     assert event.event_type == EVENT_ACCOUNT_DISABLED
     assert event.google_id == "user-1"
@@ -282,7 +284,7 @@ async def test_verify_risc_set_rejects_future_iat(
     token = _sign(private_pem, payload)
 
     with pytest.raises(RiscVerificationError, match="too far in the future"):
-        await verify_risc_set(token)
+        await verify_risc_set(token, MagicMock())
 
 
 async def test_verify_risc_set_rejects_multi_event_payload(
@@ -297,7 +299,7 @@ async def test_verify_risc_set_rejects_multi_event_payload(
     token = _sign(private_pem, payload)
 
     with pytest.raises(RiscVerificationError, match="exactly one"):
-        await verify_risc_set(token)
+        await verify_risc_set(token, MagicMock())
 
 
 async def test_verify_risc_set_rejects_missing_jti(
@@ -312,36 +314,24 @@ async def test_verify_risc_set_rejects_missing_jti(
     token = _sign(private_pem, payload)
 
     with pytest.raises(RiscVerificationError, match="jti"):
-        await verify_risc_set(token)
+        await verify_risc_set(token, MagicMock())
 
 
 async def test_verify_risc_set_rejects_malformed_jwt() -> None:
     with pytest.raises(RiscVerificationError):
-        await verify_risc_set("not-a-jwt")
+        await verify_risc_set("not-a-jwt", MagicMock())
 
 
-async def test_fetch_jwks_http_error_raises_verification_unavailable_error(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import httpx
-
+async def test_fetch_jwks_http_error_raises_verification_unavailable_error() -> None:
     class _FailingClient:
-        def __init__(self, **_kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *_args):
-            pass
-
-        async def get(self, _url):
+        async def get(self, url: str, **kwargs: Any) -> httpx.Response:
             raise httpx.ConnectError("network unreachable")
 
-    monkeypatch.setattr(risc_module.httpx, "AsyncClient", _FailingClient)
+        def stream(self, method: str, url: str, **kwargs: Any) -> None:
+            raise AssertionError("stream should not be called")
 
     with pytest.raises(
         RiscVerificationUnavailableError,
         match="Failed to fetch JWKS",
     ):
-        await risc_module._fetch_jwks()
+        await risc_module._fetch_jwks(_FailingClient())

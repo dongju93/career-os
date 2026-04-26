@@ -1,13 +1,13 @@
+import logging
 from datetime import UTC, datetime
 from typing import Annotated
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from career_os_api.auth.dependencies import get_current_user
-from career_os_api.auth.jwt import create_access_token
 from career_os_api.auth.risc import (
     SUPPORTED_EVENT_TYPES,
     RiscVerificationError,
@@ -27,7 +27,7 @@ from career_os_api.database.retry import (
     run_database_operation,
 )
 from career_os_api.database.users import update_user_name, upsert_user
-from career_os_api.responses import api_response
+from career_os_api.responses import ApiResponse
 from career_os_api.schemas import (
     CurrentUserResponse,
     JobPostingExtracted,
@@ -41,6 +41,8 @@ from career_os_api.service.job_posting.fetch import fetch_url_content
 
 v1_router = APIRouter(prefix=f"/{API_V1}")
 
+_logger = logging.getLogger(__name__)
+
 oauth = OAuth()
 oauth.register(
     name="google",
@@ -53,12 +55,35 @@ oauth.register(
 _CurrentUser = Annotated[dict, Depends(get_current_user)]
 
 
+def _resolve_callback_url(
+    callback_url: str, allowed_origins: list[str], frontend_url: str
+) -> str | None:
+    """Return a safe redirect URL or None when callback_url fails validation.
+
+    Accepts:
+    - path-only inputs (e.g. "/dashboard") — prefixed with frontend_url
+    - full URLs whose origin is explicitly listed in allowed_origins
+
+    Rejects everything else (foreign hosts, relative paths without a leading
+    slash) so the OAuth access token cannot be leaked to an attacker's domain.
+    """
+    parsed = urlparse(callback_url)
+    if not parsed.scheme and not parsed.netloc:
+        if parsed.path.startswith("/"):
+            return frontend_url.rstrip("/") + callback_url
+        return None
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    if origin in allowed_origins:
+        return callback_url
+    return None
+
+
 # ── System ────────────────────────────────────────────────────────────────────
 
 
 @v1_router.get("/", tags=["system"])
-def root() -> JSONResponse:
-    return api_response(status_code=status.HTTP_200_OK, message="Hello, World!")
+def root() -> ApiResponse[None]:
+    return ApiResponse(status=status.HTTP_200_OK, message="Hello, World!")
 
 
 @v1_router.get("/health/db", tags=["system"])
@@ -69,8 +94,13 @@ async def db_health(request: Request) -> JSONResponse:
         return row[0]
 
     result = await run_database_operation(request.app.state.pool, operation)
-    return api_response(
-        status_code=status.HTTP_200_OK, database="connected", result=result
+    return JSONResponse(
+        content={
+            "status": status.HTTP_200_OK,
+            "message": "DB connected",
+            "data": {"database": "connected", "result": result},
+        },
+        status_code=status.HTTP_200_OK,
     )
 
 
@@ -83,7 +113,11 @@ async def google_login(
     callback_url: Annotated[str | None, Query()] = None,
 ):
     if callback_url:
-        request.session["callback_url"] = callback_url
+        safe_url = _resolve_callback_url(
+            callback_url, settings.allowed_origins, settings.frontend_url
+        )
+        if safe_url:
+            request.session["callback_url"] = safe_url
     return await oauth.google.authorize_redirect(request, settings.redirect_uri)
 
 
@@ -102,9 +136,10 @@ async def google_callback(request: Request) -> RedirectResponse:
     try:
         token = await oauth.google.authorize_access_token(request)
     except Exception as exc:
+        _logger.exception("OAuth token exchange failed: %s", exc)
         request.session.clear()
         return RedirectResponse(
-            f"{target}?{urlencode({'error': f'Google 토큰 교환 실패: {exc}'})}"
+            f"{target}?{urlencode({'error': 'oauth_token_exchange_failed'})}"
         )
 
     user_info = token.get("userinfo")
@@ -132,18 +167,23 @@ async def google_callback(request: Request) -> RedirectResponse:
     request.session.clear()
     request.session["user_id"] = str(user["id"])
     request.session["issued_at"] = int(datetime.now(UTC).timestamp())
-    access_token = create_access_token(data={"sub": str(user["id"])})
 
-    return RedirectResponse(f"{target}?{urlencode({'access_token': access_token})}")
+    return RedirectResponse(target)
 
 
 @v1_router.get("/auth/me", tags=["auth"])
-async def read_current_user(current_user: _CurrentUser) -> CurrentUserResponse:
-    return CurrentUserResponse(
-        user_id=current_user["id"],
-        email=current_user["email"],
-        name=current_user["name"],
-        picture=current_user["picture"],
+async def read_current_user(
+    current_user: _CurrentUser,
+) -> ApiResponse[CurrentUserResponse]:
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="사용자 정보를 조회했습니다.",
+        data=CurrentUserResponse(
+            user_id=current_user["id"],
+            email=current_user["email"],
+            name=current_user["name"],
+            picture=current_user["picture"],
+        ),
     )
 
 
@@ -159,7 +199,7 @@ async def update_current_user(
     data: UpdateCurrentUserRequest,
     request: Request,
     current_user: _CurrentUser,
-) -> CurrentUserResponse:
+) -> ApiResponse[CurrentUserResponse]:
     async def operation(conn):
         return await update_user_name(conn, current_user["id"], data.name)
 
@@ -169,21 +209,25 @@ async def update_current_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="사용자를 찾을 수 없습니다",
         )
-    return CurrentUserResponse(
-        user_id=user["id"],
-        email=user["email"],
-        name=user["name"],
-        picture=user["picture"],
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="사용자 정보를 수정했습니다.",
+        data=CurrentUserResponse(
+            user_id=user["id"],
+            email=user["email"],
+            name=user["name"],
+            picture=user["picture"],
+        ),
     )
 
 
 @v1_router.post("/auth/logout", tags=["auth"])
 async def logout_current_user(
     request: Request, current_user: _CurrentUser
-) -> JSONResponse:
+) -> ApiResponse[None]:
     request.session.clear()
-    return api_response(
-        status_code=status.HTTP_200_OK,
+    return ApiResponse(
+        status=status.HTTP_200_OK,
         message="세션이 종료되었습니다. 토큰은 클라이언트에서 삭제해 주세요.",
     )
 
@@ -200,6 +244,7 @@ _MAX_RISC_BODY_BYTES = 65_536
         400: {"description": "Malformed or unsupported Security Event Token"},
         401: {"description": "Signature or claim verification failed"},
         413: {"description": "Request body too large"},
+        415: {"description": "Content-Type must be application/secevent+jwt"},
         503: {"description": "RISC verification temporarily unavailable"},
     },
 )
@@ -208,6 +253,13 @@ async def receive_google_risc_event(request: Request) -> Response:
     # Content-Type `application/secevent+jwt`. The body is the token itself
     # — not JSON — so stream it with a hard size cap to prevent DoS on this
     # unauthenticated endpoint.
+    content_type = request.headers.get("content-type", "")
+    if content_type.split(";")[0].strip() != "application/secevent+jwt":
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Content-Type must be application/secevent+jwt",
+        )
+
     chunks: list[bytes] = []
     total = 0
     async for chunk in request.stream():
@@ -234,7 +286,7 @@ async def receive_google_risc_event(request: Request) -> Response:
         )
 
     try:
-        event = await verify_risc_set(token)
+        event = await verify_risc_set(token, request.app.state.risc_http_client)
     except RiscVerificationUnavailableError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -270,7 +322,7 @@ async def list_job_postings(
     limit: Annotated[
         int, Query(ge=1, le=100, description="Max records to return")
     ] = 20,
-) -> JobPostingPage:
+) -> ApiResponse[JobPostingPage]:
     async def operation(conn):
         return await get_job_postings(
             conn,
@@ -280,11 +332,15 @@ async def list_job_postings(
         )
 
     rows, total = await run_database_operation(request.app.state.pool, operation)
-    return JobPostingPage(
-        items=[JobPostingListItem(**row) for row in rows],
-        total=total,
-        offset=offset,
-        limit=limit,
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="채용공고 목록을 조회했습니다.",
+        data=JobPostingPage(
+            items=[JobPostingListItem(**row) for row in rows],
+            total=total,
+            offset=offset,
+            limit=limit,
+        ),
     )
 
 
@@ -303,10 +359,21 @@ async def list_job_postings(
 )
 async def get_job_posting_extraction(
     url: Annotated[str, Query(description="Job posting URL")],
+    request: Request,
     _current_user: _CurrentUser,
-) -> JobPostingExtracted:
-    content, _ = await fetch_url_content(url)
-    return await extract_job_posting(html_content=content, source_url=url)
+) -> ApiResponse[JobPostingExtracted]:
+    content, _ = await fetch_url_content(url, request.app.state.http_client)
+    extracted = await extract_job_posting(
+        html_content=content,
+        source_url=url,
+        image_client=request.app.state.image_http_client,
+        openai_client=request.app.state.openai_client,
+    )
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="채용공고 정보를 추출했습니다.",
+        data=extracted,
+    )
 
 
 @v1_router.post(
@@ -318,7 +385,7 @@ async def get_job_posting_extraction(
         # matching the 201 body. Without it the 200 entry has no content schema and
         # generated clients treat successful updates as empty responses.
         200: {
-            "model": JobPostingStored,
+            "model": ApiResponse[JobPostingStored],
             "description": "Job posting updated (existing record)",
         },
         201: {"description": "Job posting created"},
@@ -329,20 +396,26 @@ async def create_job_posting(
     request: Request,
     response: Response,
     current_user: _CurrentUser,
-) -> JobPostingStored:
+) -> ApiResponse[JobPostingStored]:
     async def operation(conn):
         return await upsert_job_posting(conn, data, user_id=current_user["id"])
 
     row = await run_database_operation(request.app.state.pool, operation)
-    if not row["inserted"]:
-        response.status_code = status.HTTP_200_OK
-    return JobPostingStored(
+    stored = JobPostingStored(
         id=row["id"],
         scraped_at=row["scraped_at"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         **data.model_dump(),
     )
+    http_status = status.HTTP_201_CREATED if row["inserted"] else status.HTTP_200_OK
+    response.status_code = http_status
+    message = (
+        "채용공고가 저장되었습니다."
+        if row["inserted"]
+        else "채용공고가 업데이트되었습니다."
+    )
+    return ApiResponse(status=http_status, message=message, data=stored)
 
 
 @v1_router.get(
@@ -354,7 +427,7 @@ async def get_job_posting_detail(
     job_id: int,
     request: Request,
     current_user: _CurrentUser,
-) -> JobPostingStored:
+) -> ApiResponse[JobPostingStored]:
     async def operation(conn):
         return await get_job_posting(conn, job_id, user_id=current_user["id"])
 
@@ -364,4 +437,8 @@ async def get_job_posting_detail(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Job posting {job_id} not found",
         )
-    return JobPostingStored(**row)
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="채용공고 정보를 조회했습니다.",
+        data=JobPostingStored(**row),
+    )
