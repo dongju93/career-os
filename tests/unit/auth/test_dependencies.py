@@ -7,6 +7,8 @@ from fastapi import HTTPException
 from career_os_api.auth.dependencies import get_current_user
 from career_os_api.auth.jwt import create_access_token
 
+SESSION_CLIENT_HEADERS = {"x-career-os-client": "web"}
+
 
 class _FakeCursor:
     def __init__(self, row):
@@ -52,8 +54,16 @@ class _FakeApp:
         self.state = type("State", (), {"pool": _FakePool(row)})()
 
 
-def _make_request(row, *, session=None):
-    return type("Request", (), {"app": _FakeApp(row), "session": session or {}})()
+def _make_request(row, *, session=None, headers=None):
+    return type(
+        "Request",
+        (),
+        {
+            "app": _FakeApp(row),
+            "session": session or {},
+            "headers": headers or {},
+        },
+    )()
 
 
 async def test_get_current_user_bearer_token():
@@ -91,6 +101,7 @@ async def test_get_current_user_session_cookie():
             "user_id": str(user_id),
             "issued_at": int(datetime.now(UTC).timestamp()),
         },
+        headers=SESSION_CLIENT_HEADERS,
     )
     user = await get_current_user(request, None)
     assert user is not None
@@ -115,10 +126,58 @@ async def test_get_current_user_session_takes_precedence_over_bearer():
             "user_id": str(session_user_id),
             "issued_at": int(datetime.now(UTC).timestamp()),
         },
+        headers=SESSION_CLIENT_HEADERS,
     )
     user = await get_current_user(request, token)
     assert user is not None
     assert user["id"] == session_user_id
+
+
+async def test_get_current_user_session_requires_client_header():
+    user_id = uuid4()
+    row = {
+        "id": user_id,
+        "google_id": "g-123",
+        "email": "test@example.com",
+        "name": "Test",
+        "picture": None,
+        "is_active": True,
+        "auth_session_revoked_at": None,
+    }
+    request = _make_request(
+        row,
+        session={
+            "user_id": str(user_id),
+            "issued_at": int(datetime.now(UTC).timestamp()),
+        },
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        await get_current_user(request, None)
+    assert exc_info.value.status_code == 401
+
+
+async def test_get_current_user_session_without_client_header_falls_back_to_bearer():
+    bearer_user_id = uuid4()
+    token = create_access_token(data={"sub": str(bearer_user_id)})
+    row = {
+        "id": bearer_user_id,
+        "google_id": "g-123",
+        "email": "bearer@example.com",
+        "name": "Bearer User",
+        "picture": None,
+        "is_active": True,
+        "auth_session_revoked_at": None,
+    }
+    request = _make_request(
+        row,
+        session={
+            "user_id": str(uuid4()),
+            "issued_at": int(datetime.now(UTC).timestamp()),
+        },
+    )
+    user = await get_current_user(request, token)
+    assert user is not None
+    assert user["id"] == bearer_user_id
 
 
 async def test_get_current_user_invalid_session_id_falls_back_to_bearer():
@@ -201,7 +260,11 @@ async def test_get_current_user_rejects_session_without_issue_time_after_revocat
         "is_active": True,
         "auth_session_revoked_at": datetime.now(UTC),
     }
-    request = _make_request(row, session={"user_id": str(user_id)})
+    request = _make_request(
+        row,
+        session={"user_id": str(user_id)},
+        headers=SESSION_CLIENT_HEADERS,
+    )
     with pytest.raises(HTTPException) as exc_info:
         await get_current_user(request, None)
     assert exc_info.value.status_code == 401
@@ -222,6 +285,7 @@ async def test_get_current_user_accepts_session_issued_after_revocation():
     request = _make_request(
         row,
         session={"user_id": str(user_id), "issued_at": issued_at},
+        headers=SESSION_CLIENT_HEADERS,
     )
     user = await get_current_user(request, None)
     assert user is not None
@@ -249,6 +313,7 @@ async def test_get_current_user_accepts_session_issued_in_same_second_as_revocat
     request = _make_request(
         row,
         session={"user_id": str(user_id), "issued_at": issued_at},
+        headers=SESSION_CLIENT_HEADERS,
     )
     user = await get_current_user(request, None)
     assert user is not None

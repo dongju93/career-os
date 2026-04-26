@@ -9,6 +9,8 @@ from career_os_api.database.retry import run_database_operation
 from career_os_api.database.users import UserRow, find_user_by_id
 
 _oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
+_SESSION_CLIENT_HEADER = "x-career-os-client"
+_SESSION_CLIENT_HEADER_VALUE = "web"
 
 
 async def _find_current_user(request: Request, user_id: UUID):
@@ -42,13 +44,18 @@ def _session_issued_at(request: Request) -> int | None:
     return issued_at if isinstance(issued_at, int) else None
 
 
+def _has_session_client_header(request: Request) -> bool:
+    return request.headers.get(_SESSION_CLIENT_HEADER) == _SESSION_CLIENT_HEADER_VALUE
+
+
 async def get_current_user(
     request: Request,
     token: str | None = Depends(_oauth2_scheme),
 ):
-    # Session cookie first
+    # Session cookie first, but only for explicit API clients. This keeps
+    # ambient cross-site cookie requests from being accepted as authenticated.
     session_uid = request.session.get("user_id")
-    if session_uid:
+    if session_uid and _has_session_client_header(request):
         try:
             user_id = UUID(session_uid)
         except ValueError:
