@@ -2,6 +2,20 @@
   "name": "career_os_web",
   "private": true,
   "version": "0.0.0",
+  "description": "CareerOS web application",
+  "author": "dongju93 (https://github.com/dongju93)",
+  "contributors": [
+    "SoEun99 (https://github.com/SoEun99)"
+  ],
+  "homepage": "https://vercel.com/dongju93s-projects/career-os",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dongju93/career-os.git",
+    "directory": "career_os_web"
+  },
+  "bugs": {
+    "url": "https://linear.app/careeros999/team/CAR"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

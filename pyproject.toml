@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "CareerOS backend API service"
 readme = "README.md"
 requires-python = ">=3.14"
+authors = [{ name = "dongju93" }]
+maintainers = [{ name = "dongju93" }]
 dependencies = [
     "authlib>=1.7.0",
     "beautifulsoup4>=4.14.3",
@@ -15,6 +17,15 @@ dependencies = [
     "pydantic-settings>=2.14.0",
     "python-jose[cryptography]>=3.5.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/dongju93/career-os"
+Issues = "https://linear.app/careeros999/team/CAR"
+Documentation = "https://eoth999-1775281441291.atlassian.net/wiki/spaces/CareerOS"
+"Software Engineer" = "https://github.com/dongju93"
+"Product Manager" = "https://github.com/SoEun99"
+"Database Management" = "https://console.neon.tech/app/projects/twilight-firefly-07947306"
+"Backend Deployment" = "https://dashboard.fastapicloud.com/spdlqj011-77893206/apps/career-os/deployments"
 
 [tool.ruff]
 target-version = "py314"

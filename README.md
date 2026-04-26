@@ -1,6 +1,6 @@
 # CareerOS API
 
-![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?logo=fastapi&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.136.1-009688?logo=fastapi&logoColor=white)
 ![FastAPI Cloud](https://img.shields.io/badge/FastAPI%20Cloud-Deployed-009688?logo=fastapi&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)
@@ -15,6 +15,29 @@
 
 - SwaggerUI: `https://career-os.fastapicloud.dev/v1/docs`
 - ReDoc: `https://career-os.fastapicloud.dev/v1/redoc`
+
+## 프로젝트 정보
+
+### 참여자
+
+| 역할                | 링크                                    |
+| ------------------- | --------------------------------------- |
+| 프로덕트 매니저     | [SoEun99](https://github.com/SoEun99)   |
+| 소프트웨어 엔지니어 | [dongju93](https://github.com/dongju93) |
+
+### 프로젝트 관리
+
+| 항목        | 링크                                                                                      |
+| ----------- | ----------------------------------------------------------------------------------------- |
+| 이슈 트래킹 | [Linear - CAR](https://linear.app/careeros999/team/CAR)                                   |
+| 문서        | [Confluence - CareerOS](https://eoth999-1775281441291.atlassian.net/wiki/spaces/CareerOS) |
+
+### 배포 및 인프라
+
+| 항목              | 링크                                                                                                          |
+| ----------------- | ------------------------------------------------------------------------------------------------------------- |
+| 데이터베이스 관리 | [Neon - career-os](https://console.neon.tech/app/projects/twilight-firefly-07947306)                          |
+| 백엔드 배포 관리  | [FastAPI Cloud - career-os](https://dashboard.fastapicloud.com/spdlqj011-77893206/apps/career-os/deployments) |
 
 ---
 

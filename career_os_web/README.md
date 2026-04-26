@@ -6,9 +6,31 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
 [![codecov](https://codecov.io/github/dongju93/career-os/graph/badge.svg?flag=frontend&token=48VXFY8C3M)](https://codecov.io/github/dongju93/career-os)
 
-구직 활동을 관리하는 Career OS의 React 기반 프런트엔드 애플리케이션입니다. Google OAuth 인증과 채용공고 관리 기능을 제공합니다.
+구직 활동을 관리하는 Career OS의 React 기반 프론트엔드 애플리케이션입니다. Google OAuth 인증과 채용공고 관리 기능을 제공합니다.
 
 **프로덕션**: `https://career-os-sigma.vercel.app`
+
+## 프로젝트 정보
+
+### 참여자
+
+| 역할                | 링크                                    |
+| ------------------- | --------------------------------------- |
+| 프로덕트 매니저     | [SoEun99](https://github.com/SoEun99)   |
+| 소프트웨어 엔지니어 | [dongju93](https://github.com/dongju93) |
+
+### 프로젝트 관리
+
+| 항목        | 링크                                                                                      |
+| ----------- | ----------------------------------------------------------------------------------------- |
+| 이슈 트래킹 | [Linear - CAR](https://linear.app/careeros999/team/CAR)                                   |
+| 문서        | [Confluence - CareerOS](https://eoth999-1775281441291.atlassian.net/wiki/spaces/CareerOS) |
+
+### 배포 및 인프라
+
+| 항목                 | 링크                                                                  |
+| -------------------- | --------------------------------------------------------------------- |
+| 프론트엔드 배포 관리 | [Vercel - career-os](https://vercel.com/dongju93s-projects/career-os) |
 
 ---
 
@@ -49,7 +71,7 @@ pnpm dev
 
 | 라이브러리                   | 용도                     | 선정 이유                                                                                                           |
 | ---------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| **React 19**                 | UI 라이브러리            | 선언형 컴포넌트 기반 UI 작성. 생태계가 넓고 커뮤니티 지원이 활발해 프런트엔드 기반으로 적합                         |
+| **React 19**                 | UI 라이브러리            | 선언형 컴포넌트 기반 UI 작성. 생태계가 넓고 커뮤니티 지원이 활발해 프론트엔드 기반으로 적합                         |
 | **TypeScript 7**             | 정적 타입 시스템         | 컴포넌트 props·상태·API 응답 계약을 타입으로 검증해 리팩터링 안정성과 IDE 지원을 높임                               |
 | **Vite 8**                   | 개발 서버·번들러         | 빠른 HMR과 짧은 빌드 시간. ESM 네이티브 기반으로 개발 생산성이 높음                                                 |
 | **Mantine 9**                | UI 컴포넌트 라이브러리   | Provider·테마 기반 의존성으로 유지. 실제 화면 primitive는 `src/components/ui/` 사용. 접근성과 커스터마이징 지원     |
@@ -101,4 +123,4 @@ pnpm exec playwright install chromium
 
 | 구성 요소  | 플랫폼 |
 | ---------- | ------ |
-| 프런트엔드 | Vercel |
+| 프론트엔드 | Vercel |
