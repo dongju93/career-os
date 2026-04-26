@@ -76,7 +76,7 @@ pnpm dev
 | **Vite 8**                   | 개발 서버·번들러         | 빠른 HMR과 짧은 빌드 시간. ESM 네이티브 기반으로 개발 생산성이 높음                                                 |
 | **Mantine 9**                | UI 컴포넌트 라이브러리   | Provider·테마 기반 의존성으로 유지. 실제 화면 primitive는 `src/components/ui/` 사용. 접근성과 커스터마이징 지원     |
 | **React Router 7**           | 클라이언트 사이드 라우팅 | URL 기반 화면 전환·레이아웃 분리·인증 리다이렉트를 체계적으로 관리                                                  |
-| **Zustand 5**                | 전역 상태 관리           | Context 대비 보일러플레이트가 적고 가벼움. `persist` 미들웨어로 인증 상태를 `localStorage`에 영속 저장              |
+| **Zustand 5**                | 전역 상태 관리           | Context 대비 보일러플레이트가 적고 가벼움. `persist` 미들웨어로 현재 사용자 정보를 `localStorage`에 영속 저장        |
 | **Tailwind CSS 4**           | 유틸리티 퍼스트 CSS      | 반복 CSS 작성을 줄이고 토큰 기반 UI를 빠르게 조합. `@tailwindcss/vite` 플러그인으로 별도 설정 파일 없이 Vite에 연동 |
 | **React Compiler**           | 빌드 타임 최적화         | `babel-plugin-react-compiler`가 컴파일 단계에서 메모이제이션을 자동 처리해 수동 `useMemo`/`useCallback` 부담을 줄임 |
 | **Biome**                    | 린터·포매터              | 포매팅과 정적 분석을 단일 도구로 처리. Rust 기반으로 속도가 빠르고 설정이 단순함                                    |
@@ -87,8 +87,8 @@ pnpm dev
 
 ## 기능
 
-- **Google OAuth 로그인** — `/login`에서 Google 계정으로 인증, `/auth/callback`에서 JWT 토큰 수신
-- **인증 상태 관리** — Zustand로 Bearer 토큰과 사용자 정보를 관리하며 `localStorage`에 영속 저장
+- **Google OAuth 로그인** — `/login`에서 Google 계정으로 인증, `/auth/callback`에서 세션 사용자 확인
+- **인증 상태 관리** — HttpOnly 세션 쿠키로 API 인증, Zustand로 현재 사용자 정보 관리
 - **보호된 라우트** — 미인증 사용자는 로그인 페이지로 리다이렉트, 이후 원래 경로로 복귀
 - **채용공고 목록** — `/job-postings`에서 저장한 채용공고를 카드 형태로 조회
 - **채용공고 추가** — `/job-postings/new`에서 URL 입력으로 공고 추출 및 저장
