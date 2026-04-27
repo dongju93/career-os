@@ -23,11 +23,6 @@ JOB_POSTING_SECTIONS = [
 ]
 
 
-def is_saramin_url(url: str) -> bool:
-    host = urlparse(url).hostname or ""
-    return host == SARAMIN_DOMAIN or host.endswith(f".{SARAMIN_DOMAIN}")
-
-
 async def fetch_saramin_job_posting(url: str, client: AsyncHttpClient) -> bytes:
     """
     Fetch only the current job posting from a Saramin relay/view URL.

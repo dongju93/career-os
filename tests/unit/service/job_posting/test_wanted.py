@@ -40,24 +40,6 @@ SAMPLE_API_RESPONSE: dict = {
 
 
 # ---------------------------------------------------------------------------
-# is_wanted_url
-# ---------------------------------------------------------------------------
-
-
-def test_is_wanted_url_matches_bare_domain() -> None:
-    assert wanted_module.is_wanted_url("https://wanted.co.kr/wd/1") is True
-
-
-def test_is_wanted_url_matches_www_subdomain() -> None:
-    assert wanted_module.is_wanted_url("https://www.wanted.co.kr/wd/349998") is True
-
-
-def test_is_wanted_url_rejects_other_domains() -> None:
-    assert wanted_module.is_wanted_url("https://saramin.co.kr/wd/1") is False
-    assert wanted_module.is_wanted_url("https://example.com/wd/1") is False
-
-
-# ---------------------------------------------------------------------------
 # fetch_wanted_job_posting — success path
 # ---------------------------------------------------------------------------
 

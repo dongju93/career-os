@@ -7,7 +7,6 @@ from career_os_api._types import AsyncHttpClient
 from career_os_api.constants import WANTED_USER_AGENT
 from career_os_api.service.job_posting.platform import Platform, validate_posting_id
 
-WANTED_DOMAIN = "wanted.co.kr"
 WANTED_BASE_URL = "https://www.wanted.co.kr"
 WANTED_JOB_API_URL = f"{WANTED_BASE_URL}/api/v4/jobs"
 
@@ -22,11 +21,6 @@ WANTED_DETAIL_FIELDS: list[tuple[str, str]] = [
     ("benefits", "Benefits"),
     ("recruitment_process", "Hiring Process"),
 ]
-
-
-def is_wanted_url(url: str) -> bool:
-    host = urlparse(url).hostname or ""
-    return host == WANTED_DOMAIN or host.endswith(f".{WANTED_DOMAIN}")
 
 
 async def fetch_wanted_job_posting(url: str, client: AsyncHttpClient) -> bytes:
