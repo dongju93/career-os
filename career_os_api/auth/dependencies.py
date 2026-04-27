@@ -2,13 +2,13 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from career_os_api.auth.jwt import decode_access_token
 from career_os_api.database.retry import run_database_operation
 from career_os_api.database.users import UserRow, find_user_by_id
 
-_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
+_bearer_scheme = HTTPBearer(auto_error=False)
 _SESSION_CLIENT_HEADER = "x-career-os-client"
 _SESSION_CLIENT_HEADER_VALUE = "web"
 
@@ -50,7 +50,7 @@ def _has_session_client_header(request: Request) -> bool:
 
 async def get_current_user(
     request: Request,
-    token: str | None = Depends(_oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),  # noqa: B008
 ):
     # Session cookie first, but only for explicit API clients. This keeps
     # ambient cross-site cookie requests from being accepted as authenticated.
@@ -66,6 +66,7 @@ async def get_current_user(
                 return user
 
     # Bearer token fallback
+    token = credentials.credentials if credentials is not None else None
     if token is not None:
         payload = decode_access_token(token)
         if payload is not None:

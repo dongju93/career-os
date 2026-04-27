@@ -3,9 +3,15 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 
 from career_os_api.auth.dependencies import get_current_user
 from career_os_api.auth.jwt import create_access_token
+
+
+def _bearer(token: str) -> HTTPAuthorizationCredentials:
+    return HTTPAuthorizationCredentials(scheme="bearer", credentials=token)
+
 
 SESSION_CLIENT_HEADERS = {"x-career-os-client": "web"}
 
@@ -78,7 +84,7 @@ async def test_get_current_user_bearer_token():
         "is_active": True,
         "auth_session_revoked_at": None,
     }
-    user = await get_current_user(_make_request(row), token)
+    user = await get_current_user(_make_request(row), _bearer(token))
     assert user is not None
     assert user["id"] == user_id
     assert user["email"] == "test@example.com"
@@ -128,7 +134,7 @@ async def test_get_current_user_session_takes_precedence_over_bearer():
         },
         headers=SESSION_CLIENT_HEADERS,
     )
-    user = await get_current_user(request, token)
+    user = await get_current_user(request, _bearer(token))
     assert user is not None
     assert user["id"] == session_user_id
 
@@ -175,7 +181,7 @@ async def test_get_current_user_session_without_client_header_falls_back_to_bear
             "issued_at": int(datetime.now(UTC).timestamp()),
         },
     )
-    user = await get_current_user(request, token)
+    user = await get_current_user(request, _bearer(token))
     assert user is not None
     assert user["id"] == bearer_user_id
 
@@ -193,7 +199,7 @@ async def test_get_current_user_invalid_session_id_falls_back_to_bearer():
         "auth_session_revoked_at": None,
     }
     request = _make_request(row, session={"user_id": "not-a-uuid"})
-    user = await get_current_user(request, token)
+    user = await get_current_user(request, _bearer(token))
     assert user is not None
     assert user["id"] == bearer_user_id
 
@@ -201,7 +207,7 @@ async def test_get_current_user_invalid_session_id_falls_back_to_bearer():
 async def test_get_current_user_invalid_token():
     request = _make_request(None)
     with pytest.raises(HTTPException) as exc_info:
-        await get_current_user(request, "bad-token")
+        await get_current_user(request, _bearer("bad-token"))
     assert exc_info.value.status_code == 401
 
 
@@ -209,7 +215,7 @@ async def test_get_current_user_token_with_invalid_subject():
     token = create_access_token(data={"sub": "not-a-uuid"})
     request = _make_request(None)
     with pytest.raises(HTTPException) as exc_info:
-        await get_current_user(request, token)
+        await get_current_user(request, _bearer(token))
     assert exc_info.value.status_code == 401
 
 
@@ -227,7 +233,7 @@ async def test_get_current_user_inactive_user():
     }
     request = _make_request(row)
     with pytest.raises(HTTPException) as exc_info:
-        await get_current_user(request, token)
+        await get_current_user(request, _bearer(token))
     assert exc_info.value.status_code == 401
 
 
@@ -245,7 +251,7 @@ async def test_get_current_user_rejects_token_issued_before_session_revocation()
     }
     request = _make_request(row)
     with pytest.raises(HTTPException) as exc_info:
-        await get_current_user(request, token)
+        await get_current_user(request, _bearer(token))
     assert exc_info.value.status_code == 401
 
 
@@ -324,7 +330,7 @@ async def test_get_current_user_user_not_found():
     token = create_access_token(data={"sub": str(uuid4())})
     request = _make_request(None)
     with pytest.raises(HTTPException) as exc_info:
-        await get_current_user(request, token)
+        await get_current_user(request, _bearer(token))
     assert exc_info.value.status_code == 401
 
 
