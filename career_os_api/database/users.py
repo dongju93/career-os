@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TypedDict
+from typing import TypedDict, cast
 from uuid import UUID
 
 from psycopg import AsyncConnection
@@ -65,13 +65,13 @@ async def find_user_by_google_id(
 ) -> UserRow | None:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_FIND_BY_GOOGLE_ID_SQL, (google_id,))
-        return await cur.fetchone()  # type: ignore[return-value]
+        return cast("UserRow | None", await cur.fetchone())
 
 
 async def find_user_by_id(conn: AsyncConnection, user_id: UUID) -> UserRow | None:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_FIND_BY_ID_SQL, (user_id,))
-        return await cur.fetchone()  # type: ignore[return-value]
+        return cast("UserRow | None", await cur.fetchone())
 
 
 async def update_user_name(
@@ -79,7 +79,7 @@ async def update_user_name(
 ) -> UserRow | None:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_UPDATE_NAME_SQL, (name, user_id))
-        return await cur.fetchone()  # type: ignore[return-value]
+        return cast("UserRow | None", await cur.fetchone())
 
 
 async def upsert_user(
@@ -93,7 +93,7 @@ async def upsert_user(
         await cur.execute(_UPSERT_SQL, (google_id, email, name, picture))
         row = await cur.fetchone()
     assert row is not None
-    return row  # type: ignore[return-value]
+    return cast(UserRow, row)
 
 
 async def set_user_active_by_google_id(
@@ -101,7 +101,7 @@ async def set_user_active_by_google_id(
 ) -> UserRow | None:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_SET_ACTIVE_BY_GOOGLE_ID_SQL, (is_active, google_id))
-        return await cur.fetchone()  # type: ignore[return-value]
+        return cast("UserRow | None", await cur.fetchone())
 
 
 async def revoke_user_sessions_by_google_id(
@@ -109,4 +109,4 @@ async def revoke_user_sessions_by_google_id(
 ) -> UserRow | None:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_REVOKE_SESSIONS_BY_GOOGLE_ID_SQL, (google_id,))
-        return await cur.fetchone()  # type: ignore[return-value]
+        return cast("UserRow | None", await cur.fetchone())

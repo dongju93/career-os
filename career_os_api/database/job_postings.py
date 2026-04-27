@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TypedDict
+from typing import TypedDict, cast
 from uuid import UUID
 
 from psycopg import AsyncConnection
@@ -14,6 +14,41 @@ class UpsertResult(TypedDict):
     created_at: datetime
     updated_at: datetime
     inserted: bool
+
+
+class JobPostingListRow(TypedDict):
+    id: int
+    platform: str
+    posting_id: str
+    posting_url: str
+    company_name: str
+    job_title: str
+    experience_req: str | None
+    deadline: str | None
+    location: str | None
+    employment_type: str | None
+    salary: str | None
+    tech_stack: list[str] | None
+    tags: list[str] | None
+    job_category: str | None
+    industry: str | None
+    scraped_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+class JobPostingDetailRow(JobPostingListRow):
+    job_description: str | None
+    responsibilities: str | None
+    qualifications: str | None
+    preferred_points: str | None
+    benefits: str | None
+    hiring_process: str | None
+    education_req: str | None
+    application_method: str | None
+    application_form: str | None
+    contact_person: str | None
+    homepage: str | None
 
 
 _UPSERT_SQL = """
@@ -133,7 +168,7 @@ async def upsert_job_posting(
         )
         row = await cur.fetchone()
     assert row is not None  # RETURNING always yields a row on successful DML
-    return row  # type: ignore[return-value]
+    return cast(UpsertResult, row)
 
 
 async def get_job_postings(
@@ -142,14 +177,14 @@ async def get_job_postings(
     user_id: UUID,
     limit: int,
     offset: int,
-) -> tuple[list[dict], int]:
+) -> tuple[list[JobPostingListRow], int]:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_LIST_SQL, (user_id, limit, offset))
         rows = await cur.fetchall()
         await cur.execute(_COUNT_SQL, (user_id,))
         count_row = await cur.fetchone()
     assert count_row is not None  # COUNT(*) always returns exactly one row
-    return rows, count_row["total"]
+    return cast(list[JobPostingListRow], rows), count_row["total"]
 
 
 async def get_job_posting(
@@ -157,7 +192,7 @@ async def get_job_posting(
     job_id: int,
     *,
     user_id: UUID,
-) -> dict | None:
+) -> JobPostingDetailRow | None:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_DETAIL_SQL, (job_id, user_id))
-        return await cur.fetchone()
+        return cast("JobPostingDetailRow | None", await cur.fetchone())

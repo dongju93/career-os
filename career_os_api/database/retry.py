@@ -1,8 +1,9 @@
 import asyncio
 from collections.abc import Awaitable, Callable
-from typing import Any
+from contextlib import AbstractAsyncContextManager
+from typing import Any, Protocol
 
-from psycopg import InterfaceError, OperationalError
+from psycopg import AsyncConnection, InterfaceError, OperationalError
 from psycopg_pool import PoolTimeout
 
 DATABASE_RETRY_ATTEMPTS = 5
@@ -15,9 +16,13 @@ class DatabaseUnavailableError(RuntimeError):
     """Raised after transient database failures exhaust retry attempts."""
 
 
+class AsyncPoolProtocol(Protocol):
+    def connection(self) -> AbstractAsyncContextManager[Any]: ...
+
+
 async def run_database_operation[T](
-    pool: Any,
-    operation: Callable[[Any], Awaitable[T]],
+    pool: AsyncPoolProtocol,
+    operation: Callable[[AsyncConnection], Awaitable[T]],
 ) -> T:
     last_error: BaseException | None = None
 
