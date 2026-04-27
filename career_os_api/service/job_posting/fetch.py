@@ -10,6 +10,13 @@ _FETCH_DISPATCH: dict[Platform, Callable[[str, AsyncHttpClient], Awaitable[bytes
     Platform.wanted: fetch_wanted_job_posting,
 }
 
+_missing_handlers = set(Platform) - set(_FETCH_DISPATCH)
+if _missing_handlers:
+    raise RuntimeError(
+        f"fetch._FETCH_DISPATCH is missing handlers for: {_missing_handlers}. "
+        "Add a fetcher module and register it before adding a Platform enum value."
+    )
+
 
 async def fetch_url_content(
     url: str, http_client: AsyncHttpClient
