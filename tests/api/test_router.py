@@ -165,6 +165,20 @@ def test_root_endpoint_returns_hello_world(client: TestClient) -> None:
     assert response.json() == {"status": 200, "message": "Hello, World!", "data": None}
 
 
+def test_cors_preflight_response_includes_request_id(client: TestClient) -> None:
+    response = client.options(
+        f"{API_PREFIX}/job-postings",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert response.headers["x-request-id"]
+
+
 def test_google_callback_does_not_include_token_in_redirect_url(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,

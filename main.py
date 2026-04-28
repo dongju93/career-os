@@ -61,7 +61,6 @@ career_os = FastAPI(
     redoc_url=f"/{API_V1}/redoc",
 )
 
-career_os.add_middleware(RequestIdMiddleware)
 career_os.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
@@ -76,6 +75,7 @@ career_os.add_middleware(
     same_site="none",
     max_age=settings.jwt_expire_minutes * 60,
 )
+career_os.add_middleware(RequestIdMiddleware)
 
 
 @career_os.exception_handler(HTTPException)
