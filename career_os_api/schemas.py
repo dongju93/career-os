@@ -19,16 +19,6 @@ def _validate_platform_posting_id(posting_id: str, info: ValidationInfo) -> str:
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 
-class GoogleLoginResponse(BaseModel):
-    message: str
-    user_id: UUID
-    email: str
-    name: str | None
-    picture: str | None
-    access_token: str
-    token_type: str = "bearer"
-
-
 class CurrentUserResponse(BaseModel):
     user_id: UUID
     email: str
