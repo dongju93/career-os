@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     database_url: str
     openai_api_key: str
 
+    # Connection pool — tune per environment; defaults suit local / CI workloads.
+    # For Neon (serverless Postgres), keep max_size low (2–5) to stay within the
+    # plan's connection limit.  Total worst-case wait per request is roughly
+    #   DATABASE_RETRY_ATTEMPTS × pool_timeout + Σ retry_back-off_delays
+    # so pool_timeout and DATABASE_RETRY_ATTEMPTS in retry.py should be set together.
+    database_pool_min_size: int = 1
+    database_pool_max_size: int = 10
+    database_pool_timeout: float = 30.0  # seconds to wait before PoolTimeout
+
     # Google OAuth — required
     google_client_id: str
     google_client_secret: str
