@@ -1,5 +1,7 @@
 import asyncio
 import base64
+import logging
+import time
 from urllib.parse import urlparse
 
 import httpx
@@ -24,6 +26,8 @@ from career_os_api.service.job_posting.platform import (
     detect_platform,
     extract_posting_id,
 )
+
+_logger = logging.getLogger(__name__)
 
 _OPENAI_SUPPORTED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
 
@@ -274,12 +278,25 @@ async def extract_job_posting(
     """
     platform = detect_platform(source_url)
     domain_base = PLATFORM_BASE_URLS[platform]
+    posting_id = extract_posting_id(source_url, platform)
 
     soup = BeautifulSoup(html_content, HTML_PARSER)
     _annotate_headings(soup)
     text_content = soup.get_text(separator="\n", strip=True)
-    posting_id = extract_posting_id(source_url, platform)
+
+    img_found = len(soup.find_all("img"))
     image_data_urls = await _collect_images_as_base64(soup, domain_base, image_client)
+    img_sent = len(image_data_urls)
+
+    _logger.info(
+        "extraction.parse platform=%s posting_id=%s text_len=%d img_found=%d img_sent=%d img_skipped=%d",
+        platform.value,
+        posting_id,
+        len(text_content),
+        img_found,
+        img_sent,
+        img_found - img_sent,
+    )
 
     messages = _build_messages(
         text_content=text_content,
@@ -289,11 +306,20 @@ async def extract_job_posting(
         image_data_urls=image_data_urls,
     )
 
+    t0 = time.perf_counter()
     result = await openai_client.chat.completions.parse(
         model=settings.openai_model,
         messages=messages,
         response_format=JobPostingExtracted,
         reasoning_effort=settings.openai_reasoning_effort,
+    )
+    openai_ms = round((time.perf_counter() - t0) * 1000)
+
+    _logger.info(
+        "extraction.openai_done platform=%s posting_id=%s openai_duration_ms=%d",
+        platform.value,
+        posting_id,
+        openai_ms,
     )
 
     message = result.choices[0].message

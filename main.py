@@ -14,8 +14,18 @@ from career_os_api.constants import API_V1
 from career_os_api.database.ddl import init_schema
 from career_os_api.database.pool import create_postgres_pool
 from career_os_api.database.retry import DatabaseUnavailableError
+from career_os_api.middleware import RequestIdFilter, RequestIdMiddleware
 from career_os_api.responses import api_error_response, api_validation_error_response
 from career_os_api.router import v1_router
+
+_log_handler = logging.StreamHandler()
+_log_handler.setFormatter(
+    logging.Formatter(
+        "%(asctime)s %(levelname)s [req:%(request_id)s] %(name)s %(message)s"
+    )
+)
+_log_handler.addFilter(RequestIdFilter())
+logging.basicConfig(level=logging.INFO, handlers=[_log_handler])
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +61,7 @@ career_os = FastAPI(
     redoc_url=f"/{API_V1}/redoc",
 )
 
+career_os.add_middleware(RequestIdMiddleware)
 career_os.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,

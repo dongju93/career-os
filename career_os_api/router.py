@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import UTC, datetime
 from typing import Annotated
 from urllib.parse import urlencode, urlparse
@@ -356,7 +357,11 @@ async def get_job_posting_extraction(
     request: Request,
     _current_user: _CurrentUser,
 ) -> ApiResponse[JobPostingExtracted]:
+    t0 = time.perf_counter()
     content, _ = await fetch_url_content(url, request.app.state.http_client)
+    upstream_ms = round((time.perf_counter() - t0) * 1000)
+    _logger.info("fetch.done url=%s upstream_duration_ms=%d", url, upstream_ms)
+
     extracted = await extract_job_posting(
         html_content=content,
         source_url=url,
