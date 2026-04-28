@@ -260,6 +260,7 @@ def test_list_job_postings_endpoint_returns_paginated_results(
         user_id=current_user["id"],
         limit=10,
         offset=5,
+        with_total=True,
     )
 
 

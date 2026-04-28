@@ -317,6 +317,9 @@ async def list_job_postings(
     limit: Annotated[
         int, Query(ge=1, le=100, description="Max records to return")
     ] = 20,
+    with_total: Annotated[
+        bool, Query(description="Include total record count (adds a COUNT query)")
+    ] = True,
 ) -> ApiResponse[JobPostingPage]:
     async def operation(conn):
         return await get_job_postings(
@@ -324,6 +327,7 @@ async def list_job_postings(
             user_id=current_user["id"],
             limit=limit,
             offset=offset,
+            with_total=with_total,
         )
 
     rows, total = await run_database_operation(request.app.state.pool, operation)

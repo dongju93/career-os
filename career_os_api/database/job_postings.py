@@ -177,10 +177,13 @@ async def get_job_postings(
     user_id: UUID,
     limit: int,
     offset: int,
-) -> tuple[list[JobPostingListRow], int]:
+    with_total: bool = True,
+) -> tuple[list[JobPostingListRow], int | None]:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_LIST_SQL, (user_id, limit, offset))
         rows = await cur.fetchall()
+        if not with_total:
+            return cast(list[JobPostingListRow], rows), None
         await cur.execute(_COUNT_SQL, (user_id,))
         count_row = await cur.fetchone()
     assert count_row is not None  # COUNT(*) always returns exactly one row
