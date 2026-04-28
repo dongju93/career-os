@@ -1,12 +1,27 @@
 from typing import ClassVar, Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_PRODUCTION_SECRET_MIN_LENGTH = 32
+_WEAK_SECRET_PLACEHOLDERS: frozenset[str] = frozenset(
+    {
+        "changeme",
+        "secret",
+        "test-secret-key",
+        "password",
+        "your-secret-key",
+        "your_secret_key",
+    }
+)
 
 
 class Settings(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8"
     )
+
+    environment: Literal["local", "test", "production"] = "local"
 
     # Credentials — required, no defaults
     database_url: str
@@ -68,6 +83,19 @@ class Settings(BaseSettings):
     # Total base64 payload cap across all collected images (default 10 MB).
     # base64 expands raw bytes by ~33 %, so 10 MB ≈ 7.5 MB of raw image data.
     max_total_image_bytes: int = 10 * 1024 * 1024
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> Settings:
+        if self.environment == "production":
+            if len(self.secret_key) < _PRODUCTION_SECRET_MIN_LENGTH:
+                raise ValueError(
+                    f"SECRET_KEY must be at least {_PRODUCTION_SECRET_MIN_LENGTH} characters in production"
+                )
+            if self.secret_key.lower() in _WEAK_SECRET_PLACEHOLDERS:
+                raise ValueError(
+                    "SECRET_KEY appears to be a placeholder; provide a strong random secret for production"
+                )
+        return self
 
     @property
     def risc_audience(self) -> str:
