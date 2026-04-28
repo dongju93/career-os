@@ -145,6 +145,6 @@ class JobPostingPage(BaseModel):
     """Offset-paginated list response."""
 
     items: list[JobPostingListItem]
-    total: int | None
+    total: int
     offset: int
     limit: int

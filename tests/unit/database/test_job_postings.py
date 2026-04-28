@@ -161,28 +161,6 @@ async def test_get_job_postings_uses_dict_rows_and_returns_count() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_job_postings_skips_count_when_with_total_false() -> None:
-    user_id = uuid4()
-    rows = [{"id": 2, "platform": "saramin"}]
-    cursor = FakeCursor(rows=rows)
-    conn = FakeConnection(cursor=cursor)
-
-    result_rows, total = await job_postings_module.get_job_postings(
-        cast(AsyncConnection, conn),
-        user_id=user_id,
-        limit=10,
-        offset=0,
-        with_total=False,
-    )
-
-    assert result_rows == rows
-    assert total is None
-    assert cursor.execute_calls == [
-        (job_postings_module._LIST_SQL, (user_id, 10, 0)),
-    ]
-
-
-@pytest.mark.asyncio
 async def test_get_job_posting_uses_detail_query_and_returns_row() -> None:
     user_id = uuid4()
     row = {
