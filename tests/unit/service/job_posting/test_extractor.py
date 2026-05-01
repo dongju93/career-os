@@ -47,12 +47,12 @@ def _require_user_content(message: ChatCompletionMessageParam) -> list[UserConte
 
 def _require_text_part(part: UserContentPart) -> ChatCompletionContentPartTextParam:
     assert part["type"] == "text"
-    return cast(ChatCompletionContentPartTextParam, part)
+    return part
 
 
 def _require_image_part(part: UserContentPart) -> ChatCompletionContentPartImageParam:
     assert part["type"] == "image_url"
-    return cast(ChatCompletionContentPartImageParam, part)
+    return part
 
 
 def test_build_messages_includes_required_context_and_images() -> None:

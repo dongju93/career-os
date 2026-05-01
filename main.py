@@ -85,8 +85,8 @@ async def http_exception_handler(
 ) -> JSONResponse:
     return api_error_response(
         status_code=exc.status_code,
-        detail=str(exc.detail),
-        instance=str(request.url.path),
+        detail=exc.detail,
+        instance=request.url.path,
     )
 
 
@@ -97,7 +97,7 @@ async def validation_exception_handler(
 ) -> JSONResponse:
     return api_validation_error_response(
         errors=exc.errors(),
-        instance=str(request.url.path),
+        instance=request.url.path,
     )
 
 
@@ -109,7 +109,7 @@ async def database_unavailable_exception_handler(
     return api_error_response(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail="데이터베이스 연결이 일시적으로 불안정합니다. 잠시 후 다시 시도해주세요.",
-        instance=str(request.url.path),
+        instance=request.url.path,
     )
 
 
@@ -125,7 +125,7 @@ async def unhandled_exception_handler(
     return api_error_response(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-        instance=str(request.url.path),
+        instance=request.url.path,
     )
 
 
