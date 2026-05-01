@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Generator
+from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from unittest.mock import ANY, AsyncMock
@@ -115,7 +115,7 @@ class FakePool:
         self.connection_failures_remaining = 0
 
     @asynccontextmanager
-    async def connection(self) -> AsyncIterator[FakeConnection]:
+    async def connection(self) -> AsyncGenerator[FakeConnection]:
         self.connection_attempts += 1
         if self.connection_failures_remaining > 0:
             self.connection_failures_remaining -= 1
@@ -149,7 +149,7 @@ def client(
     monkeypatch: pytest.MonkeyPatch, fake_pool: FakePool
 ) -> Generator[TestClient]:
     @asynccontextmanager
-    async def fake_create_postgres_pool() -> AsyncIterator[FakePool]:
+    async def fake_create_postgres_pool() -> AsyncGenerator[FakePool]:
         yield fake_pool
 
     monkeypatch.setattr(main_module, "create_postgres_pool", fake_create_postgres_pool)
