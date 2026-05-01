@@ -170,4 +170,27 @@ describe('authentication flow', () => {
       '?next=%2Fjob-postings&error=auth_failed',
     );
   });
+
+  it('redirects to the login page with an error when fetchAuthMe fails after OAuth', async () => {
+    // 4xx does not trigger fetchWithApiRetry's retry logic — one attempt, immediate throw
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({
+          code: 'AUTH_ERROR',
+          message: '인증 오류가 발생했습니다.',
+        }),
+      }),
+    );
+
+    const { router } = renderRoute('/auth/callback');
+
+    expect(
+      await screen.findByRole('heading', { name: /^Career OS$/i }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/login');
+    expect(useAuthStore.getState().user).toBeNull();
+  });
 });
