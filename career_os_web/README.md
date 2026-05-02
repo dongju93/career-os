@@ -8,7 +8,7 @@
 
 구직 활동을 관리하는 Career OS의 React 기반 프론트엔드 애플리케이션입니다. Google OAuth 인증과 채용공고 관리 기능을 제공합니다.
 
-**프로덕션**: `https://career-os-sigma.vercel.app`
+**프로덕션**: [https://career-os-sigma.vercel.app](https://career-os-sigma.vercel.app)
 
 ## 프로젝트 정보
 
