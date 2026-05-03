@@ -69,6 +69,9 @@ SECRET_KEY=<충분히 긴 임의 문자열>
 
 # 로컬 개발 시 오버라이드
 REDIRECT_URI=http://localhost:8000/v1/auth/google/callback
+
+# 선택 — 미설정 시 사용량 제한 비활성화(fail-open)
+REDIS_URL=redis://localhost:6379/0
 ```
 
 ### 실행
@@ -90,6 +93,7 @@ API 문서: `http://localhost:8000/v1/docs`
 | **Pydantic v2 + pydantic-settings**      | 스키마 검증·설정 관리   | 런타임 검증, 직렬화, JSON Schema 생성을 타입 힌트 중심으로 통합. 설정값도 같은 검증 모델로 관리할 수 있어 환경 변수 누락이나 타입 오류를 초기에 발견하기 좋음                    |
 | **Authlib**                              | Google OAuth 클라이언트 | OAuth 2.0·OpenID Connect처럼 보안 민감도가 높은 표준 플로우를 검증된 라이브러리에 맡길 수 있음. 직접 구현 대비 인증 취약점과 유지보수 부담을 줄임                                |
 | **python-jose**                          | JWT 발급·검증           | JWT/JWS 처리를 위한 가벼운 JOSE 구현체. 내부 access token 서명·검증 요구사항에는 충분하면서, OAuth 클라이언트 라이브러리와 토큰 책임을 분리하기 쉬움                             |
+| **Redis (redis-py + hiredis)**           | 사용량 제한 저장소      | 슬라이딩 윈도우(Lua 스크립트, 원자적)와 고정 윈도우 두 전략을 조합. `REDIS_URL` 미설정 시 fail-open으로 동작해 Redis 없이도 서버가 기동됨                                        |
 | **Beautiful Soup 4**                     | HTML 파싱               | 실제 웹 페이지처럼 구조가 일정하지 않은 HTML에서도 탐색·검색 API가 안정적이고 단순함. 브라우저 자동화나 무거운 파서 없이 서버 사이드 텍스트 추출 요구를 충족                     |
 | **OpenAI Python SDK**                    | 구조화 데이터 추출      | OpenAI API의 공식 SDK라 모델·파라미터 변화에 대한 호환성이 가장 높음. async client, 멀티모달 입력, 구조화 출력 지원을 직접 HTTP 래퍼로 관리하지 않아도 됨                        |
 | **Ruff**                                 | 린터·포매터             | 린트, 포맷, import 정리, pyupgrade 계열 규칙을 단일 Rust 기반 도구로 처리해 빠르고 설정이 단순함. 여러 Python 품질 도구를 조합하는 비용을 줄임                                   |
@@ -104,6 +108,7 @@ API 문서: `http://localhost:8000/v1/docs`
 - **Google Cross-Account Protection** — RISC Security Event Token 검증·기록, 세션/토큰 폐기 이벤트 반영
 - **채용 공고 추출** — 사람인·원티드 URL을 입력하면 OpenAI로 구조화된 데이터 반환
 - **공고 저장·관리** — 사용자별 PostgreSQL upsert, 목록/상세 조회
+- **사용량 제한** — Redis 슬라이딩 윈도우(분당)와 고정 윈도우(일·월별) 조합; Redis 미설정 시 fail-open
 - **지원 플랫폼** — `saramin.co.kr`, `wanted.co.kr`
 
 ---
