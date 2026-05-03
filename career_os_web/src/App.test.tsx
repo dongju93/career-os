@@ -132,6 +132,38 @@ describe('Career OS Web app shell', () => {
     }
   });
 
+  it('shows a meaningful rate limit code for 429 job posting responses', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: new Headers({
+        'RateLimit-Limit': '10',
+        'RateLimit-Remaining': '0',
+        'RateLimit-Reset': '1777777777',
+        'Retry-After': '8',
+      }),
+      json: async () => ({
+        detail: '요청 한도를 초과했습니다. 8초 후에 다시 시도해주세요.',
+      }),
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings');
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /채용공고를 불러오지 못했습니다/i,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('요청 한도를 초과했습니다. 8초 후에 다시 시도해주세요.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('RATE_LIMIT_EXCEEDED')).toBeInTheDocument();
+    expect(screen.queryByText('UNKNOWN_API_ERROR')).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('logs the user out and returns to the login page', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn(async (_input: string, init?: RequestInit) => {

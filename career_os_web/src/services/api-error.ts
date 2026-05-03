@@ -1,12 +1,16 @@
 export const DATABASE_UNAVAILABLE_CODE = 'DATABASE_UNAVAILABLE';
 export const INTERNAL_SERVER_ERROR_CODE = 'INTERNAL_SERVER_ERROR';
 export const UNKNOWN_API_ERROR_CODE = 'UNKNOWN_API_ERROR';
+export const RATE_LIMIT_EXCEEDED_CODE = 'RATE_LIMIT_EXCEEDED';
+export const QUOTA_EXCEEDED_CODE = 'QUOTA_EXCEEDED';
 export const CLIENT_CONTRACT_MISMATCH = 'CLIENT_CONTRACT_MISMATCH';
 
 export type ApiErrorCode =
   | typeof DATABASE_UNAVAILABLE_CODE
   | typeof INTERNAL_SERVER_ERROR_CODE
   | typeof UNKNOWN_API_ERROR_CODE
+  | typeof RATE_LIMIT_EXCEEDED_CODE
+  | typeof QUOTA_EXCEEDED_CODE
   | typeof CLIENT_CONTRACT_MISMATCH
   | string;
 
@@ -39,7 +43,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function getErrorCode(status: number, body: unknown): ApiErrorCode {
+function hasAnyHeader(headers: Headers | undefined, names: string[]): boolean {
+  return names.some((name) => headers?.has(name));
+}
+
+function getErrorCode(response: Response, body: unknown): ApiErrorCode {
   if (isRecord(body) && typeof body.code === 'string') {
     return body.code;
   }
@@ -52,6 +60,21 @@ function getErrorCode(status: number, body: unknown): ApiErrorCode {
     return body.detail.code;
   }
 
+  if (response.status === 429) {
+    if (
+      hasAnyHeader(response.headers, [
+        'X-Quota-Limit',
+        'X-Quota-Remaining',
+        'X-Quota-Reset',
+      ])
+    ) {
+      return QUOTA_EXCEEDED_CODE;
+    }
+
+    return RATE_LIMIT_EXCEEDED_CODE;
+  }
+
+  const { status } = response;
   return status >= 500 ? INTERNAL_SERVER_ERROR_CODE : UNKNOWN_API_ERROR_CODE;
 }
 
@@ -88,7 +111,7 @@ export async function parseApiError(
   }
 
   return new ApiError({
-    code: getErrorCode(response.status, body),
+    code: getErrorCode(response, body),
     message: getErrorMessage(body, fallbackMessage),
     status: response.status,
   });

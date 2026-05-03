@@ -9,10 +9,15 @@ function okResponse(body: unknown = {}) {
   } as unknown as Response;
 }
 
-function errorResponse(status: number, body: unknown = {}) {
+function errorResponse(
+  status: number,
+  body: unknown = {},
+  headers?: HeadersInit,
+) {
   return {
     ok: false,
     status,
+    headers: new Headers(headers),
     json: async () => body,
   } as unknown as Response;
 }
@@ -106,6 +111,31 @@ describe('fetchWithApiRetry', () => {
       fetchWithApiRetry('/test', undefined, 'failed'),
     ).rejects.toMatchObject({
       status: 404,
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not retry 429 rate limit errors', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      errorResponse(
+        429,
+        { detail: '요청 한도를 초과했습니다. 8초 후에 다시 시도해주세요.' },
+        {
+          'RateLimit-Limit': '10',
+          'RateLimit-Remaining': '0',
+          'RateLimit-Reset': '1777777777',
+          'Retry-After': '8',
+        },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      fetchWithApiRetry('/test', undefined, 'failed'),
+    ).rejects.toMatchObject({
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: '요청 한도를 초과했습니다. 8초 후에 다시 시도해주세요.',
+      status: 429,
     });
     expect(fetchMock).toHaveBeenCalledOnce();
   });
