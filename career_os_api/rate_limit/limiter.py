@@ -23,7 +23,7 @@ _logger = logging.getLogger(__name__)
 #
 # Returns {count, -1}          on accept (count = requests in window after add)
 # Returns {count, oldest_ms}   on reject (count before add; oldest for Retry-After)
-_SLIDING_WINDOW_LUA = """
+_SLIDING_WINDOW_LOG_LUA = """
 local key    = KEYS[1]
 local now    = tonumber(ARGV[1])
 local window = tonumber(ARGV[2])
@@ -72,7 +72,7 @@ async def check_rate_limit(
     window_seconds: int,
 ) -> RateLimitResult:
     try:
-        script = redis.register_script(_SLIDING_WINDOW_LUA)
+        script = redis.register_script(_SLIDING_WINDOW_LOG_LUA)
         now_ms = int(time.time() * 1000)
         window_ms = window_seconds * 1000
         result = await script(
