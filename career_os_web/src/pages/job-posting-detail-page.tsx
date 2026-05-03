@@ -92,7 +92,7 @@ function DetailErrorState({
       <p className="mt-3 font-mono text-xs font-semibold text-red-500">
         {error.code}
       </p>
-      <Button className="mt-6" variant="outline" onClick={onRetry}>
+      <Button className="mt-6" variant="outline" onClick={() => onRetry()}>
         <RefreshCw className="h-4 w-4" />
         다시 시도
       </Button>
