@@ -30,6 +30,7 @@ def api_error_response(
     status_code: int,
     detail: str,
     instance: str | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     try:
         title = HTTPStatus(status_code).phrase
@@ -45,6 +46,7 @@ def api_error_response(
         content=body.model_dump(exclude_none=True),
         status_code=status_code,
         media_type="application/problem+json",
+        headers=headers,
     )
 
 
