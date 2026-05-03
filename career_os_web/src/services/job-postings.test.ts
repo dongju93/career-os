@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { JobPostingExtracted } from '../types/job-posting';
-import { API_BASE_URL } from './api-base-url';
 import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
 import {
   extractJobPosting,
@@ -138,7 +137,7 @@ describe('saveJobPosting', () => {
     await saveJobPosting(extracted);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `${API_BASE_URL}/v1/job-postings`,
+      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify(extracted),
@@ -205,7 +204,7 @@ describe('fetchJobPostings', () => {
     await fetchJobPostings(50, 50);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `${API_BASE_URL}/v1/job-postings?offset=50&limit=50`,
+      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=50&limit=50`,
       expect.any(Object),
     );
   });

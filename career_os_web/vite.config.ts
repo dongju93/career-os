@@ -4,8 +4,14 @@ import tailwindcss from '@tailwindcss/vite';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
+const VITE_API_BASE_URL = 'https://career-os.fastapicloud.dev'; // Production
+// const VITE_API_BASE_URL = 'http://localhost:8000'; // Local
+
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_API_BASE_URL': JSON.stringify(VITE_API_BASE_URL),
+  },
   resolve: {
     alias: {
       '@': resolve(import.meta.dirname, 'src'),

@@ -1,7 +1,6 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { API_BASE_URL } from '../services/api-base-url';
 import { useAuthStore } from '../store/auth-store';
 import { renderRoute } from '../test/test-utils';
 import type { JobPostingPage } from '../types/job-posting';
@@ -65,7 +64,10 @@ describe('JobPostingsPage', () => {
     const user = userEvent.setup();
     let requestCount = 0;
     const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
-      if (input !== `${API_BASE_URL}/v1/job-postings?offset=0&limit=50`) {
+      if (
+        input !==
+        `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=0&limit=50`
+      ) {
         throw new Error(`Unexpected fetch request: ${input}`);
       }
 

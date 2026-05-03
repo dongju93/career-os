@@ -1,7 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { API_BASE_URL } from '../services/api-base-url';
 import { useAuthStore } from '../store/auth-store';
 import { renderRoute } from '../test/test-utils';
 import type { JobPostingDetail, JobPostingPage } from '../types/job-posting';
@@ -127,7 +126,7 @@ describe('JobPostingDetailPage', () => {
       screen.getByRole('link', { name: /career-os\.example\.com/i }),
     ).toHaveAttribute('href', 'https://career-os.example.com');
     expect(fetchMock).toHaveBeenCalledWith(
-      `${API_BASE_URL}/v1/job-postings/1`,
+      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`,
       expect.objectContaining({
         credentials: 'include',
         headers: { 'X-Career-OS-Client': 'web' },
@@ -139,11 +138,14 @@ describe('JobPostingDetailPage', () => {
     const user = userEvent.setup();
     const detail = buildJobPostingDetail();
     const fetchMock = vi.fn(async (input: string) => {
-      if (input === `${API_BASE_URL}/v1/job-postings?offset=0&limit=50`) {
+      if (
+        input ===
+        `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=0&limit=50`
+      ) {
         return jsonResponse(apiResponse(buildJobPostingPage(detail)));
       }
 
-      if (input === `${API_BASE_URL}/v1/job-postings/1`) {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
         return jsonResponse(apiResponse(detail));
       }
 
@@ -163,7 +165,7 @@ describe('JobPostingDetailPage', () => {
       await screen.findByRole('heading', { name: 'Frontend Engineer' }),
     ).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      `${API_BASE_URL}/v1/job-postings/1`,
+      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`,
       expect.objectContaining({
         credentials: 'include',
         headers: { 'X-Career-OS-Client': 'web' },
@@ -175,11 +177,14 @@ describe('JobPostingDetailPage', () => {
     const user = userEvent.setup();
     const detail = buildJobPostingDetail();
     const fetchMock = vi.fn(async (input: string) => {
-      if (input === `${API_BASE_URL}/v1/job-postings?offset=0&limit=50`) {
+      if (
+        input ===
+        `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=0&limit=50`
+      ) {
         return jsonResponse(apiResponse(buildJobPostingPage(detail)));
       }
 
-      if (input === `${API_BASE_URL}/v1/job-postings/1`) {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
         return jsonResponse(apiResponse(detail));
       }
 
@@ -204,7 +209,7 @@ describe('JobPostingDetailPage', () => {
     const detail = buildJobPostingDetail();
     let detailRequestCount = 0;
     const fetchMock = vi.fn(async (input: string) => {
-      if (input !== `${API_BASE_URL}/v1/job-postings/1`) {
+      if (input !== `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
         throw new Error(`Unexpected fetch request: ${input}`);
       }
 

@@ -3,7 +3,6 @@ import { Navigate, useSearchParams } from 'react-router';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { API_BASE_URL } from '../services/api-base-url';
 import {
   DATABASE_UNAVAILABLE_CODE,
   INTERNAL_SERVER_ERROR_CODE,
@@ -93,7 +92,10 @@ export function LoginPage() {
     setLoading(true);
     storeRedirectPath(nextPath);
     window.location.assign(
-      buildGoogleLoginUrl(API_BASE_URL, window.location.origin),
+      buildGoogleLoginUrl(
+        import.meta.env.VITE_API_BASE_URL,
+        window.location.origin,
+      ),
     );
   }
 

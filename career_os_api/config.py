@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     )
 
     environment: Literal["local", "test", "production"] = "local"
+    # When True, redirect_uri and frontend_url automatically point to localhost.
+    # Set DEV=true in .env for local development instead of overriding each URL.
+    dev: bool = False
 
     # Credentials — required, no defaults
     database_url: str
@@ -95,6 +98,13 @@ class Settings(BaseSettings):
     # Total base64 payload cap across all collected images (default 10 MB).
     # base64 expands raw bytes by ~33 %, so 10 MB ≈ 7.5 MB of raw image data.
     max_total_image_bytes: int = 10 * 1024 * 1024
+
+    @model_validator(mode="after")
+    def _apply_dev_overrides(self) -> Settings:
+        if self.dev:
+            self.redirect_uri = "http://localhost:8000/v1/auth/google/callback"
+            self.frontend_url = "http://localhost:5173"
+        return self
 
     @model_validator(mode="after")
     def _validate_production_secrets(self) -> Settings:

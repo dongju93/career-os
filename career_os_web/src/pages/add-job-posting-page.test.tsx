@@ -1,7 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { API_BASE_URL } from '../services/api-base-url';
 import { useAuthStore } from '../store/auth-store';
 import { renderRoute } from '../test/test-utils';
 import type { JobPostingExtracted } from '../types/job-posting';
@@ -77,12 +76,12 @@ describe('AddJobPostingPage', () => {
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
       if (
         input ===
-        `${API_BASE_URL}/v1/job-postings/extraction?url=${encodeURIComponent(postingUrl)}`
+        `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/extraction?url=${encodeURIComponent(postingUrl)}`
       ) {
         return jsonResponse(apiResponse(extractedPosting));
       }
 
-      if (input === `${API_BASE_URL}/v1/job-postings`) {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings`) {
         saveInit = init;
         savedPayload = JSON.parse(String(init?.body)) as JobPostingExtracted;
         return jsonResponse({}, 201);

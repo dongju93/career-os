@@ -1,11 +1,10 @@
-import { API_BASE_URL } from './api-base-url';
 import { fetchWithApiRetry } from './api-client';
 import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
 import { authMeApiResponseSchema } from './schemas';
 
 export async function logoutUser(): Promise<void> {
   await fetchWithApiRetry(
-    `${API_BASE_URL}/v1/auth/logout`,
+    `${import.meta.env.VITE_API_BASE_URL}/v1/auth/logout`,
     {
       method: 'POST',
     },
@@ -22,7 +21,7 @@ export interface AuthMeResult {
 
 export async function fetchAuthMe(): Promise<AuthMeResult> {
   const response = await fetchWithApiRetry(
-    `${API_BASE_URL}/v1/auth/me`,
+    `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`,
     undefined,
     '로그인 완료에 실패했습니다. 다시 시도해주세요.',
   );
