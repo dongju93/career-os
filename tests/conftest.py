@@ -11,6 +11,9 @@ os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
 os.environ["GOOGLE_CLIENT_ID"] = "test-google-client-id"
 os.environ["GOOGLE_CLIENT_SECRET"] = "test-google-client-secret"
 os.environ["SECRET_KEY"] = "test-secret-key-for-jwt"
+# Disable Redis in tests; rate limiting fails open. client_with_redis fixture
+# overrides this by monkeypatching create_redis_client() directly.
+os.environ["REDIS_URL"] = ""
 
 from career_os_api.schemas import JobPostingExtracted
 from career_os_api.service.job_posting.platform import Platform

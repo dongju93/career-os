@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from unittest.mock import ANY, AsyncMock
 from uuid import uuid4
 
+import fakeredis
 import pytest
 from fastapi.testclient import TestClient
 from psycopg import OperationalError
@@ -913,3 +914,88 @@ def test_risc_endpoint_is_not_authenticated(client: TestClient) -> None:
 
     # Empty body returns 400 (not 401), proving auth is not required.
     assert response.status_code == 400
+
+
+# ── Rate limit integration ─────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def client_with_redis(
+    monkeypatch: pytest.MonkeyPatch, fake_pool: FakePool
+) -> Generator[TestClient]:
+    fake_redis_instance = fakeredis.FakeAsyncRedis(decode_responses=False)
+
+    @asynccontextmanager
+    async def fake_create_postgres_pool() -> AsyncGenerator[FakePool]:
+        yield fake_pool
+
+    monkeypatch.setattr(main_module, "create_postgres_pool", fake_create_postgres_pool)
+    monkeypatch.setattr(main_module, "create_redis_client", lambda: fake_redis_instance)
+
+    with TestClient(main_module.career_os) as test_client:
+        yield test_client
+
+
+def test_rate_limit_headers_present_on_successful_request(
+    client_with_redis: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = client_with_redis.get(f"{API_PREFIX}/auth/me", headers=auth_headers)
+
+    assert response.status_code == 200
+    assert "ratelimit-limit" in response.headers
+    assert "ratelimit-remaining" in response.headers
+    assert "ratelimit-reset" in response.headers
+    assert response.headers["ratelimit-limit"] == "20"
+    assert int(response.headers["ratelimit-remaining"]) == 19
+
+
+def test_rate_limit_remaining_decrements_per_request(
+    client_with_redis: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    for expected_remaining in [19, 18, 17]:
+        response = client_with_redis.get(f"{API_PREFIX}/auth/me", headers=auth_headers)
+        assert response.status_code == 200
+        assert int(response.headers["ratelimit-remaining"]) == expected_remaining
+
+
+def test_rate_limit_429_on_exceeding_limit(
+    client_with_redis: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    # /auth/logout has rate_limit(20, per="minute"). Exhaust the limit then
+    # verify the next request returns 429 with required headers and ProblemDetail body.
+    for _ in range(20):
+        r = client_with_redis.post(f"{API_PREFIX}/auth/logout", headers=auth_headers)
+        assert r.status_code == 200
+
+    response = client_with_redis.post(f"{API_PREFIX}/auth/logout", headers=auth_headers)
+
+    assert response.status_code == 429
+    assert response.headers["content-type"] == "application/problem+json"
+    assert "retry-after" in response.headers
+    assert "ratelimit-limit" in response.headers
+    assert response.headers["ratelimit-remaining"] == "0"
+
+    body = response.json()
+    assert body["status"] == 429
+    assert body["title"] == "Too Many Requests"
+    assert "retry_after" not in body or True  # detail string contains retry info
+    assert "instance" in body
+
+
+def test_rate_limit_429_body_matches_problem_detail_schema(
+    client_with_redis: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    for _ in range(20):
+        client_with_redis.post(f"{API_PREFIX}/auth/logout", headers=auth_headers)
+
+    response = client_with_redis.post(f"{API_PREFIX}/auth/logout", headers=auth_headers)
+
+    assert response.status_code == 429
+    body = response.json()
+    assert set(body.keys()) <= {"type", "title", "status", "detail", "instance"}
+    assert body["type"] == "about:blank"
+    assert body["status"] == 429

@@ -3,14 +3,17 @@ import {
   ApiError,
   INTERNAL_SERVER_ERROR_CODE,
   parseApiError,
+  QUOTA_EXCEEDED_CODE,
+  RATE_LIMIT_EXCEEDED_CODE,
   toUserFacingError,
   UNKNOWN_API_ERROR_CODE,
 } from './api-error';
 
-function fakeResponse(status: number, body: unknown) {
+function fakeResponse(status: number, body: unknown, headers?: HeadersInit) {
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers: new Headers(headers),
     json: async () => body,
   } as unknown as Response;
 }
@@ -69,10 +72,45 @@ describe('parseApiError', () => {
     expect(err.message).toBe('fallback message');
   });
 
+  it('uses RATE_LIMIT_EXCEEDED_CODE for 429 rate limit responses', async () => {
+    const res = fakeResponse(
+      429,
+      { detail: '요청 한도를 초과했습니다. 8초 후에 다시 시도해주세요.' },
+      {
+        'RateLimit-Limit': '10',
+        'RateLimit-Remaining': '0',
+        'RateLimit-Reset': '1777777777',
+        'Retry-After': '8',
+      },
+    );
+    const err = await parseApiError(res, 'fallback message');
+    expect(err.code).toBe(RATE_LIMIT_EXCEEDED_CODE);
+    expect(err.message).toBe(
+      '요청 한도를 초과했습니다. 8초 후에 다시 시도해주세요.',
+    );
+  });
+
+  it('uses QUOTA_EXCEEDED_CODE for 429 quota responses', async () => {
+    const res = fakeResponse(
+      429,
+      { detail: '할당량을 초과했습니다. 120초 후 초기화됩니다.' },
+      {
+        'Retry-After': '120',
+        'X-Quota-Limit': '100',
+        'X-Quota-Remaining': '0',
+        'X-Quota-Reset': '1777777777',
+      },
+    );
+    const err = await parseApiError(res, 'fallback message');
+    expect(err.code).toBe(QUOTA_EXCEEDED_CODE);
+    expect(err.message).toBe('할당량을 초과했습니다. 120초 후 초기화됩니다.');
+  });
+
   it('uses fallback message and derived code when JSON parsing fails', async () => {
     const res = {
       ok: false,
       status: 500,
+      headers: new Headers(),
       json: async () => {
         throw new SyntaxError('Unexpected token');
       },

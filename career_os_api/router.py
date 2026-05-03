@@ -25,6 +25,7 @@ from career_os_api.database.job_postings import (
 )
 from career_os_api.database.retry import run_database_operation
 from career_os_api.database.users import update_user_name, upsert_user
+from career_os_api.rate_limit import quota, rate_limit
 from career_os_api.responses import ApiResponse
 from career_os_api.schemas import (
     CurrentUserResponse,
@@ -166,7 +167,7 @@ async def google_callback(request: Request) -> RedirectResponse:
     return RedirectResponse(target, status_code=status.HTTP_302_FOUND)
 
 
-@v1_router.get("/auth/me", tags=["auth"])
+@v1_router.get("/auth/me", tags=["auth"], dependencies=[rate_limit(20, per="minute")])
 async def read_current_user(
     current_user: _CurrentUser,
 ) -> ApiResponse[CurrentUserResponse]:
@@ -185,6 +186,7 @@ async def read_current_user(
 @v1_router.patch(
     "/auth/me",
     tags=["auth"],
+    dependencies=[rate_limit(10, per="minute"), quota(50, per="day")],
     responses={
         401: {"description": "인증 실패"},
         404: {"description": "사용자를 찾을 수 없습니다"},
@@ -216,7 +218,9 @@ async def update_current_user(
     )
 
 
-@v1_router.post("/auth/logout", tags=["auth"])
+@v1_router.post(
+    "/auth/logout", tags=["auth"], dependencies=[rate_limit(20, per="minute")]
+)
 async def logout_current_user(
     request: Request, current_user: _CurrentUser
 ) -> ApiResponse[None]:
@@ -309,7 +313,9 @@ async def receive_google_risc_event(request: Request) -> Response:
 # ── Job Postings ──────────────────────────────────────────────────────────────
 
 
-@v1_router.get("/job-postings", tags=["job-postings"])
+@v1_router.get(
+    "/job-postings", tags=["job-postings"], dependencies=[rate_limit(60, per="minute")]
+)
 async def list_job_postings(
     request: Request,
     current_user: _CurrentUser,
@@ -342,6 +348,11 @@ async def list_job_postings(
 @v1_router.get(
     "/job-postings/extraction",
     tags=["job-postings"],
+    dependencies=[
+        rate_limit(10, per="minute"),
+        quota(100, per="day"),
+        quota(500, per="month"),
+    ],
     responses={
         400: {"description": "Invalid URL, unsupported domain, or missing posting ID"},
         404: {"description": "URL returned a 404 from the upstream server"},
@@ -378,6 +389,7 @@ async def get_job_posting_extraction(
 @v1_router.post(
     "/job-postings",
     tags=["job-postings"],
+    dependencies=[rate_limit(30, per="minute"), quota(500, per="day")],
     status_code=status.HTTP_201_CREATED,
     responses={
         # "model" causes FastAPI to emit a full JSON Schema $ref for this status code,
@@ -420,6 +432,7 @@ async def create_job_posting(
 @v1_router.get(
     "/job-postings/{job_id}",
     tags=["job-postings"],
+    dependencies=[rate_limit(60, per="minute")],
     responses={404: {"description": "Job posting not found"}},
 )
 async def get_job_posting_detail(

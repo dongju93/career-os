@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     google_risc_max_iat_skew_seconds: int = 60 * 5  # 5 minutes
     google_risc_http_timeout_seconds: float = 10.0
 
+    # Redis — optional; rate limiting is silently disabled (fail-open) when unset.
+    redis_url: str | None = None
+
     # HTTP client timeouts (seconds) — tunable per environment
     http_fetch_timeout: float = 30.0
     # Per-image connect+read timeout passed to the httpx client.

@@ -15,6 +15,7 @@ from career_os_api.database.ddl import init_schema
 from career_os_api.database.pool import create_postgres_pool
 from career_os_api.database.retry import DatabaseUnavailableError
 from career_os_api.middleware import RequestIdFilter, RequestIdMiddleware
+from career_os_api.rate_limit.client import create_redis_client
 from career_os_api.responses import api_error_response, api_validation_error_response
 from career_os_api.router import v1_router
 
@@ -32,26 +33,32 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with (
-        create_postgres_pool() as pool,
-        httpx.AsyncClient(
-            follow_redirects=True, timeout=settings.http_fetch_timeout
-        ) as http_client,
-        httpx.AsyncClient(
-            follow_redirects=True, timeout=settings.http_image_timeout
-        ) as image_http_client,
-        httpx.AsyncClient(
-            timeout=settings.google_risc_http_timeout_seconds
-        ) as risc_http_client,
-        AsyncOpenAI(api_key=settings.openai_api_key) as openai_client,
-    ):
-        await init_schema(pool)
-        app.state.pool = pool
-        app.state.http_client = http_client
-        app.state.image_http_client = image_http_client
-        app.state.risc_http_client = risc_http_client
-        app.state.openai_client = openai_client
-        yield
+    redis_client = create_redis_client()
+    try:
+        async with (
+            create_postgres_pool() as pool,
+            httpx.AsyncClient(
+                follow_redirects=True, timeout=settings.http_fetch_timeout
+            ) as http_client,
+            httpx.AsyncClient(
+                follow_redirects=True, timeout=settings.http_image_timeout
+            ) as image_http_client,
+            httpx.AsyncClient(
+                timeout=settings.google_risc_http_timeout_seconds
+            ) as risc_http_client,
+            AsyncOpenAI(api_key=settings.openai_api_key) as openai_client,
+        ):
+            await init_schema(pool)
+            app.state.pool = pool
+            app.state.redis = redis_client
+            app.state.http_client = http_client
+            app.state.image_http_client = image_http_client
+            app.state.risc_http_client = risc_http_client
+            app.state.openai_client = openai_client
+            yield
+    finally:
+        if redis_client is not None:
+            await redis_client.aclose()
 
 
 career_os = FastAPI(
@@ -87,6 +94,7 @@ async def http_exception_handler(
         status_code=exc.status_code,
         detail=exc.detail,
         instance=request.url.path,
+        headers=dict(exc.headers) if exc.headers else None,
     )
 
 
