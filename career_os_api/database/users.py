@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from typing import TypedDict, cast
 from uuid import UUID
@@ -29,8 +30,8 @@ WHERE id = %s
 """
 
 _UPSERT_SQL = """
-INSERT INTO users (google_id, email, name, picture)
-VALUES (%s, %s, %s, %s)
+INSERT INTO users (id, google_id, email, name, picture)
+VALUES (%s, %s, %s, %s, %s)
 ON CONFLICT (google_id) DO UPDATE
     SET email   = EXCLUDED.email,
         name    = EXCLUDED.name,
@@ -90,7 +91,7 @@ async def upsert_user(
     picture: str | None,
 ) -> UserRow:
     async with conn.cursor(row_factory=dict_row) as cur:
-        await cur.execute(_UPSERT_SQL, (google_id, email, name, picture))
+        await cur.execute(_UPSERT_SQL, (uuid.uuid7(), google_id, email, name, picture))
         row = await cur.fetchone()
     assert row is not None
     return cast(UserRow, row)

@@ -1,8 +1,8 @@
+import uuid
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from unittest.mock import ANY, AsyncMock
-from uuid import uuid4
 
 import fakeredis
 import pytest
@@ -65,7 +65,7 @@ def make_list_row(sample_job_posting, *, job_id: int = 1) -> dict:
 
 def make_current_user() -> dict:
     return {
-        "id": uuid4(),
+        "id": uuid.uuid7(),
         "google_id": "google-user-1",
         "email": "user@example.com",
         "name": "Career OS User",
@@ -184,7 +184,7 @@ def test_google_callback_does_not_include_token_in_redirect_url(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    user_id = uuid4()
+    user_id = uuid.uuid7()
     mock_token = {
         "userinfo": {
             "sub": "google-sub-123",

@@ -1,6 +1,6 @@
+import uuid
 from datetime import UTC, datetime
 from typing import cast
-from uuid import uuid4
 
 import pytest
 from psycopg import AsyncConnection
@@ -41,7 +41,7 @@ class FakeConnection:
 
 def make_user_row(*, user_id=None) -> dict:
     return {
-        "id": user_id or uuid4(),
+        "id": user_id or uuid.uuid7(),
         "google_id": "google-user-1",
         "email": "user@example.com",
         "name": "Career OS User",
@@ -71,7 +71,7 @@ async def test_find_user_by_google_id_uses_dict_rows_and_returns_row() -> None:
 
 @pytest.mark.asyncio
 async def test_find_user_by_id_returns_none_when_missing() -> None:
-    user_id = uuid4()
+    user_id = uuid.uuid7()
     cursor = FakeCursor(fetchone_results=[None])
     conn = FakeConnection(cursor=cursor)
 
@@ -84,7 +84,7 @@ async def test_find_user_by_id_returns_none_when_missing() -> None:
 
 @pytest.mark.asyncio
 async def test_update_user_name_executes_sql_with_user_id_and_name() -> None:
-    user_id = uuid4()
+    user_id = uuid.uuid7()
     row = make_user_row(user_id=user_id) | {"name": "New Name"}
     cursor = FakeCursor(fetchone_results=[row])
     conn = FakeConnection(cursor=cursor)
@@ -183,9 +183,8 @@ async def test_upsert_user_executes_sql_and_returns_row() -> None:
 
     assert result == row
     assert conn.cursor_row_factories == [dict_row]
-    assert cursor.execute_calls == [
-        (
-            users_module._UPSERT_SQL,
-            ("google-user-1", "user@example.com", "Career OS User", None),
-        ),
-    ]
+    sql, params = cursor.execute_calls[0]
+    assert sql == users_module._UPSERT_SQL
+    assert params is not None
+    assert isinstance(params[0], uuid.UUID)
+    assert params[1:] == ("google-user-1", "user@example.com", "Career OS User", None)

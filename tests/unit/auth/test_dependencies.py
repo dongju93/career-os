@@ -1,5 +1,5 @@
+import uuid
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
@@ -73,7 +73,7 @@ def _make_request(row, *, session=None, headers=None):
 
 
 async def test_get_current_user_bearer_token():
-    user_id = uuid4()
+    user_id = uuid.uuid7()
     token = create_access_token(data={"sub": str(user_id)})
     row = {
         "id": user_id,
@@ -91,7 +91,7 @@ async def test_get_current_user_bearer_token():
 
 
 async def test_get_current_user_session_cookie():
-    user_id = uuid4()
+    user_id = uuid.uuid7()
     row = {
         "id": user_id,
         "google_id": "g-123",
@@ -115,7 +115,7 @@ async def test_get_current_user_session_cookie():
 
 
 async def test_get_current_user_session_takes_precedence_over_bearer():
-    session_user_id = uuid4()
+    session_user_id = uuid.uuid7()
     row = {
         "id": session_user_id,
         "google_id": "g-123",
@@ -125,7 +125,7 @@ async def test_get_current_user_session_takes_precedence_over_bearer():
         "is_active": True,
         "auth_session_revoked_at": None,
     }
-    token = create_access_token(data={"sub": str(uuid4())})
+    token = create_access_token(data={"sub": str(uuid.uuid7())})
     request = _make_request(
         row,
         session={
@@ -140,7 +140,7 @@ async def test_get_current_user_session_takes_precedence_over_bearer():
 
 
 async def test_get_current_user_session_requires_client_header():
-    user_id = uuid4()
+    user_id = uuid.uuid7()
     row = {
         "id": user_id,
         "google_id": "g-123",
@@ -163,7 +163,7 @@ async def test_get_current_user_session_requires_client_header():
 
 
 async def test_get_current_user_session_without_client_header_falls_back_to_bearer():
-    bearer_user_id = uuid4()
+    bearer_user_id = uuid.uuid7()
     token = create_access_token(data={"sub": str(bearer_user_id)})
     row = {
         "id": bearer_user_id,
@@ -177,7 +177,7 @@ async def test_get_current_user_session_without_client_header_falls_back_to_bear
     request = _make_request(
         row,
         session={
-            "user_id": str(uuid4()),
+            "user_id": str(uuid.uuid7()),
             "issued_at": int(datetime.now(UTC).timestamp()),
         },
     )
@@ -187,7 +187,7 @@ async def test_get_current_user_session_without_client_header_falls_back_to_bear
 
 
 async def test_get_current_user_invalid_session_id_falls_back_to_bearer():
-    bearer_user_id = uuid4()
+    bearer_user_id = uuid.uuid7()
     token = create_access_token(data={"sub": str(bearer_user_id)})
     row = {
         "id": bearer_user_id,
@@ -220,7 +220,7 @@ async def test_get_current_user_token_with_invalid_subject():
 
 
 async def test_get_current_user_inactive_user():
-    user_id = uuid4()
+    user_id = uuid.uuid7()
     token = create_access_token(data={"sub": str(user_id)})
     row = {
         "id": user_id,
@@ -238,7 +238,7 @@ async def test_get_current_user_inactive_user():
 
 
 async def test_get_current_user_rejects_token_issued_before_session_revocation():
-    user_id = uuid4()
+    user_id = uuid.uuid7()
     token = create_access_token(data={"sub": str(user_id)})
     row = {
         "id": user_id,
@@ -256,7 +256,7 @@ async def test_get_current_user_rejects_token_issued_before_session_revocation()
 
 
 async def test_get_current_user_rejects_session_without_issue_time_after_revocation():
-    user_id = uuid4()
+    user_id = uuid.uuid7()
     row = {
         "id": user_id,
         "google_id": "g-123",
@@ -277,7 +277,7 @@ async def test_get_current_user_rejects_session_without_issue_time_after_revocat
 
 
 async def test_get_current_user_accepts_session_issued_after_revocation():
-    user_id = uuid4()
+    user_id = uuid.uuid7()
     issued_at = int(datetime.now(UTC).timestamp())
     row = {
         "id": user_id,
@@ -302,7 +302,7 @@ async def test_get_current_user_accepts_session_issued_in_same_second_as_revocat
     # JWT iat is second-precision. A session issued at T+0.800 after a revocation
     # at T+0.500 gets iat=T (floor). Without truncating revoked_at to seconds the
     # comparison T.000 > T.500 is false and the valid session is wrongly rejected.
-    user_id = uuid4()
+    user_id = uuid.uuid7()
     issued_at = int(datetime.now(UTC).timestamp())
     row = {
         "id": user_id,
@@ -327,7 +327,7 @@ async def test_get_current_user_accepts_session_issued_in_same_second_as_revocat
 
 
 async def test_get_current_user_user_not_found():
-    token = create_access_token(data={"sub": str(uuid4())})
+    token = create_access_token(data={"sub": str(uuid.uuid7())})
     request = _make_request(None)
     with pytest.raises(HTTPException) as exc_info:
         await get_current_user(request, _bearer(token))

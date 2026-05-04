@@ -77,7 +77,7 @@ async def check_rate_limit(
         window_ms = window_seconds * 1000
         result = await script(
             keys=[key],
-            args=[now_ms, window_ms, limit, window_seconds + 1, uuid.uuid4().hex],
+            args=[now_ms, window_ms, limit, window_seconds + 1, uuid.uuid7().hex],
         )
         count = int(result[0])
         second = int(result[1])

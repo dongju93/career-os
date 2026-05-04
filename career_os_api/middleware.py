@@ -36,7 +36,7 @@ class RequestIdMiddleware:
             await self.app(scope, receive, send)
             return
 
-        request_id = str(uuid.uuid4())
+        request_id = str(uuid.uuid7())
         token = _request_id_var.set(request_id)
 
         async def _send(message: Any) -> None:
