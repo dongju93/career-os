@@ -64,6 +64,17 @@ describe('JobPostingsPage', () => {
     const user = userEvent.setup();
     let requestCount = 0;
     const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
       if (
         input !==
         `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=0&limit=50`
@@ -100,7 +111,7 @@ describe('JobPostingsPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'Frontend Engineer' }),
     ).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[1]?.[1]?.signal).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[2]?.[1]?.signal).toBeUndefined();
   });
 });

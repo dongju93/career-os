@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { fetchAuthMe } from '../services/auth';
-import { useAuthStore } from '../store/auth-store';
+import { resetAuthStore, useAuthStore } from '../store/auth-store';
 import {
   buildLoginPath,
   getRedirectPathFromLocation,
@@ -9,18 +9,11 @@ import {
 
 export function ProtectedRoute() {
   const user = useAuthStore((state) => state.user);
-  const { clearAuth, setAuth } = useAuthStore();
+  const setAuth = useAuthStore((state) => state.setAuth);
   const location = useLocation();
-  const [hasCheckedSession, setHasCheckedSession] = useState(Boolean(user));
+  const [hasCheckedSession, setHasCheckedSession] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      setHasCheckedSession(true);
-      return;
-    }
-
-    if (hasCheckedSession) return;
-
     let isActive = true;
 
     fetchAuthMe()
@@ -36,14 +29,14 @@ export function ProtectedRoute() {
       })
       .catch(() => {
         if (!isActive) return;
-        clearAuth();
+        resetAuthStore();
         setHasCheckedSession(true);
       });
 
     return () => {
       isActive = false;
     };
-  }, [user, setAuth, clearAuth, hasCheckedSession]);
+  }, [setAuth]);
 
   if (!user && !hasCheckedSession) {
     return null;

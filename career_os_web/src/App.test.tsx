@@ -65,9 +65,20 @@ describe('Career OS Web app shell', () => {
   });
 
   it('redirects the root route to saved job postings and loads the page data', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => apiResponse(jobPostingPage),
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === 'https://career-os.fastapicloud.dev/v1/auth/me') {
+        return {
+          ok: true,
+          json: async () =>
+            apiResponse({
+              user_id: 'user-1',
+              email: 'user@example.com',
+              name: 'Career OS User',
+              picture: null,
+            }),
+        };
+      }
+      return { ok: true, json: async () => apiResponse(jobPostingPage) };
     });
 
     vi.stubGlobal('fetch', fetchMock);
@@ -98,16 +109,30 @@ describe('Career OS Web app shell', () => {
 
   it('shows the API error code page when job postings stay unavailable', async () => {
     vi.useFakeTimers();
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 503,
-      json: async () => ({
-        type: 'about:blank',
-        title: 'Service Unavailable',
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === 'https://career-os.fastapicloud.dev/v1/auth/me') {
+        return {
+          ok: true,
+          json: async () =>
+            apiResponse({
+              user_id: 'user-1',
+              email: 'user@example.com',
+              name: 'Career OS User',
+              picture: null,
+            }),
+        };
+      }
+      return {
+        ok: false,
         status: 503,
-        detail: '데이터베이스 연결이 일시적으로 불안정합니다.',
-        instance: '/v1/job-postings',
-      }),
+        json: async () => ({
+          type: 'about:blank',
+          title: 'Service Unavailable',
+          status: 503,
+          detail: '데이터베이스 연결이 일시적으로 불안정합니다.',
+          instance: '/v1/job-postings',
+        }),
+      };
     });
 
     vi.stubGlobal('fetch', fetchMock);
@@ -126,25 +151,39 @@ describe('Career OS Web app shell', () => {
       expect(
         screen.queryByText(/Internal Server Error/i),
       ).not.toBeInTheDocument();
-      expect(fetchMock).toHaveBeenCalledTimes(5);
+      expect(fetchMock).toHaveBeenCalledTimes(6);
     } finally {
       vi.useRealTimers();
     }
   });
 
   it('shows a meaningful rate limit code for 429 job posting responses', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 429,
-      headers: new Headers({
-        'RateLimit-Limit': '10',
-        'RateLimit-Remaining': '0',
-        'RateLimit-Reset': '1777777777',
-        'Retry-After': '8',
-      }),
-      json: async () => ({
-        detail: '요청 한도를 초과했습니다. 8초 후에 다시 시도해주세요.',
-      }),
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === 'https://career-os.fastapicloud.dev/v1/auth/me') {
+        return {
+          ok: true,
+          json: async () =>
+            apiResponse({
+              user_id: 'user-1',
+              email: 'user@example.com',
+              name: 'Career OS User',
+              picture: null,
+            }),
+        };
+      }
+      return {
+        ok: false,
+        status: 429,
+        headers: new Headers({
+          'RateLimit-Limit': '10',
+          'RateLimit-Remaining': '0',
+          'RateLimit-Reset': '1777777777',
+          'Retry-After': '8',
+        }),
+        json: async () => ({
+          detail: '요청 한도를 초과했습니다. 8초 후에 다시 시도해주세요.',
+        }),
+      };
     });
 
     vi.stubGlobal('fetch', fetchMock);
@@ -161,12 +200,25 @@ describe('Career OS Web app shell', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('RATE_LIMIT_EXCEEDED')).toBeInTheDocument();
     expect(screen.queryByText('UNKNOWN_API_ERROR')).not.toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('logs the user out and returns to the login page', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn(async (_input: string, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === 'https://career-os.fastapicloud.dev/v1/auth/me') {
+        return {
+          ok: true,
+          json: async () =>
+            apiResponse({
+              user_id: 'user-1',
+              email: 'user@example.com',
+              name: 'Career OS User',
+              picture: null,
+            }),
+        };
+      }
+
       if (init?.method === 'POST') {
         return {
           ok: true,
@@ -204,6 +256,6 @@ describe('Career OS Web app shell', () => {
     const meCalls = fetchMock.mock.calls.filter((args) =>
       args[0].includes('/v1/auth/me'),
     );
-    expect(meCalls).toHaveLength(0);
+    expect(meCalls).toHaveLength(1);
   });
 });

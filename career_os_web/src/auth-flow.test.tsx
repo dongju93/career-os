@@ -53,9 +53,23 @@ describe('authentication flow', () => {
   });
 
   it('redirects authenticated users away from the login page', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => apiResponse(emptyJobPostingPage),
+    const authUser = {
+      user_id: 'user-1',
+      email: 'user@example.com',
+      name: 'Career OS User',
+      picture: null,
+    };
+
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === 'https://career-os.fastapicloud.dev/v1/auth/me') {
+        return { ok: true, json: async () => apiResponse(authUser) };
+      }
+      if (
+        input.startsWith('https://career-os.fastapicloud.dev/v1/job-postings')
+      ) {
+        return { ok: true, json: async () => apiResponse(emptyJobPostingPage) };
+      }
+      throw new Error(`Unexpected fetch request: ${input}`);
     });
 
     vi.stubGlobal('fetch', fetchMock);
@@ -76,12 +90,92 @@ describe('authentication flow', () => {
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/job-postings');
     expect(fetchMock).toHaveBeenCalledWith(
+      'https://career-os.fastapicloud.dev/v1/auth/me',
+      {
+        credentials: 'include',
+        headers: { 'X-Career-OS-Client': 'web' },
+      },
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
       'https://career-os.fastapicloud.dev/v1/job-postings?offset=0&limit=50',
       expect.objectContaining({
         credentials: 'include',
         headers: { 'X-Career-OS-Client': 'web' },
       }),
     );
+  });
+
+  it('calls /auth/me even when a user is already stored in localStorage', async () => {
+    const authUser = {
+      user_id: 'user-1',
+      email: 'user@example.com',
+      name: 'Career OS User',
+      picture: null,
+    };
+
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === 'https://career-os.fastapicloud.dev/v1/auth/me') {
+        return { ok: true, json: async () => apiResponse(authUser) };
+      }
+      if (
+        input.startsWith('https://career-os.fastapicloud.dev/v1/job-postings')
+      ) {
+        return { ok: true, json: async () => apiResponse(emptyJobPostingPage) };
+      }
+      throw new Error(`Unexpected fetch request: ${input}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    useAuthStore.getState().setAuth({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'Career OS User',
+      picture: null,
+    });
+
+    renderRoute('/job-postings');
+
+    expect(
+      await screen.findByRole('heading', { name: /^채용공고$/i }),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://career-os.fastapicloud.dev/v1/auth/me',
+      {
+        credentials: 'include',
+        headers: { 'X-Career-OS-Client': 'web' },
+      },
+    );
+  });
+
+  it('clears localStorage and redirects to login when /auth/me returns 401 despite a stored user', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        type: 'about:blank',
+        title: 'Unauthorized',
+        status: 401,
+        detail: '인증이 필요합니다',
+        instance: '/v1/auth/me',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    useAuthStore.getState().setAuth({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'Career OS User',
+      picture: null,
+    });
+
+    const { router } = renderRoute('/job-postings');
+
+    expect(
+      await screen.findByRole('heading', { name: /^Career OS$/i }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/login');
+    expect(useAuthStore.getState().user).toBeNull();
   });
 
   it('builds the Google OAuth entry URL with the frontend callback URL', () => {
