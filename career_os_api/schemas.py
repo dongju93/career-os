@@ -1,10 +1,15 @@
 from datetime import datetime
 from typing import Annotated
+from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
-from career_os_api.service.job_posting.platform import Platform, validate_posting_id
+from career_os_api.service.job_posting.platform import (
+    PLATFORM_REGISTRY,
+    Platform,
+    validate_posting_id,
+)
 
 PostingId = Annotated[str, Field(min_length=1, max_length=50)]
 
@@ -102,6 +107,36 @@ class JobPostingExtracted(BaseModel):
     @classmethod
     def validate_platform_posting_id(cls, posting_id: str, info: ValidationInfo) -> str:
         return _validate_platform_posting_id(posting_id, info)
+
+    @model_validator(mode="after")
+    def validate_posting_url_consistency(self) -> JobPostingExtracted:
+        parsed = urlparse(self.posting_url)
+        host = parsed.hostname or ""
+        adapter = PLATFORM_REGISTRY[self.platform]
+
+        if host != adapter.domain and not host.endswith(f".{adapter.domain}"):
+            raise ValueError(
+                f"posting_url host '{host}' does not match platform '{self.platform.value}' (expected *.{adapter.domain})"
+            )
+
+        if self.platform == Platform.saramin:
+            rec_idx = parse_qs(parsed.query).get("rec_idx", [None])[0]
+            if rec_idx != self.posting_id:
+                raise ValueError(
+                    f"posting_url rec_idx '{rec_idx}' does not match posting_id '{self.posting_id}'"
+                )
+        elif self.platform == Platform.wanted:
+            segments = parsed.path.rstrip("/").split("/")
+            if (
+                len(segments) < 3
+                or segments[1] != "wd"
+                or segments[2] != self.posting_id
+            ):
+                raise ValueError(
+                    f"posting_url path must be /wd/{self.posting_id} for Wanted postings"
+                )
+
+        return self
 
 
 class JobPostingStored(JobPostingExtracted):
