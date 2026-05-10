@@ -1,6 +1,6 @@
 # Career OS — Frontend Design Specification
 
-This document is the authoritative reference for the Career OS frontend design system. Any redesign or new feature implementation must conform to every section below. It covers design tokens, glassmorphism utilities, typography, layout architecture, every UI primitive component, and each page.
+This document tracks the current Career OS frontend design system. The implementation is the source of truth; keep this file aligned with the code when routes, components, or visual patterns change. It covers design tokens, glassmorphism utilities, typography, layout architecture, every UI primitive component, and each page.
 
 ---
 
@@ -35,17 +35,17 @@ Every surface layers translucent frosted-glass panels on a bright, light backgro
 **Key rules:**
 
 - Glass surfaces use white-channel backgrounds with `backdrop-filter: blur(20px) saturate(120%)` and dark-channel borders (`rgba(0,0,0,0.06)`), not white borders.
-- Shadows use near-black with very low alpha. Never use `gray` color names.
+- Shadows use near-black with very low alpha. Tailwind `gray-*` utilities are currently used for neutral helper text, timestamps, and avatar shells.
 - Rounded corners: `rounded-2xl` on cards, `rounded-xl` on interactive elements, `rounded-full` on badges, chips, and avatars.
-- Never use Mantine component primitives for new UI — use the custom CVA-based components in `src/components/ui/`.
-- All user-facing text is in Korean. Code identifiers are in English.
-- Icons from `lucide-react` only.
+- Never use Mantine component primitives for new UI — use the custom components in `src/components/ui/`.
+- Primary action and body copy is Korean. Brand labels, page super-labels, platform IDs, and the login badge may use English exactly as implemented.
+- Icons come from `lucide-react`; `LoginPage` keeps an inline Google brand SVG for the OAuth button.
 
 ---
 
 ## 2. Required Dependency: `@/lib/utils`
 
-All component and page files import `cn()` from `@/lib/utils`. The file lives at `src/lib/utils.ts`:
+Files that need conditional class merging import `cn()` from `@/lib/utils`. The file lives at `src/lib/utils.ts`:
 
 ```ts
 import { type ClassValue, clsx } from "clsx";
@@ -125,7 +125,7 @@ Depth and atmosphere come from **ambient blobs** rendered as absolutely position
 </div>
 ```
 
-All blobs are `pointer-events-none` and `aria-hidden`. They are always placed behind content with a low `z-index`. LoginPage and AuthCallbackPage use 2 blobs; AppLayout uses 3.
+All blobs are `pointer-events-none` and `aria-hidden`. They are always placed behind content. `AppLayout` and `LoginPage` use 3 blobs; `AuthCallbackPage` uses 2.
 
 ---
 
@@ -221,7 +221,7 @@ Solid (non-frosted) surface. Used when `Card` is rendered with `glass={false}`.
 
 ## 6. Button & Input Utility Classes
 
-These CSS utility classes are defined in `src/index.css` and consumed by the `Button` and `Input`/`Textarea` components via CVA variants.
+These CSS utility classes are defined in `src/index.css`. `Button` consumes them through CVA variants; `Input` and `Textarea` attach `input-clean` directly.
 
 ### `.btn-primary`
 
@@ -387,7 +387,7 @@ All keyframes and animation utility classes are defined in `src/index.css`.
 }
 ```
 
-**Used on:** page-level wrappers for every page (`JobPostingsPage`, `AddJobPostingPage`, `LoginPage`, `AuthCallbackPage`, `NotFoundPage`).
+**Used on:** page-level wrappers for every page (`JobPostingsPage`, `JobPostingDetailPage`, `AddJobPostingPage`, `LoginPage`, `AuthCallbackPage`, `NotFoundPage`) and route error UI.
 
 ### `slide-in-right` / `.animate-slide-in`
 
@@ -434,6 +434,7 @@ active:scale-[0.97]
        ├── /                  → redirect to /job-postings
        ├── /job-postings      → JobPostingsPage
        ├── /job-postings/new  → AddJobPostingPage
+       ├── /job-postings/:id  → JobPostingDetailPage
        └── *                  → NotFoundPage
 ```
 
@@ -460,7 +461,7 @@ active:scale-[0.97]
 
   <!-- Mobile sidebar overlay (when open) -->
   <div class="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm md:hidden" />
-  <aside class="fixed inset-y-0 left-0 z-50 w-64 border-r border glass-strong md:hidden">
+  <aside class="fixed inset-y-0 left-0 z-50 w-64 rounded-r-3xl border-r border glass-strong md:hidden">
     <SidebarContent />
   </aside>
 
@@ -527,7 +528,7 @@ active:scale-[0.97]
 When `mobileOpen` is true:
 
 - Backdrop: `fixed inset-0 z-40 bg-black/20 backdrop-blur-sm`
-- Sidebar: same `SidebarContent` but **without** `rounded-r-3xl`, full-height flush
+- Sidebar: same `SidebarContent`, full-height, `rounded-r-3xl`, `.glass-strong`
 
 ---
 
@@ -604,7 +605,7 @@ Each nav item is a React Router `<NavLink>` rendered with `isActive` from the ro
 
 ## 12. UI Component Specifications
 
-All components live in `src/components/ui/`. They use Radix UI primitives where needed, styled with CVA variants + Tailwind. Import `cn` from `@/lib/utils`.
+All components live in `src/components/ui/`. They use Radix UI primitives where needed and are styled with CVA variants and/or direct Tailwind classes. Import `cn` from `@/lib/utils` when class merging is needed.
 
 ### `Button` (`button.tsx`)
 
@@ -787,7 +788,7 @@ The page header floats directly on the background — no Card wrapper:
 </div>
 ```
 
-Used on: `JobPostingsPage`.
+Used on: `JobPostingsPage`, `AddJobPostingPage`, and `JobPostingDetailPage`.
 
 ### Summary Chips
 
@@ -824,7 +825,9 @@ Used on: empty state (`Sparkles` icon). `NotFoundPage` uses `bg-accent text-gray
   class="inline-flex items-center gap-2 rounded-full bg-accent border px-3 py-1.5"
 >
   <Icon class="h-4 w-4 text-primary" />
-  <span class="text-sm font-semibold">{sectionTitle}</span>
+  <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-600">
+    {sectionTitle}
+  </h3>
 </div>
 ```
 
@@ -849,10 +852,11 @@ salary:    rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-gray-600
 <div
   class="relative h-[4.5rem] w-[4.5rem] rounded-full bg-primary/10 border border-primary/20"
 >
-  <div class="absolute inset-0 rounded-full bg-primary/10 blur-md" />
-  <Loader2
-    class="absolute inset-0 m-auto h-10 w-10 text-primary animate-spin"
+  <div
+    class="absolute inset-2 rounded-full bg-linear-to-br from-primary/15
+              to-teal-500/12 blur-md"
   />
+  <Loader2 class="relative z-10 h-10 w-10 text-primary animate-spin" />
 </div>
 ```
 
@@ -868,7 +872,18 @@ salary:    rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-gray-600
 - **Loading state**: `<LoadingCard />` × N — `<Card>` with stacked `<Skeleton>` placeholders
 - **Error state**: `min-h-[22rem] rounded-xl border border-red-500/20 bg-red-500/8 px-6 py-12 text-center` — icon circle + message + retry `<Button>`
 - **Empty state**: full-span `<Card>` centered in grid — gradient icon container with `Sparkles` + CTA
-- **`JobPostingCard`**: `<Card interactive>`, `<CardContent className="relative p-5">`, platform `<Badge>`, company with `Building2` icon, `<h3>` title with `line-clamp-2 group-hover:text-primary`, details panel, deadline/salary chips, tech stack `<Badge variant="secondary">` (max 5) + overflow `<Badge variant="outline">`
+- **`JobPostingCard`**: `<Card className="group glass-hover relative overflow-hidden ...">`, `<CardContent className="p-5">`, platform `<Badge>`, company with `Building2` icon, `<h3>` title with `line-clamp-2 group-hover:text-primary`, internal title link to `/job-postings/:id`, details panel, deadline/salary chips, tech stack `<Badge variant="secondary">` (max 5) + overflow `<Badge variant="outline">`
+
+### `JobPostingDetailPage` (`src/pages/job-posting-detail-page.tsx`)
+
+- Root: `animate-fade-in space-y-6`
+- Back link: `<Button variant="ghost" size="sm" asChild>` wrapping `<Link to="/job-postings">`
+- **Loading state**: back link + `DetailLoadingSkeleton` with stacked `<Skeleton>` placeholders
+- **Error state**: same error panel pattern as `JobPostingsPage` with retry `<Button variant="outline">`
+- **Header**: transparent, floating. Super-label "Job Detail", company row with `Building2`, H1, platform `<Badge>`, created timestamp, optional original posting `<Button variant="outline" size="sm" asChild>`
+- **Metadata card**: glass `<Card>` containing location, experience, employment type, deadline, and salary rows when present
+- **Section cards**: glass `<Card>` panels for tech stack, text sections, additional info, and homepage
+- **Section heading**: inline rounded accent pill with lucide icon and Korean title
 
 ### `AddJobPostingPage` (`src/pages/add-job-posting-page.tsx`)
 
@@ -883,7 +898,8 @@ Three phases driven by local state:
 
 **Phase 2 — Editable Extracted Form:**
 
-- Card header: `border-b border-white/8 bg-white/3` — platform `<Badge>` + `<CardTitle>` + `<CardDescription>` + external link icon
+- `<Card className="overflow-hidden">` with `<CardContent className="space-y-8 pt-6">`
+- Top summary row inside `JobPostingFormFields`: platform `<Badge>`, company name, job title, and optional external link icon
 - `<FormSection>` component: renders a section heading pill (see §13)
 - `<FormField>` component: `space-y-1.5` wrapper with `<Label htmlFor>` + input + optional `text-xs text-red-400` error
 - Section layout grids: `grid-cols-1`, `sm:grid-cols-2`, `sm:grid-cols-2 lg:grid-cols-3`
@@ -975,7 +991,7 @@ Tailwind defaults only. No custom breakpoints.
 
 ```ts
 {
-  primaryColor: 'orange',   // not rendered; does not match CSS --primary
+  primaryColor: 'teal',
   defaultRadius: 'md',
   fontFamily: 'IBM Plex Sans, Avenir Next, Segoe UI Variable, Segoe UI, sans-serif',
   headings: {
@@ -993,13 +1009,13 @@ Tailwind defaults only. No custom breakpoints.
 
 When adding a new authenticated page:
 
-- [ ] Add a `navigationItems` entry in `src/components/app-layout.tsx` (§11)
+- [ ] Add a `navigationItems` entry in `src/components/app-layout.tsx` (§11) when the page should appear in sidebar navigation
 - [ ] Add a route inside `ProtectedRoute → AppLayout` in `src/app/router.tsx` (§10)
 - [ ] Wrap the page root element with `animate-fade-in`
-- [ ] Use `max-w-6xl mx-auto` (handled by `AppLayout`) — do not add extra centering wrappers
+- [ ] Use the `AppLayout` `max-w-6xl mx-auto` wrapper by default; narrower focused flows may use a local wrapper such as `mx-auto max-w-4xl`
 - [ ] Use `<Card>` (default `glass={true}`) for content panels
 - [ ] Use `<Button>` variants from §12 — never raw `<button>`
-- [ ] Korean UI labels throughout
-- [ ] Icons from `lucide-react` only
+- [ ] Korean primary UI copy, with existing English brand/super-label conventions preserved
+- [ ] Icons from `lucide-react`, except approved brand SVGs such as the Google OAuth mark
 - [ ] Import `cn` from `@/lib/utils` if conditional class merging is needed
 - [ ] Page header: floating (no Card), transparent, with super-label above `<h1>`
