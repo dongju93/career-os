@@ -1,7 +1,9 @@
+from datetime import datetime
+
 import pytest
 from pydantic import ValidationError
 
-from career_os_api.schemas import JobPostingExtracted
+from career_os_api.schemas import JobPostingExtracted, JobPostingStored
 from career_os_api.service.job_posting.platform import Platform
 
 _SARAMIN_URL = "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930"
@@ -129,3 +131,37 @@ def test_posting_url_consistency_accepts_saramin_subdomain() -> None:
         posting_url="https://m.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=77",
     )
     assert posting.posting_id == "77"
+
+
+# ── JobPostingStored read-path: no URL consistency re-validation ───────────────
+
+_STORED_DEFAULTS = {
+    "id": 1,
+    "scraped_at": datetime(2024, 1, 1),
+    "created_at": datetime(2024, 1, 1),
+    "updated_at": datetime(2024, 1, 1),
+    "company_name": "Career OS",
+    "job_title": "Backend Engineer",
+}
+
+
+def test_job_posting_stored_accepts_legacy_mismatched_saramin_url() -> None:
+    # A DB row whose rec_idx in the URL doesn't match posting_id must not raise —
+    # the DB doesn't enforce this constraint and legacy rows can diverge.
+    stored = JobPostingStored(
+        platform=Platform.saramin,
+        posting_id="9999",
+        posting_url="https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1111",
+        **_STORED_DEFAULTS,
+    )
+    assert stored.posting_id == "9999"
+
+
+def test_job_posting_stored_accepts_legacy_mismatched_wanted_url() -> None:
+    stored = JobPostingStored(
+        platform=Platform.wanted,
+        posting_id="123",
+        posting_url="https://www.wanted.co.kr/wd/999",
+        **_STORED_DEFAULTS,
+    )
+    assert stored.posting_id == "123"

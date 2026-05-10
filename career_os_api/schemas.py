@@ -46,12 +46,11 @@ class UpdateCurrentUserRequest(BaseModel):
 # ── Job Postings ──────────────────────────────────────────────────────────────
 
 
-class JobPostingExtracted(BaseModel):
+class _JobPostingBase(BaseModel):
     """
-    Structured output schema mirroring the job_postings table columns.
-    All optional fields default to None — the model must not fabricate values.
-    String lengths mirror the VARCHAR(...) limits in the DDL so validation
-    fails at the API boundary, not at the database insert.
+    Shared fields and field-level validators for all job posting schemas.
+    String lengths mirror the VARCHAR(...) limits in the DDL so field
+    validation fails at the API boundary, not at the database insert.
     """
 
     # Identity (derived from URL, echoed back for traceability)
@@ -97,7 +96,6 @@ class JobPostingExtracted(BaseModel):
     @field_validator("tech_stack", "tags", mode="before")
     @classmethod
     def drop_empty_strings(cls, v: list[str] | None) -> list[str] | None:
-        """Remove blank entries the model may emit instead of omitting items."""
         if v is None:
             return None
         cleaned = [item for item in v if isinstance(item, str) and item.strip()]
@@ -107,6 +105,17 @@ class JobPostingExtracted(BaseModel):
     @classmethod
     def validate_platform_posting_id(cls, posting_id: str, info: ValidationInfo) -> str:
         return _validate_platform_posting_id(posting_id, info)
+
+
+class JobPostingExtracted(_JobPostingBase):
+    """
+    Write-path schema: OpenAI response_format and POST request body.
+    All optional fields default to None — the model must not fabricate values.
+
+    Adds posting_url↔platform/posting_id consistency validation that is
+    intentionally absent from JobPostingStored so that the read path never
+    raises on legacy rows whose URLs predate or diverge from these rules.
+    """
 
     @model_validator(mode="after")
     def validate_posting_url_consistency(self) -> JobPostingExtracted:
@@ -139,8 +148,16 @@ class JobPostingExtracted(BaseModel):
         return self
 
 
-class JobPostingStored(JobPostingExtracted):
-    """Response model after a successful upsert into job_postings."""
+class JobPostingStored(_JobPostingBase):
+    """
+    Read-path schema: response model for DB rows returned after upsert or fetch.
+
+    Inherits from _JobPostingBase (not JobPostingExtracted) so that
+    validate_posting_url_consistency does not run when deserialising persisted
+    rows. The DB schema does not enforce URL↔platform/posting_id consistency,
+    so any legacy mismatch would raise ValidationError and turn a valid fetch
+    into a 500 if the check ran here.
+    """
 
     id: int
     scraped_at: datetime
