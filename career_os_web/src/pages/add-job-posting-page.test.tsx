@@ -74,6 +74,17 @@ describe('AddJobPostingPage', () => {
     let saveInit: RequestInit | undefined;
 
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
       if (
         input ===
         `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/extraction?url=${encodeURIComponent(postingUrl)}`
@@ -143,6 +154,17 @@ describe('AddJobPostingPage', () => {
     let extractionCalls = 0;
 
     const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
       if (input.includes('/v1/job-postings/extraction?url=')) {
         extractionCalls += 1;
 

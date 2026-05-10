@@ -100,9 +100,19 @@ describe('JobPostingDetailPage', () => {
 
   it('loads a stored posting detail with the session cookie and renders all populated sections', async () => {
     const detail = buildJobPostingDetail();
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(jsonResponse(apiResponse(detail)));
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+      return jsonResponse(apiResponse(detail));
+    });
 
     vi.stubGlobal('fetch', fetchMock);
 
@@ -138,6 +148,17 @@ describe('JobPostingDetailPage', () => {
     const user = userEvent.setup();
     const detail = buildJobPostingDetail();
     const fetchMock = vi.fn(async (input: string) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
       if (
         input ===
         `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=0&limit=50`
@@ -177,6 +198,17 @@ describe('JobPostingDetailPage', () => {
     const user = userEvent.setup();
     const detail = buildJobPostingDetail();
     const fetchMock = vi.fn(async (input: string) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
       if (
         input ===
         `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=0&limit=50`
@@ -209,6 +241,17 @@ describe('JobPostingDetailPage', () => {
     const detail = buildJobPostingDetail();
     let detailRequestCount = 0;
     const fetchMock = vi.fn(async (input: string) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
       if (input !== `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
         throw new Error(`Unexpected fetch request: ${input}`);
       }
@@ -250,6 +293,6 @@ describe('JobPostingDetailPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'Frontend Engineer' }),
     ).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
