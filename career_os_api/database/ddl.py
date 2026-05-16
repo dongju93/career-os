@@ -116,44 +116,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_job_postings_group_id
 CREATE INDEX IF NOT EXISTS idx_job_postings_group_id_scraped_at
     ON job_postings (group_id, scraped_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_job_postings_platform
-    ON job_postings (platform);
-
-CREATE INDEX IF NOT EXISTS idx_job_postings_company
-    ON job_postings (company_name);
-
-CREATE INDEX IF NOT EXISTS idx_job_postings_deadline
-    ON job_postings (deadline);
-
-CREATE INDEX IF NOT EXISTS idx_job_postings_location
-    ON job_postings (location);
-
-CREATE INDEX IF NOT EXISTS idx_job_postings_tech_stack
-    ON job_postings USING GIN (tech_stack);
-
-CREATE INDEX IF NOT EXISTS idx_job_postings_tags
-    ON job_postings USING GIN (tags);
-
-CREATE INDEX IF NOT EXISTS idx_job_postings_scraped_at
-    ON job_postings (scraped_at DESC);
-
 CREATE INDEX IF NOT EXISTS idx_job_postings_user_id_scraped_at
     ON job_postings (user_id, scraped_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_users_google_id
-    ON users (google_id);
-
-CREATE INDEX IF NOT EXISTS idx_users_email
-    ON users (email);
-
-CREATE INDEX IF NOT EXISTS idx_risc_events_google_id
-    ON risc_events (google_id);
-
-CREATE INDEX IF NOT EXISTS idx_risc_events_event_type
-    ON risc_events (event_type);
-
-CREATE INDEX IF NOT EXISTS idx_risc_events_received_at
-    ON risc_events (received_at DESC);
 """
 
 CREATE_COMMENTS = """
