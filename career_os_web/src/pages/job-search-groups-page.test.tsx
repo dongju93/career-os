@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../store/auth-store';
 import { renderRoute } from '../test/test-utils';
 import type { JobSearchGroupItem } from '../types/job-search-group';
+import { formatLocalDateInputValue } from '../utils/local-date';
 
 function jsonResponse(body: unknown, status = 200) {
   return {
@@ -169,7 +170,10 @@ describe('JobSearchGroupsPage', () => {
     await user.click(screen.getByRole('button', { name: /^저장$/ }));
 
     await waitFor(() => {
-      expect(postBody).toMatchObject({ name: '2026년 하반기 취업' });
+      expect(postBody).toMatchObject({
+        name: '2026년 하반기 취업',
+        started_at: formatLocalDateInputValue(),
+      });
     });
   });
 
@@ -204,7 +208,9 @@ describe('JobSearchGroupsPage', () => {
     await user.click(screen.getByRole('button', { name: /^확인$/ }));
 
     await waitFor(() => {
-      expect(patchBody).toMatchObject({ ended_at: expect.any(String) });
+      expect(patchBody).toMatchObject({
+        ended_at: formatLocalDateInputValue(),
+      });
     });
   });
 

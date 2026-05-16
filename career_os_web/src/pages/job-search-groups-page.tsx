@@ -23,13 +23,17 @@ import {
   updateJobSearchGroup,
 } from '../services/job-search-groups';
 import type { JobSearchGroupItem } from '../types/job-search-group';
+import {
+  formatLocalDateInputValue,
+  parseLocalDateInputValue,
+} from '../utils/local-date';
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+function todayLocalDateInputValue(): string {
+  return formatLocalDateInputValue();
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('ko-KR', {
+  return parseLocalDateInputValue(dateStr).toLocaleDateString('ko-KR', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -173,7 +177,9 @@ export function JobSearchGroupsPage() {
 
   const [modal, setModal] = useState<ModalState>({ type: 'closed' });
   const [formName, setFormName] = useState('');
-  const [formStartedAt, setFormStartedAt] = useState(todayISO());
+  const [formStartedAt, setFormStartedAt] = useState(
+    todayLocalDateInputValue(),
+  );
   const [formEndedAt, setFormEndedAt] = useState('');
   const [formMemo, setFormMemo] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
@@ -211,7 +217,7 @@ export function JobSearchGroupsPage() {
 
   function openCreateModal() {
     setFormName('');
-    setFormStartedAt(todayISO());
+    setFormStartedAt(todayLocalDateInputValue());
     setFormEndedAt('');
     setFormMemo('');
     setFormError(null);
@@ -247,7 +253,7 @@ export function JobSearchGroupsPage() {
 
     const payload = {
       name: formName.trim(),
-      started_at: formStartedAt || todayISO(),
+      started_at: formStartedAt || todayLocalDateInputValue(),
       ended_at: formEndedAt || null,
       memo: formMemo.trim() || null,
     };
@@ -271,7 +277,9 @@ export function JobSearchGroupsPage() {
   async function handleEndGroup(groupId: string) {
     setEndingGroupId(null);
     try {
-      await updateJobSearchGroup(groupId, { ended_at: todayISO() });
+      await updateJobSearchGroup(groupId, {
+        ended_at: todayLocalDateInputValue(),
+      });
       await loadGroups();
     } catch (err) {
       const { message } = toUserFacingError(err, '종료에 실패했습니다.');
