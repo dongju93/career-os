@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS job_postings (
     job_category          VARCHAR(200),
     industry              VARCHAR(200),
 
+    -- Group
+    group_id              UUID          NOT NULL REFERENCES job_search_groups (id) ON DELETE CASCADE,
+
     -- Metadata
     scraped_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     created_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -72,12 +75,6 @@ CREATE TABLE IF NOT EXISTS job_search_groups (
 
 CREATE INDEX IF NOT EXISTS idx_job_search_groups_user_id
     ON job_search_groups (user_id, created_at DESC);
-"""
-
-ALTER_JOB_POSTINGS_ADD_GROUP_ID = """
-ALTER TABLE job_postings
-    ADD COLUMN IF NOT EXISTS group_id UUID NOT NULL
-        REFERENCES job_search_groups (id) ON DELETE CASCADE;
 """
 
 CREATE_USERS_TABLE = """
@@ -194,7 +191,6 @@ async def _apply_schema(conn: AsyncConnection) -> None:
     await conn.execute(CREATE_USERS_TABLE)
     await conn.execute(CREATE_JOB_SEARCH_GROUPS_TABLE)
     await conn.execute(CREATE_JOB_POSTINGS_TABLE)
-    await conn.execute(ALTER_JOB_POSTINGS_ADD_GROUP_ID)
     await conn.execute(CREATE_RISC_EVENTS_TABLE)
     await conn.execute(CREATE_INDEXES)
     await conn.execute(CREATE_COMMENTS)
