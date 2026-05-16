@@ -44,6 +44,7 @@ export interface JobPostingListItem {
   tags: string[] | null;
   job_category: string | null;
   industry: string | null;
+  group_id: string;
   scraped_at: string;
   created_at: string;
   updated_at: string;

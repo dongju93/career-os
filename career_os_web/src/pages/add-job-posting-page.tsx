@@ -1,12 +1,13 @@
 import {
   AlertCircle,
   CheckCircle2,
+  FolderOpen,
   PlusCircle,
   Save,
   Search,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,8 +20,10 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { toUserFacingError } from '../services/api-error';
+import { ApiError, toUserFacingError } from '../services/api-error';
 import { extractJobPosting, saveJobPosting } from '../services/job-postings';
+import { fetchJobSearchGroups } from '../services/job-search-groups';
+import type { JobSearchGroupItem } from '../types/job-search-group';
 import { JobPostingFormFields } from './job-posting-form-fields';
 import {
   type AddJobPostingPhase,
@@ -34,10 +37,43 @@ const IDLE: AddJobPostingPhase = { phase: 'idle' };
 
 export function AddJobPostingPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const preselectedGroupId = searchParams.get('group') ?? undefined;
 
   const [url, setUrl] = useState('');
   const [pagePhase, setPagePhase] = useState<AddJobPostingPhase>(IDLE);
   const extractControllerRef = useRef<AbortController | null>(null);
+
+  const [activeGroups, setActiveGroups] = useState<JobSearchGroupItem[]>([]);
+  const [endedGroups, setEndedGroups] = useState<JobSearchGroupItem[]>([]);
+  // '' = auto-resolve (backend picks current group); any UUID = explicit selection
+  const [selectedGroupId, setSelectedGroupId] = useState<string>(
+    preselectedGroupId ?? '',
+  );
+  const [noGroupError, setNoGroupError] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.all([
+      fetchJobSearchGroups({ status: 'active', limit: 50 }, controller.signal),
+      fetchJobSearchGroups({ status: 'ended', limit: 50 }, controller.signal),
+    ])
+      .then(([activeData, endedData]) => {
+        setActiveGroups(activeData.items);
+        setEndedGroups(endedData.items);
+        if (preselectedGroupId) {
+          const allGroups = [...activeData.items, ...endedData.items];
+          const match = allGroups.find((g) => g.id === preselectedGroupId);
+          if (!match && activeData.items.length > 0) {
+            setSelectedGroupId('');
+          }
+        }
+      })
+      .catch(() => {
+        // Non-critical: group selector degrades gracefully
+      });
+    return () => controller.abort();
+  }, [preselectedGroupId]);
 
   async function handleExtract() {
     if (!url.trim()) return;
@@ -46,6 +82,7 @@ export function AddJobPostingPage() {
     const controller = new AbortController();
     extractControllerRef.current = controller;
 
+    setNoGroupError(false);
     setPagePhase({ phase: 'extracting' });
     try {
       const data = await extractJobPosting(url.trim(), controller.signal);
@@ -90,15 +127,30 @@ export function AddJobPostingPage() {
       return;
     }
 
+    setNoGroupError(false);
     setPagePhase({ phase: 'saving', meta, form });
     try {
-      await saveJobPosting(toExtracted(form, meta));
+      await saveJobPosting(
+        toExtracted(form, meta),
+        selectedGroupId || undefined,
+      );
       setPagePhase({
         phase: 'saved',
         company_name: form.company_name,
         job_title: form.job_title,
       });
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setNoGroupError(true);
+        setPagePhase({
+          phase: 'editing',
+          meta,
+          form,
+          errors: {},
+          saveError: null,
+        });
+        return;
+      }
       const { message } = toUserFacingError(err, '저장에 실패했습니다.');
       setPagePhase({
         phase: 'editing',
@@ -112,6 +164,7 @@ export function AddJobPostingPage() {
 
   function handleReset() {
     setUrl('');
+    setNoGroupError(false);
     setPagePhase(IDLE);
   }
 
@@ -154,6 +207,8 @@ export function AddJobPostingPage() {
 
   const isExtracting = pagePhase.phase === 'extracting';
   const isSaving = pagePhase.phase === 'saving';
+  const showForm =
+    pagePhase.phase === 'editing' || pagePhase.phase === 'saving';
 
   return (
     <div className="mx-auto max-w-4xl animate-fade-in space-y-6">
@@ -225,9 +280,72 @@ export function AddJobPostingPage() {
         </CardContent>
       </Card>
 
-      {(pagePhase.phase === 'editing' || pagePhase.phase === 'saving') && (
+      {showForm && (
         <Card className="overflow-hidden">
           <CardContent className="space-y-8 pt-6">
+            {/* Group selector */}
+            {(activeGroups.length > 0 || endedGroups.length > 0) && (
+              <div className="space-y-2">
+                <label
+                  htmlFor="group-select"
+                  className="text-sm font-medium text-foreground"
+                >
+                  저장할 구직 활동
+                </label>
+                <select
+                  id="group-select"
+                  className="w-full rounded-xl border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  value={selectedGroupId}
+                  onChange={(e) => setSelectedGroupId(e.target.value)}
+                  disabled={isSaving}
+                >
+                  <option value="">자동 선택 (현재 활동)</option>
+                  {activeGroups.length > 0 && (
+                    <optgroup label="진행 중인 구직 활동">
+                      {activeGroups.map((group, index) => (
+                        <option key={group.id} value={group.id}>
+                          {group.name}
+                          {index === 0 ? ' (현재)' : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {endedGroups.length > 0 && (
+                    <optgroup label="지난 구직 활동">
+                      {endedGroups.map((group) => (
+                        <option key={group.id} value={group.id}>
+                          {group.name} (종료)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+            )}
+
+            {noGroupError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>구직 활동 그룹이 없습니다</AlertTitle>
+                <AlertDescription className="flex flex-col gap-2">
+                  <span>
+                    채용공고를 저장하려면 먼저 구직 활동 그룹을 만들어야 합니다.
+                  </span>
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="self-start"
+                  >
+                    <Link to="/job-search-groups">
+                      <FolderOpen className="h-3.5 w-3.5" />
+                      구직 활동 만들기
+                    </Link>
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+
             <JobPostingFormFields
               meta={pagePhase.meta}
               form={pagePhase.form}

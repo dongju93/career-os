@@ -69,6 +69,7 @@ const minimalDetail = {
   tags: null,
   job_category: null,
   industry: null,
+  group_id: '00000000-0000-7000-8000-000000000001',
   scraped_at: '2026-01-01T00:00:00Z',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
@@ -121,16 +122,23 @@ describe('extractJobPosting', () => {
 });
 
 describe('saveJobPosting', () => {
-  it('returns HTTP status code on success', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({}, 201)));
+  it('returns the saved posting detail on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(okResponse(apiResponse(minimalDetail))),
+    );
 
-    const status = await saveJobPosting(buildExtracted());
+    const result = await saveJobPosting(buildExtracted());
 
-    expect(status).toBe(201);
+    expect(result.id).toBe(1);
+    expect(result.company_name).toBe('Acme Corp');
+    expect(result.group_id).toBe('00000000-0000-7000-8000-000000000001');
   });
 
   it('sends a POST to /v1/job-postings with the posting as JSON', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(okResponse({}, 201));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(okResponse(apiResponse(minimalDetail)));
     vi.stubGlobal('fetch', fetchMock);
 
     const extracted = buildExtracted({ company_name: 'Acme Corp' });
@@ -141,6 +149,25 @@ describe('saveJobPosting', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify(extracted),
+      }),
+    );
+  });
+
+  it('includes group_id in the request body when provided', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(okResponse(apiResponse(minimalDetail)));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const extracted = buildExtracted();
+    const groupId = '00000000-0000-7000-8000-000000000002';
+    await saveJobPosting(extracted, groupId);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ ...extracted, group_id: groupId }),
       }),
     );
   });

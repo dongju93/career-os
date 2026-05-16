@@ -1,6 +1,7 @@
 import {
   Briefcase,
   ChevronRight,
+  FolderOpen,
   LogOut,
   Menu,
   PlusCircle,
@@ -20,6 +21,12 @@ const navigationItems = [
     icon: Briefcase,
     label: '채용공고',
     description: '저장한 채용공고 관리',
+  },
+  {
+    href: '/job-search-groups',
+    icon: FolderOpen,
+    label: '구직 활동',
+    description: '구직 그룹 관리',
   },
   {
     href: '/job-postings/new',
