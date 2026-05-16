@@ -63,13 +63,12 @@ known-first-party = ["career_os_api"]
 quote-style = "double"
 indent-style = "space"
 
-[tool.pyrefly]
-python-version = "3.14"
-python-platform = "linux"
-python-interpreter-path = ".venv/bin/python"
-project-includes = ["career_os_api", "main.py"]
-project-excludes = ["**/.[!/.]*", "**/tests", "**/__pycache__", "**/.venv/**"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.pyrefly]
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]

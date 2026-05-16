@@ -4,6 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from './store/auth-store';
 import { renderRoute } from './test/test-utils';
 
+const emptyGroupsResponse = {
+  status: 200,
+  message: 'ok',
+  data: { items: [], total: 0, offset: 0, limit: 50 },
+};
+
 const jobPostingPage = {
   items: [
     {
@@ -22,6 +28,7 @@ const jobPostingPage = {
       tags: ['frontend'],
       job_category: 'Engineering',
       industry: 'Software',
+      group_id: '00000000-0000-7000-8000-000000000001',
       scraped_at: '2026-04-20T12:00:00Z',
       created_at: '2026-04-20T12:00:00Z',
       updated_at: '2026-04-20T12:00:00Z',
@@ -122,6 +129,9 @@ describe('Career OS Web app shell', () => {
             }),
         };
       }
+      if ((input as string).includes('/v1/job-search-groups')) {
+        return { ok: true, json: async () => emptyGroupsResponse };
+      }
       return {
         ok: false,
         status: 503,
@@ -151,7 +161,8 @@ describe('Career OS Web app shell', () => {
       expect(
         screen.queryByText(/Internal Server Error/i),
       ).not.toBeInTheDocument();
-      expect(fetchMock).toHaveBeenCalledTimes(6);
+      // calls: auth/me + groups-fetch + 5 retried job-posting attempts
+      expect(fetchMock).toHaveBeenCalledTimes(7);
     } finally {
       vi.useRealTimers();
     }
@@ -170,6 +181,9 @@ describe('Career OS Web app shell', () => {
               picture: null,
             }),
         };
+      }
+      if ((input as string).includes('/v1/job-search-groups')) {
+        return { ok: true, json: async () => emptyGroupsResponse };
       }
       return {
         ok: false,
@@ -200,7 +214,8 @@ describe('Career OS Web app shell', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('RATE_LIMIT_EXCEEDED')).toBeInTheDocument();
     expect(screen.queryByText('UNKNOWN_API_ERROR')).not.toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // calls: auth/me + groups-fetch + 1 rate-limited job-posting attempt
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('logs the user out and returns to the login page', async () => {

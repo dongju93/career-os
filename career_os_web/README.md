@@ -6,7 +6,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
 [![codecov](https://codecov.io/github/dongju93/career-os/graph/badge.svg?flag=frontend&token=48VXFY8C3M)](https://codecov.io/github/dongju93/career-os)
 
-구직 활동을 관리하는 Career OS의 React 기반 프론트엔드 애플리케이션입니다. Google OAuth 인증과 채용공고 관리 기능을 제공합니다.
+구직 활동을 관리하는 Career OS의 React 기반 프론트엔드 애플리케이션입니다. Google OAuth 인증, 구직 활동 그룹 관리, 채용공고 저장·조회 기능을 제공합니다.
 
 **프로덕션**: [https://career-os-sigma.vercel.app](https://career-os-sigma.vercel.app)
 
@@ -90,8 +90,10 @@ pnpm dev
 - **Google OAuth 로그인** — `/login`에서 Google 계정으로 인증, `/auth/callback`에서 세션 사용자 확인
 - **인증 상태 관리** — HttpOnly 세션 쿠키로 API 인증, Zustand로 현재 사용자 정보 관리
 - **보호된 라우트** — 미인증 사용자는 로그인 페이지로 리다이렉트, 이후 원래 경로로 복귀
-- **채용공고 목록** — `/job-postings`에서 저장한 채용공고를 카드 형태로 조회
-- **채용공고 추가** — `/job-postings/new`에서 URL 입력으로 공고 추출 및 저장
+- **구직 활동 관리** — `/job-search-groups`에서 구직 라운드 생성·수정·종료·삭제, 진행 중/지난 활동 분리 조회
+- **채용공고 목록** — `/job-postings`에서 저장한 채용공고를 카드 형태로 조회하고 구직 활동 그룹별로 필터링
+- **채용공고 추가** — `/job-postings/new`에서 URL 입력으로 공고를 추출하고 현재 또는 선택한 구직 활동 그룹에 저장
+- **채용공고 상세** — `/job-postings/:id`에서 저장된 공고의 상세 추출 정보를 조회
 
 ---
 

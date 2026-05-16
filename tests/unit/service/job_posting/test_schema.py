@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 import pytest
@@ -137,6 +138,7 @@ def test_posting_url_consistency_accepts_saramin_subdomain() -> None:
 
 _STORED_DEFAULTS = {
     "id": 1,
+    "group_id": uuid.uuid7(),
     "scraped_at": datetime(2024, 1, 1),
     "created_at": datetime(2024, 1, 1),
     "updated_at": datetime(2024, 1, 1),

@@ -43,7 +43,9 @@ export async function extractJobPosting(
 
 export async function saveJobPosting(
   data: JobPostingExtracted,
-): Promise<number> {
+  groupId?: string,
+): Promise<JobPostingDetail> {
+  const body = groupId ? { ...data, group_id: groupId } : data;
   const response = await fetchWithApiRetry(
     `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings`,
     {
@@ -51,12 +53,14 @@ export async function saveJobPosting(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(body),
     },
     '저장에 실패했습니다.',
     { retryable: true }, // POST /v1/job-postings is a server-side upsert
   );
-  return response.status;
+  const raw = await response.json();
+  return assertContractMatch(jobPostingDetailApiResponseSchema.safeParse(raw))
+    .data;
 }
 
 export async function fetchJobPosting(
@@ -76,9 +80,11 @@ export async function fetchJobPosting(
 export async function fetchJobPostings(
   offset = 0,
   limit = 50,
+  groupId?: string,
   signal?: AbortSignal,
 ): Promise<JobPostingPage> {
-  const url = `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=${offset}&limit=${limit}`;
+  let url = `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=${offset}&limit=${limit}`;
+  if (groupId) url += `&group_id=${encodeURIComponent(groupId)}`;
   const response = await fetchWithApiRetry(
     url,
     { signal },

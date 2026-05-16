@@ -21,6 +21,14 @@ function apiResponse<T>(data: T, status = 200) {
   };
 }
 
+const TEST_GROUP_ID = '00000000-0000-7000-8000-000000000001';
+
+const emptyGroupsResponse = {
+  status: 200,
+  message: 'ok',
+  data: { items: [], total: 0, offset: 0, limit: 50 },
+};
+
 function buildJobPostingDetail(
   overrides: Partial<JobPostingDetail> = {},
 ): JobPostingDetail {
@@ -40,6 +48,7 @@ function buildJobPostingDetail(
     tags: ['frontend'],
     job_category: 'Engineering',
     industry: 'Software',
+    group_id: TEST_GROUP_ID,
     scraped_at: '2026-04-20T12:00:00Z',
     created_at: '2026-04-20T12:00:00Z',
     updated_at: '2026-04-20T12:00:00Z',
@@ -77,6 +86,7 @@ function buildJobPostingPage(detail = buildJobPostingDetail()): JobPostingPage {
         tags: detail.tags,
         job_category: detail.job_category,
         industry: detail.industry,
+        group_id: detail.group_id,
         scraped_at: detail.scraped_at,
         created_at: detail.created_at,
         updated_at: detail.updated_at,
@@ -160,6 +170,14 @@ describe('JobPostingDetailPage', () => {
       }
 
       if (
+        (input as string).startsWith(
+          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups`,
+        )
+      ) {
+        return jsonResponse(emptyGroupsResponse);
+      }
+
+      if (
         input ===
         `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=0&limit=50`
       ) {
@@ -207,6 +225,14 @@ describe('JobPostingDetailPage', () => {
             picture: null,
           }),
         );
+      }
+
+      if (
+        (input as string).startsWith(
+          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups`,
+        )
+      ) {
+        return jsonResponse(emptyGroupsResponse);
       }
 
       if (

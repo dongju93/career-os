@@ -63,8 +63,10 @@ async def test_upsert_job_posting_executes_sql_with_model_fields(
 ) -> None:
     timestamp = datetime(2026, 4, 13, 9, 0, tzinfo=UTC)
     user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
     returned_row = {
         "id": 7,
+        "group_id": group_id,
         "scraped_at": timestamp,
         "created_at": timestamp,
         "updated_at": timestamp,
@@ -77,6 +79,7 @@ async def test_upsert_job_posting_executes_sql_with_model_fields(
         cast(AsyncConnection, conn),
         sample_job_posting,
         user_id=user_id,
+        group_id=group_id,
     )
 
     assert row == returned_row
@@ -86,6 +89,7 @@ async def test_upsert_job_posting_executes_sql_with_model_fields(
             job_postings_module._UPSERT_SQL,
             (
                 user_id,
+                group_id,
                 "saramin",
                 sample_job_posting.posting_id,
                 sample_job_posting.posting_url,
@@ -119,9 +123,11 @@ async def test_upsert_job_posting_executes_sql_with_model_fields(
 @pytest.mark.asyncio
 async def test_get_job_postings_uses_dict_rows_and_returns_count() -> None:
     user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
     rows = [
         {
             "id": 1,
+            "group_id": group_id,
             "platform": "saramin",
             "posting_id": "4930",
             "posting_url": "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930",
@@ -155,8 +161,32 @@ async def test_get_job_postings_uses_dict_rows_and_returns_count() -> None:
     assert total == 3
     assert conn.cursor_row_factories == [dict_row]
     assert cursor.execute_calls == [
-        (job_postings_module._LIST_SQL, (user_id, 20, 40)),
-        (job_postings_module._COUNT_SQL, (user_id,)),
+        (job_postings_module._LIST_BY_USER_SQL, (user_id, 20, 40)),
+        (job_postings_module._COUNT_BY_USER_SQL, (user_id,)),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_job_postings_filters_by_group_id() -> None:
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+    rows: list = []
+    cursor = FakeCursor(rows=rows, fetchone_results=[{"total": 0}])
+    conn = FakeConnection(cursor=cursor)
+
+    result_rows, total = await job_postings_module.get_job_postings(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        limit=10,
+        offset=0,
+        group_id=group_id,
+    )
+
+    assert result_rows == []
+    assert total == 0
+    assert cursor.execute_calls == [
+        (job_postings_module._LIST_BY_GROUP_SQL, (group_id, 10, 0)),
+        (job_postings_module._COUNT_BY_GROUP_SQL, (group_id,)),
     ]
 
 

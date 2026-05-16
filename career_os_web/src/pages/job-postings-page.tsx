@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  Layers,
   MapPin,
   PlusCircle,
   RefreshCw,
@@ -16,9 +17,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { fetchJobPostings } from '../services/job-postings';
+import { fetchJobSearchGroups } from '../services/job-search-groups';
 import type { JobPostingListItem } from '../types/job-posting';
+import type { JobSearchGroupItem } from '../types/job-search-group';
 import {
   formatRelativeDate,
   platformVariant,
@@ -186,14 +190,99 @@ function JobPostingsErrorState({
   );
 }
 
+function GroupFilterBar({
+  groups,
+  selected,
+  onSelect,
+}: {
+  groups: JobSearchGroupItem[];
+  selected: string | 'all';
+  onSelect: (value: string | 'all') => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1">
+      <button
+        type="button"
+        className={cn(
+          'flex items-center gap-1.5 shrink-0 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors border',
+          selected === 'all'
+            ? 'bg-primary/15 text-primary border-primary/20'
+            : 'text-gray-600 border-transparent hover:bg-muted',
+        )}
+        onClick={() => onSelect('all')}
+      >
+        <Layers className="h-3.5 w-3.5" />
+        모든 공고
+      </button>
+      {groups.map((group, index) => (
+        <button
+          key={group.id}
+          type="button"
+          className={cn(
+            'shrink-0 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors border',
+            selected === group.id
+              ? 'bg-primary/15 text-primary border-primary/20'
+              : 'text-gray-600 border-transparent hover:bg-muted',
+          )}
+          onClick={() => onSelect(group.id)}
+        >
+          {index === 0 ? `${group.name} (현재)` : group.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function JobPostingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Math.max(1, Number(searchParams.get('page') ?? '1'));
+  const groupParam = searchParams.get('group');
+
+  const [activeGroups, setActiveGroups] = useState<JobSearchGroupItem[]>([]);
+  const [groupsLoaded, setGroupsLoaded] = useState(false);
+
+  // Derive selected group: param takes precedence; default to first active group
+  const selectedGroup: string | 'all' =
+    groupParam === 'all'
+      ? 'all'
+      : (groupParam ??
+        (groupsLoaded && activeGroups.length > 0 ? activeGroups[0].id : 'all'));
 
   const [items, setItems] = useState<JobPostingListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<UserFacingError | null>(null);
+
+  // Load active groups for the filter bar
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchJobSearchGroups({ status: 'active', limit: 50 }, controller.signal)
+      .then((data) => {
+        setActiveGroups(data.items);
+        setGroupsLoaded(true);
+      })
+      .catch(() => {
+        // Non-critical: filter bar gracefully degrades
+        setGroupsLoaded(true);
+      });
+    return () => controller.abort();
+  }, []);
+
+  // When groups finish loading and there's no explicit group param, set default
+  useEffect(() => {
+    if (groupsLoaded && activeGroups.length > 0 && groupParam === null) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('group', activeGroups[0].id);
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  }, [groupsLoaded, activeGroups, groupParam, setSearchParams]);
+
+  const groupId = selectedGroup === 'all' ? undefined : selectedGroup;
 
   const loadJobPostings = useCallback(
     (signal?: AbortSignal) => {
@@ -201,7 +290,7 @@ export function JobPostingsPage() {
       setIsLoading(true);
       setError(null);
 
-      fetchJobPostings(offset, PAGE_SIZE, signal)
+      fetchJobPostings(offset, PAGE_SIZE, groupId, signal)
         .then((pageData) => {
           setItems(pageData.items);
           setTotal(pageData.total);
@@ -214,7 +303,7 @@ export function JobPostingsPage() {
           if (!signal?.aborted) setIsLoading(false);
         });
     },
-    [page],
+    [page, groupId],
   );
 
   useEffect(() => {
@@ -234,6 +323,15 @@ export function JobPostingsPage() {
       return next;
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function selectGroup(value: string | 'all') {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('group', value);
+      next.delete('page');
+      return next;
+    });
   }
 
   return (
@@ -267,12 +365,27 @@ export function JobPostingsPage() {
             }
           />
           <Button asChild className="sm:self-stretch">
-            <Link to="/job-postings/new">
+            <Link
+              to={
+                selectedGroup !== 'all'
+                  ? `/job-postings/new?group=${selectedGroup}`
+                  : '/job-postings/new'
+              }
+            >
               <PlusCircle className="h-4 w-4" />새 채용공고 등록
             </Link>
           </Button>
         </div>
       </div>
+
+      {/* Group filter bar */}
+      {groupsLoaded && (
+        <GroupFilterBar
+          groups={activeGroups}
+          selected={selectedGroup}
+          onSelect={selectGroup}
+        />
+      )}
 
       {isLoading && (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -304,7 +417,13 @@ export function JobPostingsPage() {
               </p>
             </div>
             <Button asChild>
-              <Link to="/job-postings/new">
+              <Link
+                to={
+                  selectedGroup !== 'all'
+                    ? `/job-postings/new?group=${selectedGroup}`
+                    : '/job-postings/new'
+                }
+              >
                 <PlusCircle className="h-4 w-4" />
                 채용공고 등록하기
               </Link>

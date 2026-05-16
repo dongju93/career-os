@@ -5,11 +5,11 @@
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)
 ![OpenAI](https://img.shields.io/badge/OpenAI_SDK-2.33-412991?logo=openai&logoColor=white)
-![Pyrefly](https://img.shields.io/badge/Pyrefly-0.64.1-0668E1?logo=meta&logoColor=white)
+![Pyrefly](https://img.shields.io/badge/Pyrefly-1.0.0-0668E1?logo=meta&logoColor=white)
 ![Google OAuth](https://img.shields.io/badge/Google_OAuth-Authlib-4285F4?logo=google&logoColor=white)
 [![codecov](https://codecov.io/github/dongju93/career-os/graph/badge.svg?flag=backend&token=48VXFY8C3M)](https://codecov.io/github/dongju93/career-os)
 
-한국 채용 플랫폼(사람인, 원티드)의 채용 공고를 수집·추출·저장하는 FastAPI 백엔드 서비스입니다.
+한국 채용 플랫폼(사람인, 원티드)의 채용 공고를 수집·추출하고, 구직 활동 그룹별로 저장·관리하는 FastAPI 백엔드 서비스입니다.
 
 **프로덕션**
 
@@ -106,8 +106,9 @@ API 문서: `http://localhost:8000/v1/docs`
 
 - **Google OAuth 로그인** — 브라우저용 세션 쿠키 인증, 서버 발급 Bearer 토큰 fallback 지원
 - **Google Cross-Account Protection** — RISC Security Event Token 검증·기록, 세션/토큰 폐기 이벤트 반영
+- **구직 활동 그룹 관리** — 구직 라운드 생성·조회·수정·종료·삭제, 진행/종료 상태 필터링, 최초 로그인 시 기본 그룹 자동 생성
 - **채용 공고 추출** — 사람인·원티드 URL을 입력하면 OpenAI로 구조화된 데이터 반환
-- **공고 저장·관리** — 사용자별 PostgreSQL upsert, 목록/상세 조회
+- **공고 저장·관리** — 공고를 `group_id`에 연결해 저장, 그룹별 목록 필터링, 동일 공고의 다른 그룹별 별도 저장 지원
 - **사용량 제한** — Redis 슬라이딩 윈도우(분당)와 고정 윈도우(일·월별) 조합; Redis 미설정 시 fail-open
 - **지원 플랫폼** — `saramin.co.kr`, `wanted.co.kr`
 
@@ -128,20 +129,25 @@ OAuth 로그인으로 저장되는 사용자 계정 정보와 Google Cross-Accou
 
 모든 엔드포인트는 `/v1` 접두사를 사용합니다. 보호된 엔드포인트는 브라우저 세션 쿠키와 `X-Career-OS-Client: web` 헤더 또는 `Authorization: Bearer <token>` 헤더가 필요합니다.
 
-| 메서드  | 경로                            | 인증 | 설명                                       |
-| ------- | ------------------------------- | :--: | ------------------------------------------ |
-| `GET`   | `/`                             |      | 헬스체크                                   |
-| `GET`   | `/health/db`                    |      | DB 연결 확인                               |
-| `GET`   | `/auth/google`                  |      | Google 로그인 시작 (`?callback_url=` 지원) |
-| `GET`   | `/auth/google/callback`         |      | OAuth 콜백, 세션 발급                      |
-| `POST`  | `/auth/google/risc`             |      | Google RISC 보안 이벤트 수신               |
-| `GET`   | `/auth/me`                      |  ✓   | 현재 사용자 조회                           |
-| `PATCH` | `/auth/me`                      |  ✓   | 사용자 이름 수정                           |
-| `POST`  | `/auth/logout`                  |  ✓   | 로그아웃                                   |
-| `GET`   | `/job-postings`                 |  ✓   | 저장된 공고 목록 (`offset`, `limit`)       |
-| `GET`   | `/job-postings/extraction?url=` |  ✓   | URL에서 공고 추출 (저장 안 함)             |
-| `POST`  | `/job-postings`                 |  ✓   | 추출된 공고 저장 (201 신규 / 200 갱신)     |
-| `GET`   | `/job-postings/{id}`            |  ✓   | 저장된 공고 상세 조회                      |
+| 메서드   | 경로                            | 인증 | 설명                                                             |
+| -------- | ------------------------------- | :--: | ---------------------------------------------------------------- |
+| `GET`    | `/`                             |      | 헬스체크                                                         |
+| `GET`    | `/health/db`                    |      | DB 연결 확인                                                     |
+| `GET`    | `/auth/google`                  |      | Google 로그인 시작 (`?callback_url=` 지원)                       |
+| `GET`    | `/auth/google/callback`         |      | OAuth 콜백, 세션 발급                                            |
+| `POST`   | `/auth/google/risc`             |      | Google RISC 보안 이벤트 수신                                     |
+| `GET`    | `/auth/me`                      |  ✓   | 현재 사용자 조회                                                 |
+| `PATCH`  | `/auth/me`                      |  ✓   | 사용자 이름 수정                                                 |
+| `POST`   | `/auth/logout`                  |  ✓   | 로그아웃                                                         |
+| `GET`    | `/job-postings`                 |  ✓   | 저장된 공고 목록 (`offset`, `limit`, 선택 `group_id`)            |
+| `GET`    | `/job-postings/extraction?url=` |  ✓   | URL에서 공고 추출 (저장 안 함)                                   |
+| `POST`   | `/job-postings`                 |  ✓   | 추출된 공고를 그룹에 저장 (선택 `group_id`, 201 신규 / 200 갱신) |
+| `GET`    | `/job-postings/{id}`            |  ✓   | 저장된 공고 상세 조회                                            |
+| `GET`    | `/job-search-groups`            |  ✓   | 구직 활동 그룹 목록 (`status`, `offset`, `limit`)                |
+| `POST`   | `/job-search-groups`            |  ✓   | 구직 활동 그룹 생성                                              |
+| `GET`    | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 상세 조회                                         |
+| `PATCH`  | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 이름·기간·메모 수정                               |
+| `DELETE` | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 삭제 (마지막 그룹 삭제 불가)                      |
 
 ---
 

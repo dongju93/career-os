@@ -8,6 +8,49 @@ import type { JobPostingExtracted } from '../types/job-posting';
 const postingUrl = 'https://www.wanted.co.kr/wd/123';
 const unsupportedUrl = 'https://example.com/jobs/1';
 
+const emptyGroupsResponse = {
+  status: 200,
+  message: 'ok',
+  data: { items: [], total: 0, offset: 0, limit: 50 },
+};
+
+const savedDetailResponse = {
+  status: 200,
+  message: 'ok',
+  data: {
+    id: 1,
+    platform: 'wanted' as const,
+    posting_id: 'wd-123',
+    posting_url: postingUrl,
+    company_name: 'Career OS',
+    job_title: 'Frontend Engineer',
+    experience_req: '3년 이상',
+    deadline: '상시',
+    location: '서울',
+    employment_type: '정규직',
+    salary: '면접 후 결정',
+    tech_stack: ['React', 'TypeScript'],
+    tags: ['frontend'],
+    job_category: 'Engineering',
+    industry: 'Software',
+    group_id: '00000000-0000-7000-8000-000000000001',
+    scraped_at: '2026-01-01T00:00:00Z',
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    job_description: null,
+    responsibilities: null,
+    qualifications: null,
+    preferred_points: null,
+    benefits: null,
+    hiring_process: null,
+    education_req: null,
+    application_method: null,
+    application_form: null,
+    contact_person: null,
+    homepage: null,
+  },
+};
+
 function jsonResponse(body: unknown, status = 200) {
   return {
     ok: status >= 200 && status < 300,
@@ -86,6 +129,14 @@ describe('AddJobPostingPage', () => {
       }
 
       if (
+        (input as string).startsWith(
+          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups`,
+        )
+      ) {
+        return jsonResponse(emptyGroupsResponse);
+      }
+
+      if (
         input ===
         `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/extraction?url=${encodeURIComponent(postingUrl)}`
       ) {
@@ -95,7 +146,7 @@ describe('AddJobPostingPage', () => {
       if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings`) {
         saveInit = init;
         savedPayload = JSON.parse(String(init?.body)) as JobPostingExtracted;
-        return jsonResponse({}, 201);
+        return jsonResponse(savedDetailResponse);
       }
 
       throw new Error(`Unexpected fetch request: ${input}`);
@@ -163,6 +214,14 @@ describe('AddJobPostingPage', () => {
             picture: null,
           }),
         );
+      }
+
+      if (
+        (input as string).startsWith(
+          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups`,
+        )
+      ) {
+        return jsonResponse(emptyGroupsResponse);
       }
 
       if (input.includes('/v1/job-postings/extraction?url=')) {

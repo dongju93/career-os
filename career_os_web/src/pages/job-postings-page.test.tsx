@@ -22,6 +22,12 @@ function apiResponse<T>(data: T, status = 200) {
   };
 }
 
+const emptyGroupsResponse = {
+  status: 200,
+  message: 'ok',
+  data: { items: [], total: 0, offset: 0, limit: 50 },
+};
+
 const jobPostingPage: JobPostingPage = {
   items: [
     {
@@ -40,6 +46,7 @@ const jobPostingPage: JobPostingPage = {
       tags: ['frontend'],
       job_category: 'Engineering',
       industry: 'Software',
+      group_id: '00000000-0000-7000-8000-000000000001',
       scraped_at: '2026-04-20T12:00:00Z',
       created_at: '2026-04-20T12:00:00Z',
       updated_at: '2026-04-20T12:00:00Z',
@@ -73,6 +80,14 @@ describe('JobPostingsPage', () => {
             picture: null,
           }),
         );
+      }
+
+      if (
+        (input as string).startsWith(
+          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups`,
+        )
+      ) {
+        return jsonResponse(emptyGroupsResponse);
       }
 
       if (
@@ -111,7 +126,10 @@ describe('JobPostingsPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'Frontend Engineer' }),
     ).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock.mock.calls[2]?.[1]?.signal).toBeUndefined();
+    // calls: auth/me + groups-fetch + first-postings(rate-limited) + retry-postings
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    // The manual retry (last call) must not carry a signal from the click event
+    const lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+    expect(lastCall?.[1]?.signal).toBeUndefined();
   });
 });

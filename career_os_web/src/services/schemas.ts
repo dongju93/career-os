@@ -46,6 +46,7 @@ const jobPostingListItemSchema = z.object({
   tags: z.array(z.string()).nullable(),
   job_category: z.string().nullable(),
   industry: z.string().nullable(),
+  group_id: z.string().uuid(),
   scraped_at: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -99,3 +100,32 @@ export const jobPostingPageApiResponseSchema =
   apiResponseSchema(jobPostingPageSchema);
 
 export const authMeApiResponseSchema = apiResponseSchema(authMeResponseSchema);
+
+const jobSearchGroupItemSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  started_at: z.string(),
+  ended_at: z.string().nullable(),
+  memo: z.string().nullable(),
+  posting_count: z.number(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+const jobSearchGroupSchema = jobSearchGroupItemSchema.omit({
+  posting_count: true,
+});
+
+const jobSearchGroupPageSchema = z.object({
+  items: z.array(jobSearchGroupItemSchema),
+  total: z.number(),
+  offset: z.number(),
+  limit: z.number(),
+});
+
+export const jobSearchGroupApiResponseSchema =
+  apiResponseSchema(jobSearchGroupSchema);
+
+export const jobSearchGroupPageApiResponseSchema = apiResponseSchema(
+  jobSearchGroupPageSchema,
+);

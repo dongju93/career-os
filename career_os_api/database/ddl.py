@@ -55,6 +55,31 @@ CREATE TABLE IF NOT EXISTS job_postings (
 );
 """
 
+CREATE_JOB_SEARCH_GROUPS_TABLE = """
+CREATE TABLE IF NOT EXISTS job_search_groups (
+    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID         NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name        VARCHAR(100) NOT NULL,
+    started_at  DATE         NOT NULL,
+    ended_at    DATE,
+    memo        TEXT,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT chk_job_search_groups_dates
+        CHECK (ended_at IS NULL OR ended_at >= started_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_job_search_groups_user_id
+    ON job_search_groups (user_id, created_at DESC);
+"""
+
+ALTER_JOB_POSTINGS_ADD_GROUP_ID = """
+ALTER TABLE job_postings
+    ADD COLUMN IF NOT EXISTS group_id UUID NOT NULL
+        REFERENCES job_search_groups (id) ON DELETE CASCADE;
+"""
+
 CREATE_USERS_TABLE = """
 CREATE TABLE IF NOT EXISTS users (
     id          UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -88,8 +113,11 @@ CREATE TABLE IF NOT EXISTS risc_events (
 """
 
 CREATE_INDEXES = """
-CREATE UNIQUE INDEX IF NOT EXISTS uq_job_postings_user_id
-    ON job_postings (user_id, platform, posting_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_job_postings_group_id
+    ON job_postings (group_id, platform, posting_id);
+
+CREATE INDEX IF NOT EXISTS idx_job_postings_group_id_scraped_at
+    ON job_postings (group_id, scraped_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_job_postings_platform
     ON job_postings (platform);
@@ -151,6 +179,10 @@ COMMENT ON COLUMN risc_events.event_type IS 'RISC 이벤트 타입 URI';
 COMMENT ON COLUMN risc_events.google_id  IS '대상 Google 사용자 ID (subject.sub, verification 이벤트는 NULL)';
 COMMENT ON COLUMN risc_events.issued_at  IS 'SET JWT의 iat (발급 시각)';
 COMMENT ON COLUMN risc_events.payload    IS '검증을 통과한 SET JWT의 원본 클레임 전체';
+
+COMMENT ON TABLE  job_search_groups          IS '사용자의 구직 활동 라운드 그룹';
+COMMENT ON COLUMN job_search_groups.ended_at IS 'NULL = 진행 중; NOT NULL = 종료된 구직 활동';
+COMMENT ON COLUMN job_search_groups.memo     IS '구직 활동 관련 자유 메모';
 """
 
 # ---------------------------------------------------------------------------
@@ -160,7 +192,9 @@ COMMENT ON COLUMN risc_events.payload    IS '검증을 통과한 SET JWT의 원�
 
 async def _apply_schema(conn: AsyncConnection) -> None:
     await conn.execute(CREATE_USERS_TABLE)
+    await conn.execute(CREATE_JOB_SEARCH_GROUPS_TABLE)
     await conn.execute(CREATE_JOB_POSTINGS_TABLE)
+    await conn.execute(ALTER_JOB_POSTINGS_ADD_GROUP_ID)
     await conn.execute(CREATE_RISC_EVENTS_TABLE)
     await conn.execute(CREATE_INDEXES)
     await conn.execute(CREATE_COMMENTS)
