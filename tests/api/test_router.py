@@ -28,10 +28,11 @@ def to_api_datetime(value: datetime) -> str:
     return value.isoformat().replace("+00:00", "Z")
 
 
-def make_stored_row(sample_job_posting, *, job_id: int = 1) -> dict:
+def make_stored_row(sample_job_posting, *, job_id: int = 1, group_id=None) -> dict:
     timestamp = datetime(2026, 4, 13, 9, 0, tzinfo=UTC)
     return {
         "id": job_id,
+        "group_id": group_id or uuid.uuid7(),
         **sample_job_posting.model_dump(),
         "scraped_at": timestamp,
         "created_at": timestamp,
@@ -39,10 +40,11 @@ def make_stored_row(sample_job_posting, *, job_id: int = 1) -> dict:
     }
 
 
-def make_list_row(sample_job_posting, *, job_id: int = 1) -> dict:
-    stored = make_stored_row(sample_job_posting, job_id=job_id)
+def make_list_row(sample_job_posting, *, job_id: int = 1, group_id=None) -> dict:
+    stored = make_stored_row(sample_job_posting, job_id=job_id, group_id=group_id)
     return {
         "id": stored["id"],
+        "group_id": stored["group_id"],
         "platform": stored["platform"],
         "posting_id": stored["posting_id"],
         "posting_url": stored["posting_url"],
@@ -107,6 +109,10 @@ class FakeConnection:
 
     def cursor(self, **kwargs) -> FakeCursor:
         return FakeCursor(self.user_row)
+
+    @asynccontextmanager
+    async def transaction(self):  # NOSONAR
+        yield
 
 
 class FakePool:
@@ -209,6 +215,8 @@ def test_google_callback_does_not_include_token_in_redirect_url(
         AsyncMock(return_value=mock_token),
     )
     monkeypatch.setattr(app_module, "upsert_user", AsyncMock(return_value=fake_user))
+    # New: callback now checks for an existing group and creates one if absent.
+    monkeypatch.setattr(app_module, "has_any_group", AsyncMock(return_value=True))
 
     response = client.get(
         f"{API_PREFIX}/auth/google/callback",
@@ -227,7 +235,8 @@ def test_list_job_postings_endpoint_returns_paginated_results(
     monkeypatch: pytest.MonkeyPatch,
     sample_job_posting,
 ) -> None:
-    rows = [make_list_row(sample_job_posting, job_id=7)]
+    group_id = uuid.uuid7()
+    rows = [make_list_row(sample_job_posting, job_id=7, group_id=group_id)]
     get_job_postings = AsyncMock(return_value=(rows, 1))
 
     monkeypatch.setattr(app_module, "get_job_postings", get_job_postings)
@@ -246,6 +255,7 @@ def test_list_job_postings_endpoint_returns_paginated_results(
             "items": [
                 {
                     "id": 7,
+                    "group_id": str(group_id),
                     "platform": "saramin",
                     "posting_id": sample_job_posting.posting_id,
                     "posting_url": sample_job_posting.posting_url,
@@ -275,6 +285,7 @@ def test_list_job_postings_endpoint_returns_paginated_results(
         user_id=current_user["id"],
         limit=10,
         offset=5,
+        group_id=None,
     )
 
 
@@ -355,10 +366,15 @@ def test_create_job_posting_endpoint_returns_created_record(
     monkeypatch: pytest.MonkeyPatch,
     sample_job_posting,
 ) -> None:
-    stored = make_stored_row(sample_job_posting, job_id=11)
+    group_id = uuid.uuid7()
+    stored = make_stored_row(sample_job_posting, job_id=11, group_id=group_id)
+    monkeypatch.setattr(
+        app_module, "get_current_group_id", AsyncMock(return_value=group_id)
+    )
     upsert_job_posting = AsyncMock(
         return_value={
             "id": stored["id"],
+            "group_id": group_id,
             "scraped_at": stored["scraped_at"],
             "created_at": stored["created_at"],
             "updated_at": stored["updated_at"],
@@ -379,6 +395,7 @@ def test_create_job_posting_endpoint_returns_created_record(
         "message": "채용공고가 저장되었습니다.",
         "data": {
             "id": 11,
+            "group_id": str(group_id),
             **sample_job_posting.model_dump(mode="json"),
             "scraped_at": to_api_datetime(stored["scraped_at"]),
             "created_at": to_api_datetime(stored["created_at"]),
@@ -389,8 +406,11 @@ def test_create_job_posting_endpoint_returns_created_record(
     await_args = upsert_job_posting.await_args
     assert await_args is not None
     assert await_args.args[0] is fake_pool.connection_obj
-    assert await_args.args[1].model_dump() == sample_job_posting.model_dump()
-    assert await_args.kwargs == {"user_id": current_user["id"]}
+    assert (
+        await_args.args[1].model_dump(exclude={"group_id"})
+        == sample_job_posting.model_dump()
+    )
+    assert await_args.kwargs == {"user_id": current_user["id"], "group_id": group_id}
 
 
 def test_create_job_posting_endpoint_returns_200_for_updates(
@@ -399,13 +419,18 @@ def test_create_job_posting_endpoint_returns_200_for_updates(
     monkeypatch: pytest.MonkeyPatch,
     sample_job_posting,
 ) -> None:
-    stored = make_stored_row(sample_job_posting, job_id=11)
+    group_id = uuid.uuid7()
+    stored = make_stored_row(sample_job_posting, job_id=11, group_id=group_id)
+    monkeypatch.setattr(
+        app_module, "get_current_group_id", AsyncMock(return_value=group_id)
+    )
     monkeypatch.setattr(
         app_module,
         "upsert_job_posting",
         AsyncMock(
             return_value={
                 "id": stored["id"],
+                "group_id": group_id,
                 "scraped_at": stored["scraped_at"],
                 "created_at": stored["created_at"],
                 "updated_at": stored["updated_at"],
@@ -455,7 +480,8 @@ def test_get_job_posting_detail_endpoint_returns_stored_record(
     monkeypatch: pytest.MonkeyPatch,
     sample_job_posting,
 ) -> None:
-    stored = make_stored_row(sample_job_posting, job_id=19)
+    group_id = uuid.uuid7()
+    stored = make_stored_row(sample_job_posting, job_id=19, group_id=group_id)
     get_job_posting = AsyncMock(return_value=stored)
 
     monkeypatch.setattr(app_module, "get_job_posting", get_job_posting)
@@ -468,6 +494,7 @@ def test_get_job_posting_detail_endpoint_returns_stored_record(
         "message": "채용공고 정보를 조회했습니다.",
         "data": {
             "id": 19,
+            "group_id": str(group_id),
             **sample_job_posting.model_dump(mode="json"),
             "scraped_at": to_api_datetime(stored["scraped_at"]),
             "created_at": to_api_datetime(stored["created_at"]),

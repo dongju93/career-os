@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID
@@ -148,6 +148,12 @@ class JobPostingExtracted(_JobPostingBase):
         return self
 
 
+class JobPostingCreateRequest(JobPostingExtracted):
+    """POST /v1/job-postings body — extraction result plus optional target group."""
+
+    group_id: UUID | None = None
+
+
 class JobPostingStored(_JobPostingBase):
     """
     Read-path schema: response model for DB rows returned after upsert or fetch.
@@ -160,6 +166,7 @@ class JobPostingStored(_JobPostingBase):
     """
 
     id: int
+    group_id: UUID
     scraped_at: datetime
     created_at: datetime
     updated_at: datetime
@@ -169,6 +176,7 @@ class JobPostingListItem(BaseModel):
     """Lightweight projection for list responses — heavy text fields excluded."""
 
     id: int
+    group_id: UUID
     platform: Platform
     posting_id: PostingId
     posting_url: str
@@ -197,6 +205,61 @@ class JobPostingPage(BaseModel):
     """Offset-paginated list response."""
 
     items: list[JobPostingListItem]
+    total: int
+    offset: int
+    limit: int
+
+
+# ── Job Search Groups ─────────────────────────────────────────────────────────
+
+
+class JobSearchGroupCreate(BaseModel):
+    name: Annotated[str, Field(min_length=1, max_length=100)]
+    started_at: date | None = None
+    ended_at: date | None = None
+    memo: str | None = None
+
+    @model_validator(mode="after")
+    def check_dates(self) -> JobSearchGroupCreate:
+        if self.started_at and self.ended_at and self.ended_at < self.started_at:
+            raise ValueError("ended_at must be >= started_at")
+        return self
+
+
+class JobSearchGroupUpdate(BaseModel):
+    name: Annotated[str, Field(min_length=1, max_length=100)] | None = None
+    started_at: date | None = None
+    ended_at: date | None = None
+    memo: str | None = None
+
+
+class JobSearchGroupItem(BaseModel):
+    """List response projection — includes posting_count."""
+
+    id: UUID
+    name: str
+    started_at: date
+    ended_at: date | None
+    memo: str | None
+    posting_count: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class JobSearchGroup(BaseModel):
+    """Single-record response — no posting_count."""
+
+    id: UUID
+    name: str
+    started_at: date
+    ended_at: date | None
+    memo: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class JobSearchGroupPage(BaseModel):
+    items: list[JobSearchGroupItem]
     total: int
     offset: int
     limit: int

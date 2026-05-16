@@ -1,8 +1,9 @@
 import logging
 import time
-from datetime import UTC, datetime
-from typing import Annotated
+from datetime import UTC, date, datetime
+from typing import Annotated, Literal
 from urllib.parse import urlencode, urlparse
+from uuid import UUID
 
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -23,16 +24,33 @@ from career_os_api.database.job_postings import (
     get_job_postings,
     upsert_job_posting,
 )
+from career_os_api.database.job_search_groups import (
+    create_initial_group,
+    create_job_search_group,
+    delete_job_search_group,
+    get_current_group_id,
+    get_job_search_group,
+    get_job_search_groups,
+    get_user_group_ids_for_update,
+    has_any_group,
+    update_job_search_group,
+)
 from career_os_api.database.retry import run_database_operation
 from career_os_api.database.users import update_user_name, upsert_user
 from career_os_api.rate_limit import quota, rate_limit
 from career_os_api.responses import ApiResponse
 from career_os_api.schemas import (
     CurrentUserResponse,
+    JobPostingCreateRequest,
     JobPostingExtracted,
     JobPostingListItem,
     JobPostingPage,
     JobPostingStored,
+    JobSearchGroup,
+    JobSearchGroupCreate,
+    JobSearchGroupItem,
+    JobSearchGroupPage,
+    JobSearchGroupUpdate,
     UpdateCurrentUserRequest,
 )
 from career_os_api.service.job_posting.extractor import extract_job_posting
@@ -156,7 +174,11 @@ async def google_callback(request: Request) -> RedirectResponse:
     picture: str | None = user_info.get("picture")
 
     async def operation(conn):
-        return await upsert_user(conn, google_id, email, name, picture)
+        async with conn.transaction():
+            user = await upsert_user(conn, google_id, email, name, picture)
+            if not await has_any_group(conn, user["id"]):
+                await create_initial_group(conn, user["id"])
+            return user
 
     user = await run_database_operation(request.app.state.pool, operation)
 
@@ -323,13 +345,24 @@ async def list_job_postings(
     limit: Annotated[
         int, Query(ge=1, le=100, description="Max records to return")
     ] = 20,
+    group_id: Annotated[
+        UUID | None, Query(description="Filter by job search group")
+    ] = None,
 ) -> ApiResponse[JobPostingPage]:
     async def operation(conn):
+        if group_id is not None:
+            grp = await get_job_search_group(conn, group_id)
+            if grp is None or grp["user_id"] != current_user["id"]:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="다른 사용자의 그룹에 접근할 수 없습니다.",
+                )
         return await get_job_postings(
             conn,
             user_id=current_user["id"],
             limit=limit,
             offset=offset,
+            group_id=group_id,
         )
 
     rows, total = await run_database_operation(request.app.state.pool, operation)
@@ -403,21 +436,39 @@ async def get_job_posting_extraction(
     },
 )
 async def create_job_posting(
-    data: JobPostingExtracted,
+    data: JobPostingCreateRequest,
     request: Request,
     response: Response,
     current_user: _CurrentUser,
 ) -> ApiResponse[JobPostingStored]:
     async def operation(conn):
-        return await upsert_job_posting(conn, data, user_id=current_user["id"])
+        gid = data.group_id
+        if gid is None:
+            gid = await get_current_group_id(conn, current_user["id"])
+            if gid is None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="구직 활동 그룹이 없습니다. 먼저 그룹을 생성하세요.",
+                )
+        else:
+            grp = await get_job_search_group(conn, gid)
+            if grp is None or grp["user_id"] != current_user["id"]:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="다른 사용자의 그룹에 접근할 수 없습니다.",
+                )
+        return await upsert_job_posting(
+            conn, data, user_id=current_user["id"], group_id=gid
+        )
 
     row = await run_database_operation(request.app.state.pool, operation)
     stored = JobPostingStored(
         id=row["id"],
+        group_id=row["group_id"],
         scraped_at=row["scraped_at"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
-        **data.model_dump(),
+        **data.model_dump(exclude={"group_id"}),
     )
     http_status = status.HTTP_201_CREATED if row["inserted"] else status.HTTP_200_OK
     response.status_code = http_status
@@ -454,3 +505,212 @@ async def get_job_posting_detail(
         message="채용공고 정보를 조회했습니다.",
         data=JobPostingStored(**row),
     )
+
+
+# ── Job Search Groups ─────────────────────────────────────────────────────────
+
+
+@v1_router.get(
+    "/job-search-groups",
+    tags=["job-search-groups"],
+    dependencies=[rate_limit(60, per="minute")],
+)
+async def list_job_search_groups(
+    request: Request,
+    current_user: _CurrentUser,
+    status_filter: Annotated[
+        Literal["active", "ended"] | None,
+        Query(alias="status", description="Filter by group status"),
+    ] = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> ApiResponse[JobSearchGroupPage]:
+    async def operation(conn):
+        return await get_job_search_groups(
+            conn,
+            user_id=current_user["id"],
+            status=status_filter,
+            limit=limit,
+            offset=offset,
+        )
+
+    rows, total = await run_database_operation(request.app.state.pool, operation)
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="구직 활동 그룹 목록을 조회했습니다.",
+        data=JobSearchGroupPage(
+            items=[JobSearchGroupItem(**row) for row in rows],
+            total=total,
+            offset=offset,
+            limit=limit,
+        ),
+    )
+
+
+@v1_router.post(
+    "/job-search-groups",
+    tags=["job-search-groups"],
+    dependencies=[rate_limit(10, per="minute"), quota(50, per="day")],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_job_search_group_handler(
+    data: JobSearchGroupCreate,
+    request: Request,
+    current_user: _CurrentUser,
+) -> ApiResponse[JobSearchGroup]:
+    started_at = data.started_at or date.today()
+
+    async def operation(conn):
+        return await create_job_search_group(
+            conn,
+            user_id=current_user["id"],
+            name=data.name,
+            started_at=started_at,
+            ended_at=data.ended_at,
+            memo=data.memo,
+        )
+
+    row = await run_database_operation(
+        request.app.state.pool,
+        operation,
+        idempotent=False,
+        label="create_job_search_group",
+    )
+    return ApiResponse(
+        status=status.HTTP_201_CREATED,
+        message="구직 활동 그룹이 생성되었습니다.",
+        data=JobSearchGroup(**row),
+    )
+
+
+@v1_router.get(
+    "/job-search-groups/{group_id}",
+    tags=["job-search-groups"],
+    dependencies=[rate_limit(60, per="minute")],
+)
+async def get_job_search_group_handler(
+    group_id: UUID,
+    request: Request,
+    current_user: _CurrentUser,
+) -> ApiResponse[JobSearchGroup]:
+    async def operation(conn):
+        return await get_job_search_group(conn, group_id)
+
+    row = await run_database_operation(request.app.state.pool, operation)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Group {group_id} not found",
+        )
+    if row["user_id"] != current_user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="다른 사용자의 그룹에 접근할 수 없습니다.",
+        )
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="구직 활동 그룹 정보를 조회했습니다.",
+        data=JobSearchGroup(**row),
+    )
+
+
+@v1_router.patch(
+    "/job-search-groups/{group_id}",
+    tags=["job-search-groups"],
+    dependencies=[rate_limit(20, per="minute"), quota(100, per="day")],
+)
+async def update_job_search_group_handler(
+    group_id: UUID,
+    data: JobSearchGroupUpdate,
+    request: Request,
+    current_user: _CurrentUser,
+) -> ApiResponse[JobSearchGroup]:
+    # Reject explicit null for NOT NULL columns before hitting the DB.
+    for field in ("name", "started_at"):
+        if field in data.model_fields_set and getattr(data, field) is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"{field} cannot be null",
+            )
+
+    update_fields = {
+        k: v for k, v in data.model_dump().items() if k in data.model_fields_set
+    }
+
+    async def operation(conn):
+        existing = await get_job_search_group(conn, group_id)
+        if existing is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Group {group_id} not found",
+            )
+        if existing["user_id"] != current_user["id"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="다른 사용자의 그룹에 접근할 수 없습니다.",
+            )
+        # Server-side date constraint: validate merged state.
+        effective_started = update_fields.get("started_at", existing["started_at"])
+        effective_ended = update_fields.get("ended_at", existing["ended_at"])
+        if effective_ended is not None and effective_ended < effective_started:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="ended_at must be >= started_at",
+            )
+        return await update_job_search_group(
+            conn, group_id, user_id=current_user["id"], fields=update_fields
+        )
+
+    row = await run_database_operation(
+        request.app.state.pool,
+        operation,
+        idempotent=False,
+        label="update_job_search_group",
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Group {group_id} not found",
+        )
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="구직 활동 그룹이 수정되었습니다.",
+        data=JobSearchGroup(**row),
+    )
+
+
+@v1_router.delete(
+    "/job-search-groups/{group_id}",
+    tags=["job-search-groups"],
+    dependencies=[rate_limit(10, per="minute")],
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_job_search_group_handler(
+    group_id: UUID,
+    request: Request,
+    current_user: _CurrentUser,
+) -> Response:
+    async def operation(conn):
+        async with conn.transaction():
+            # FOR UPDATE locks all user group rows, preventing concurrent deletes
+            # from violating the "at least one group" invariant.
+            group_ids = await get_user_group_ids_for_update(conn, current_user["id"])
+            if group_id not in group_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Group {group_id} not found",
+                )
+            if len(group_ids) <= 1:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="마지막 구직 활동 그룹은 삭제할 수 없습니다.",
+                )
+            await delete_job_search_group(conn, group_id, user_id=current_user["id"])
+
+    await run_database_operation(
+        request.app.state.pool,
+        operation,
+        idempotent=False,
+        label="delete_job_search_group",
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

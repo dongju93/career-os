@@ -10,6 +10,7 @@ from career_os_api.schemas import JobPostingExtracted
 
 class UpsertResult(TypedDict):
     id: int
+    group_id: UUID
     scraped_at: datetime
     created_at: datetime
     updated_at: datetime
@@ -18,6 +19,7 @@ class UpsertResult(TypedDict):
 
 class JobPostingListRow(TypedDict):
     id: int
+    group_id: UUID
     platform: str
     posting_id: str
     posting_url: str
@@ -53,7 +55,7 @@ class JobPostingDetailRow(JobPostingListRow):
 
 _UPSERT_SQL = """
 INSERT INTO job_postings (
-    user_id,
+    user_id, group_id,
     platform, posting_id, posting_url,
     company_name, job_title, experience_req, deadline, location,
     employment_type, job_description, responsibilities, qualifications,
@@ -63,9 +65,9 @@ INSERT INTO job_postings (
     homepage, job_category, industry
 ) VALUES (
     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
 )
-ON CONFLICT (user_id, platform, posting_id) DO UPDATE SET
+ON CONFLICT (group_id, platform, posting_id) DO UPDATE SET
     posting_url        = EXCLUDED.posting_url,
     company_name       = EXCLUDED.company_name,
     job_title          = EXCLUDED.job_title,
@@ -91,13 +93,13 @@ ON CONFLICT (user_id, platform, posting_id) DO UPDATE SET
     industry           = EXCLUDED.industry,
     scraped_at         = NOW(),
     updated_at         = NOW()
-RETURNING id, scraped_at, created_at, updated_at, (xmax = 0) AS inserted
+RETURNING id, group_id, scraped_at, created_at, updated_at, (xmax = 0) AS inserted
 """
 
 # Selects only summary-level columns — heavy text fields are intentionally omitted.
-_LIST_SQL = """
+_LIST_BY_USER_SQL = """
 SELECT
-    id, platform, posting_id, posting_url,
+    id, group_id, platform, posting_id, posting_url,
     company_name, job_title, experience_req, deadline, location,
     employment_type, salary, tech_stack, tags,
     job_category, industry, scraped_at, created_at, updated_at
@@ -107,15 +109,33 @@ ORDER BY scraped_at DESC
 LIMIT %s OFFSET %s
 """
 
-_COUNT_SQL = """
+_COUNT_BY_USER_SQL = """
 SELECT COUNT(*) AS total
 FROM job_postings
 WHERE user_id = %s
 """
 
+_LIST_BY_GROUP_SQL = """
+SELECT
+    id, group_id, platform, posting_id, posting_url,
+    company_name, job_title, experience_req, deadline, location,
+    employment_type, salary, tech_stack, tags,
+    job_category, industry, scraped_at, created_at, updated_at
+FROM job_postings
+WHERE group_id = %s
+ORDER BY scraped_at DESC
+LIMIT %s OFFSET %s
+"""
+
+_COUNT_BY_GROUP_SQL = """
+SELECT COUNT(*) AS total
+FROM job_postings
+WHERE group_id = %s
+"""
+
 _DETAIL_SQL = """
 SELECT
-    id, platform, posting_id, posting_url,
+    id, group_id, platform, posting_id, posting_url,
     company_name, job_title, experience_req, deadline, location,
     employment_type, job_description, responsibilities, qualifications,
     preferred_points, benefits, hiring_process,
@@ -133,12 +153,14 @@ async def upsert_job_posting(
     conn: AsyncConnection,
     data: JobPostingExtracted,
     user_id: UUID,
+    group_id: UUID,
 ) -> UpsertResult:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(
             _UPSERT_SQL,
             (
                 user_id,
+                group_id,
                 str(data.platform),
                 data.posting_id,
                 data.posting_url,
@@ -177,11 +199,17 @@ async def get_job_postings(
     user_id: UUID,
     limit: int,
     offset: int,
+    group_id: UUID | None = None,
 ) -> tuple[list[JobPostingListRow], int]:
     async with conn.cursor(row_factory=dict_row) as cur:
-        await cur.execute(_LIST_SQL, (user_id, limit, offset))
-        rows = await cur.fetchall()
-        await cur.execute(_COUNT_SQL, (user_id,))
+        if group_id is not None:
+            await cur.execute(_LIST_BY_GROUP_SQL, (group_id, limit, offset))
+            rows = await cur.fetchall()
+            await cur.execute(_COUNT_BY_GROUP_SQL, (group_id,))
+        else:
+            await cur.execute(_LIST_BY_USER_SQL, (user_id, limit, offset))
+            rows = await cur.fetchall()
+            await cur.execute(_COUNT_BY_USER_SQL, (user_id,))
         count_row = await cur.fetchone()
     assert count_row is not None  # COUNT(*) always returns exactly one row
     return cast(list[JobPostingListRow], rows), count_row["total"]
