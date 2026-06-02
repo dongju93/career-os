@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-import httpx
+import httpx2
 import pytest
 from fastapi import HTTPException
 
@@ -98,9 +98,9 @@ async def test_fetch_saramin_job_posting_maps_upstream_status() -> None:
 async def test_fetch_saramin_job_posting_maps_request_errors() -> None:
     client = SequenceAsyncClient(
         [
-            httpx.RequestError(
+            httpx2.RequestError(
                 "boom",
-                request=httpx.Request("GET", saramin_module.SARAMIN_JOB_AJAX_URL),
+                request=httpx2.Request("GET", saramin_module.SARAMIN_JOB_AJAX_URL),
             )
         ]
     )

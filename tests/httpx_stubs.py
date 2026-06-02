@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
-import httpx
+import httpx2
 
 
 def make_response(
@@ -10,9 +10,9 @@ def make_response(
     status_code: int = 200,
     content: bytes = b"",
     headers: dict[str, str] | None = None,
-) -> httpx.Response:
-    request = httpx.Request("GET", url)
-    return httpx.Response(
+) -> httpx2.Response:
+    request = httpx2.Request("GET", url)
+    return httpx2.Response(
         status_code=status_code,
         content=content,
         headers=headers,
@@ -20,9 +20,9 @@ def make_response(
     )
 
 
-def make_http_status_error(url: str, status_code: int) -> httpx.HTTPStatusError:
+def make_http_status_error(url: str, status_code: int) -> httpx2.HTTPStatusError:
     response = make_response(url, status_code=status_code)
-    return httpx.HTTPStatusError(
+    return httpx2.HTTPStatusError(
         f"HTTP {status_code}",
         request=response.request,
         response=response,
@@ -30,7 +30,7 @@ def make_http_status_error(url: str, status_code: int) -> httpx.HTTPStatusError:
 
 
 class _FakeStreamResponse:
-    def __init__(self, response: httpx.Response) -> None:
+    def __init__(self, response: httpx2.Response) -> None:
         self._content = response.content
         self.status_code = response.status_code
         self.headers = response.headers
@@ -41,7 +41,7 @@ class _FakeStreamResponse:
 
 
 class _FakeStreamContext:
-    def __init__(self, outcome: httpx.Response | Exception) -> None:
+    def __init__(self, outcome: httpx2.Response | Exception) -> None:
         self._outcome = outcome
 
     async def __aenter__(self) -> _FakeStreamResponse:
@@ -54,7 +54,7 @@ class _FakeStreamContext:
 
 
 class SequenceAsyncClient:
-    def __init__(self, outcomes: Sequence[httpx.Response | Exception]) -> None:
+    def __init__(self, outcomes: Sequence[httpx2.Response | Exception]) -> None:
         self._outcomes = list(outcomes)
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
@@ -71,7 +71,7 @@ class SequenceAsyncClient:
         outcome = self._outcomes.pop(0)
         return _FakeStreamContext(outcome)
 
-    async def get(self, url: str, **kwargs: Any) -> httpx.Response:
+    async def get(self, url: str, **kwargs: Any) -> httpx2.Response:
         self.calls.append((url, kwargs))
 
         if not self._outcomes:

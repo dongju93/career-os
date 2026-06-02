@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-import httpx
+import httpx2
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,13 +37,13 @@ async def lifespan(app: FastAPI):
     try:
         async with (
             create_postgres_pool() as pool,
-            httpx.AsyncClient(
+            httpx2.AsyncClient(
                 follow_redirects=True, timeout=settings.http_fetch_timeout
             ) as http_client,
-            httpx.AsyncClient(
+            httpx2.AsyncClient(
                 follow_redirects=True, timeout=settings.http_image_timeout
             ) as image_http_client,
-            httpx.AsyncClient(
+            httpx2.AsyncClient(
                 timeout=settings.google_risc_http_timeout_seconds
             ) as risc_http_client,
             AsyncOpenAI(api_key=settings.openai_api_key) as openai_client,

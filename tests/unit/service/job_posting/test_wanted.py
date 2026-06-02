@@ -1,6 +1,6 @@
 import json
 
-import httpx
+import httpx2
 import pytest
 from fastapi import HTTPException
 
@@ -200,9 +200,9 @@ async def test_fetch_wanted_job_posting_maps_upstream_status() -> None:
 async def test_fetch_wanted_job_posting_maps_request_errors() -> None:
     client = SequenceAsyncClient(
         [
-            httpx.RequestError(
+            httpx2.RequestError(
                 "timeout",
-                request=httpx.Request(
+                request=httpx2.Request(
                     "GET", f"{wanted_module.WANTED_JOB_API_URL}/349998"
                 ),
             )

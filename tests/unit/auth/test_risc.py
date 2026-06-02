@@ -3,7 +3,7 @@ from collections.abc import Generator
 from typing import Any
 from unittest.mock import MagicMock
 
-import httpx
+import httpx2
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -211,7 +211,7 @@ async def test_verify_risc_set_rejects_unknown_kid(
     private_pem, _ = signing_pair
     # Simulate a forced-refresh that still does not return a matching key.
 
-    async def fake_fetch(_client: httpx.AsyncClient) -> list[dict[str, Any]]:
+    async def fake_fetch(_client: httpx2.AsyncClient) -> list[dict[str, Any]]:
         return []
 
     monkeypatch.setattr(risc_module, "_fetch_jwks", fake_fetch)
@@ -231,7 +231,7 @@ async def test_verify_risc_set_does_not_force_refresh_for_fresh_unknown_kid(
 ) -> None:
     private_pem, _ = signing_pair
 
-    async def unexpected_fetch(_client: httpx.AsyncClient) -> list[dict[str, Any]]:
+    async def unexpected_fetch(_client: httpx2.AsyncClient) -> list[dict[str, Any]]:
         raise AssertionError("fresh unknown kid should not force JWKS refresh")
 
     monkeypatch.setattr(risc_module, "_fetch_jwks", unexpected_fetch)
@@ -256,7 +256,7 @@ async def test_verify_risc_set_refreshes_stale_cache_for_unknown_kid(
         time.monotonic() - settings.google_risc_unknown_kid_refresh_cooldown_seconds - 1
     )
 
-    async def fake_fetch(_client: httpx.AsyncClient) -> list[dict[str, Any]]:
+    async def fake_fetch(_client: httpx2.AsyncClient) -> list[dict[str, Any]]:
         return [public_jwk]
 
     monkeypatch.setattr(risc_module, "_fetch_jwks", fake_fetch)
@@ -324,8 +324,8 @@ async def test_verify_risc_set_rejects_malformed_jwt() -> None:
 
 async def test_fetch_jwks_http_error_raises_verification_unavailable_error() -> None:
     class _FailingClient:
-        async def get(self, url: str, **kwargs: Any) -> httpx.Response:
-            raise httpx.ConnectError("network unreachable")
+        async def get(self, url: str, **kwargs: Any) -> httpx2.Response:
+            raise httpx2.ConnectError("network unreachable")
 
         def stream(self, method: str, url: str, **kwargs: Any) -> None:
             raise AssertionError("stream should not be called")

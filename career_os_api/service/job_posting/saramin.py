@@ -1,6 +1,6 @@
 from urllib.parse import parse_qs, urlparse
 
-import httpx
+import httpx2
 from bs4 import BeautifulSoup
 from fastapi import HTTPException, status
 
@@ -61,7 +61,7 @@ async def fetch_saramin_job_posting(url: str, client: AsyncHttpClient) -> bytes:
             headers=headers,
         )
         ajax_resp.raise_for_status()
-    except httpx.HTTPStatusError as e:
+    except httpx2.HTTPStatusError as e:
         upstream_status = e.response.status_code
         if upstream_status == status.HTTP_404_NOT_FOUND:
             raise HTTPException(
@@ -72,7 +72,7 @@ async def fetch_saramin_job_posting(url: str, client: AsyncHttpClient) -> bytes:
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Saramin returned {upstream_status}",
         ) from e
-    except httpx.RequestError:
+    except httpx2.RequestError:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to reach Saramin",
@@ -113,7 +113,7 @@ async def _inline_iframe_content(
             user_content = detail_soup.select_one(".user_content")
             if user_content:
                 iframe.replace_with(user_content)
-    except httpx.RequestError:
+    except httpx2.RequestError:
         pass  # Leave the iframe in place if the fetch fails
 
 

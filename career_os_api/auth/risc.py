@@ -15,7 +15,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-import httpx
+import httpx2
 from jose import JWTError, jwt
 
 from career_os_api._types import AsyncHttpClient
@@ -90,7 +90,7 @@ async def _fetch_jwks(http_client: AsyncHttpClient) -> list[dict[str, Any]]:
         response = await http_client.get(settings.google_risc_jwks_uri)
         response.raise_for_status()
         data = response.json()
-    except httpx.HTTPError as exc:
+    except httpx2.HTTPError as exc:
         raise RiscVerificationUnavailableError(f"Failed to fetch JWKS: {exc}") from exc
     except ValueError as exc:
         raise RiscVerificationUnavailableError("Malformed JWKS document") from exc

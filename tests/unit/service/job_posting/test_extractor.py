@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from typing import TypedDict, cast
 from unittest.mock import AsyncMock, MagicMock
 
-import httpx
+import httpx2
 import pytest
 from bs4 import BeautifulSoup
 from fastapi import HTTPException
@@ -105,9 +105,9 @@ async def test_collect_images_as_base64_normalizes_sources_and_skips_failures() 
                 content=b"png-bytes",
                 headers={"content-type": "image/png"},
             ),
-            httpx.RequestError(
+            httpx2.RequestError(
                 "boom",
-                request=httpx.Request("GET", "https://cdn.saramin.co.kr/b.jpg"),
+                request=httpx2.Request("GET", "https://cdn.saramin.co.kr/b.jpg"),
             ),
             make_response(
                 "https://img.saramin.co.kr/c.gif",

@@ -1,6 +1,6 @@
 from urllib.parse import urlparse
 
-import httpx
+import httpx2
 from fastapi import HTTPException, status
 
 from career_os_api._types import AsyncHttpClient
@@ -60,7 +60,7 @@ async def fetch_wanted_job_posting(url: str, client: AsyncHttpClient) -> bytes:
     try:
         resp = await client.get(f"{WANTED_JOB_API_URL}/{posting_id}", headers=headers)
         resp.raise_for_status()
-    except httpx.HTTPStatusError as e:
+    except httpx2.HTTPStatusError as e:
         upstream_status = e.response.status_code
         if upstream_status == status.HTTP_404_NOT_FOUND:
             raise HTTPException(
@@ -71,7 +71,7 @@ async def fetch_wanted_job_posting(url: str, client: AsyncHttpClient) -> bytes:
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Wanted returned {upstream_status}",
         ) from e
-    except httpx.RequestError:
+    except httpx2.RequestError:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to reach Wanted",

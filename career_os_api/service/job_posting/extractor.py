@@ -4,7 +4,7 @@ import logging
 import time
 from urllib.parse import urlparse
 
-import httpx
+import httpx2
 from bs4 import BeautifulSoup
 from fastapi import HTTPException, status
 from openai import AsyncOpenAI
@@ -94,7 +94,7 @@ async def _fetch_one_image(
                         return None
                     chunks.append(chunk)
                 return mime, b"".join(chunks)
-        except httpx.RequestError:
+        except httpx2.RequestError:
             return None
 
 

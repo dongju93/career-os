@@ -80,7 +80,7 @@ class Settings(BaseSettings):
 
     # HTTP client timeouts (seconds) — tunable per environment
     http_fetch_timeout: float = 30.0
-    # Per-image connect+read timeout passed to the httpx client.
+    # Per-image connect+read timeout passed to the httpx2 client.
     http_image_timeout: float = 10.0
     # Overall deadline for the entire concurrent image-fetch gather.
     # Prevents a large batch of slow images from blocking extraction indefinitely.
