@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse
 from openai import AsyncOpenAI
 from starlette.middleware.sessions import SessionMiddleware
 
+from career_os_api.chatkit.server import CareerOsChatKitServer
+from career_os_api.chatkit.store import PostgresChatKitStore
 from career_os_api.config import settings
 from career_os_api.constants import API_V1
 from career_os_api.database.ddl import init_schema
@@ -55,6 +57,13 @@ async def lifespan(app: FastAPI):
             app.state.image_http_client = image_http_client
             app.state.risc_http_client = risc_http_client
             app.state.openai_client = openai_client
+            # ChatKit server depends on the pool + OpenAI client, so build it last.
+            store = PostgresChatKitStore(pool)
+            app.state.chatkit_server = CareerOsChatKitServer(
+                store,
+                openai_client=openai_client,
+                model=settings.chatkit_model or settings.openai_model,
+            )
             yield
     finally:
         if redis_client is not None:

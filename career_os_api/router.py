@@ -17,6 +17,7 @@ from career_os_api.auth.risc import (
     verify_risc_set,
 )
 from career_os_api.auth.risc_handlers import apply_risc_event
+from career_os_api.chatkit.routes import router as chatkit_router
 from career_os_api.config import settings
 from career_os_api.constants import API_V1
 from career_os_api.database.job_postings import (
@@ -70,6 +71,9 @@ oauth.register(
 )
 
 _CurrentUser = Annotated[dict, Depends(get_current_user)]
+
+# ChatKit routes live in their own module; mount them under the same /v1 prefix.
+v1_router.include_router(chatkit_router)
 
 
 def _resolve_callback_url(
