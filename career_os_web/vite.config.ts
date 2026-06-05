@@ -7,10 +7,16 @@ import { defineConfig } from 'vitest/config';
 const VITE_API_BASE_URL = 'https://career-os.fastapicloud.dev'; // Production
 // const VITE_API_BASE_URL = 'http://localhost:8000'; // Local
 
+const VITE_CHATKIT_DOMAIN_KEY = 'career-os-production'; // Production
+// const VITE_CHATKIT_DOMAIN_KEY = 'local-dev'; // Local
+
 // https://vite.dev/config/
 export default defineConfig({
   define: {
     'import.meta.env.VITE_API_BASE_URL': JSON.stringify(VITE_API_BASE_URL),
+    'import.meta.env.VITE_CHATKIT_DOMAIN_KEY': JSON.stringify(
+      VITE_CHATKIT_DOMAIN_KEY,
+    ),
   },
   resolve: {
     alias: {

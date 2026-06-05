@@ -4,6 +4,19 @@ import { useAuthStore } from './store/auth-store';
 import { renderRoute } from './test/test-utils';
 import { buildGoogleLoginUrl } from './utils/auth-redirect';
 
+// AppLayout mounts the ChatKit floating assistant on authenticated pages. Stub
+// the embed binding so these route-level tests stay deterministic and offline.
+vi.mock('@openai/chatkit-react', () => ({
+  useChatKit: () => ({
+    control: {},
+    setThreadId: vi.fn(),
+    showHistory: vi.fn(),
+    hideHistory: vi.fn(),
+    focusComposer: vi.fn(),
+  }),
+  ChatKit: () => null,
+}));
+
 const emptyJobPostingPage = {
   items: [],
   total: 0,
@@ -286,5 +299,62 @@ describe('authentication flow', () => {
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/login');
     expect(useAuthStore.getState().user).toBeNull();
+  });
+
+  it('shows the AI assistant launcher for authenticated users', async () => {
+    const authUser = {
+      user_id: 'user-1',
+      email: 'user@example.com',
+      name: 'Career OS User',
+      picture: null,
+    };
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input === 'https://career-os.fastapicloud.dev/v1/auth/me') {
+        return { ok: true, json: async () => apiResponse(authUser) };
+      }
+      if (
+        input.startsWith('https://career-os.fastapicloud.dev/v1/job-postings')
+      ) {
+        return { ok: true, json: async () => apiResponse(emptyJobPostingPage) };
+      }
+      throw new Error(`Unexpected fetch request: ${input}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    useAuthStore.getState().setAuth({
+      id: 'user-1',
+      email: 'user@example.com',
+      name: 'Career OS User',
+      picture: null,
+    });
+
+    renderRoute('/job-postings');
+
+    await screen.findByRole('heading', { name: /^채용공고$/i });
+    expect(
+      screen.getByRole('button', { name: 'AI 어시스턴트 열기' }),
+    ).toBeInTheDocument();
+  });
+
+  it('does not show the AI assistant launcher for unauthenticated visitors', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        type: 'about:blank',
+        title: 'Unauthorized',
+        status: 401,
+        detail: '인증이 필요합니다',
+        instance: '/v1/auth/me',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings');
+
+    await screen.findByRole('heading', { name: /^Career OS$/i });
+    expect(
+      screen.queryByRole('button', { name: 'AI 어시스턴트 열기' }),
+    ).toBeNull();
   });
 });

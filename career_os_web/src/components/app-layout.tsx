@@ -12,6 +12,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router';
 import { cn } from '@/lib/utils';
 import { logoutUser } from '../services/auth';
 import { resetAuthStore, useAuthStore } from '../store/auth-store';
+import { ChatKitFloatingAssistant } from './chatkit-floating-assistant';
 import { AvatarFallback, AvatarImage, AvatarRoot } from './ui/avatar';
 import { Button } from './ui/button';
 
@@ -249,6 +250,8 @@ export function AppLayout() {
           </Suspense>
         </div>
       </main>
+
+      <ChatKitFloatingAssistant />
     </div>
   );
 }
