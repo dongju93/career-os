@@ -162,10 +162,13 @@ class PostgresChatKitStore(Store[ChatKitRequestContext]):
                         )
                 await cur.execute(
                     """
+                    -- Conflict target matches the (id, user_id) unique constraint, not
+                    -- the bare `id` PK: a same-id row owned by another user must raise
+                    -- a UniqueViolation here rather than silently being overwritten.
                     INSERT INTO chatkit_threads
                         (id, user_id, title, status, payload, created_at)
                     VALUES (%s, %s, %s, %s, %s::jsonb, %s)
-                    ON CONFLICT (id) DO UPDATE SET
+                    ON CONFLICT (id, user_id) DO UPDATE SET
                         title = EXCLUDED.title,
                         status = EXCLUDED.status,
                         payload = EXCLUDED.payload,

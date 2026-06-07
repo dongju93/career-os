@@ -230,7 +230,9 @@ async def test_save_thread_existing_updates_without_counting() -> None:
 
     # exists-check + upsert only; no COUNT(*) query.
     assert all("COUNT(*)" not in sql for sql, _ in cursor.executed)
-    assert any("ON CONFLICT (id) DO UPDATE" in sql for sql, _ in cursor.executed)
+    assert any(
+        "ON CONFLICT (id, user_id) DO UPDATE" in sql for sql, _ in cursor.executed
+    )
 
 
 # ── load_threads (pagination) ─────────────────────────────────────────────────
