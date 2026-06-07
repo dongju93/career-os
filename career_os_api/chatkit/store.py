@@ -289,7 +289,10 @@ class PostgresChatKitStore(Store[ChatKitRequestContext]):
         user_id = context.user_id
         payload = _dumps(item.model_dump(mode="json"))
         conflict = (
-            "ON CONFLICT (id) DO UPDATE SET "
+            # Conflict target matches the (id, user_id) unique constraint, not the
+            # bare `id` PK — mirrors save_thread: a same-id row owned by another
+            # user must raise a UniqueViolation here rather than being overwritten.
+            "ON CONFLICT (id, user_id) DO UPDATE SET "
             "payload = EXCLUDED.payload, item_type = EXCLUDED.item_type, "
             "updated_at = NOW()"
             if upsert

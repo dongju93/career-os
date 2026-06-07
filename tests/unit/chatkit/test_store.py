@@ -332,7 +332,7 @@ async def test_save_item_upserts_and_touches_thread() -> None:
     insert_sql, _ = cursor.executed[0]
     update_sql, _ = cursor.executed[1]
     assert "INSERT INTO chatkit_items" in insert_sql
-    assert "ON CONFLICT (id) DO UPDATE" in insert_sql
+    assert "ON CONFLICT (id, user_id) DO UPDATE" in insert_sql
     assert "UPDATE chatkit_threads" in update_sql
 
 
