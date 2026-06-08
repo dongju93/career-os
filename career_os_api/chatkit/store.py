@@ -13,7 +13,7 @@ retry / `DatabaseUnavailableError` handling.
 import json
 import logging
 from collections.abc import Awaitable, Callable
-from typing import Any, Literal
+from typing import Any
 
 from chatkit.store import NotFoundError, Store
 from chatkit.types import Page, ThreadItem, ThreadMetadata
@@ -378,7 +378,3 @@ class PostgresChatKitStore(Store[ChatKitRequestContext]):
         self, attachment_id: str, context: ChatKitRequestContext
     ) -> None:
         raise NotImplementedError("attachments are not supported")
-
-
-# Re-exported for callers/tests that introspect supported orderings.
-SupportedOrder = Literal["asc", "desc"]
