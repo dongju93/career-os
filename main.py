@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 
 import httpx2
+from agents import set_default_openai_client, set_tracing_disabled
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -57,11 +58,16 @@ async def lifespan(app: FastAPI):
             app.state.image_http_client = image_http_client
             app.state.risc_http_client = risc_http_client
             app.state.openai_client = openai_client
+            # The Agents SDK keeps a module-global OpenAI client and tracing flag
+            # rather than accepting them per `Runner` call. Bind them once, here,
+            # to the app's shared client before constructing the ChatKit server —
+            # this keeps the rebind explicit and out of `CareerOsChatKitServer.__init__`.
+            set_default_openai_client(openai_client, use_for_tracing=False)
+            set_tracing_disabled(True)
             # ChatKit server depends on the pool + OpenAI client, so build it last.
             store = PostgresChatKitStore(pool)
             app.state.chatkit_server = CareerOsChatKitServer(
                 store,
-                openai_client=openai_client,
                 model=settings.chatkit_model or settings.openai_model,
             )
             yield

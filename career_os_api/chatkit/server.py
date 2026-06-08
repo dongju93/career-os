@@ -2,20 +2,23 @@
 
 Text-only assistant: each turn is grounded solely in the current thread's stored
 history plus the new user message. No tools, no retrieval, no file/page context.
-The Agents SDK is pointed at the app's shared `AsyncOpenAI` via
-`set_default_openai_client` (the SDK keeps a module-global client rather than
-accepting one per `Runner` call), and tracing is disabled to avoid extra egress.
+
+The Agents SDK keeps a module-global OpenAI client and tracing flag rather than
+accepting them per `Runner` call, so `set_default_openai_client` and
+`set_tracing_disabled` are invoked once in `main.py`'s `lifespan` — before this
+server is constructed — to point the SDK at the app's shared `AsyncOpenAI` and
+disable tracing export. Keeping that process-global mutation out of `__init__`
+means constructing this server never has side effects beyond its own instance.
 """
 
 import logging
 from collections.abc import AsyncIterator
 
-from agents import Agent, Runner, set_default_openai_client, set_tracing_disabled
+from agents import Agent, Runner
 from chatkit.agents import AgentContext, simple_to_agent_input, stream_agent_response
 from chatkit.server import ChatKitServer
 from chatkit.store import Store
 from chatkit.types import ThreadMetadata, ThreadStreamEvent, UserMessageItem
-from openai import AsyncOpenAI
 
 from career_os_api.chatkit.context import ChatKitRequestContext
 
@@ -58,15 +61,10 @@ class CareerOsChatKitServer(ChatKitServer[ChatKitRequestContext]):
         self,
         store: Store[ChatKitRequestContext],
         *,
-        openai_client: AsyncOpenAI,
         model: str,
     ) -> None:
         super().__init__(store)
         self._model = model
-        # Reuse the app's single AsyncOpenAI for all agent runs; disable tracing
-        # export so the SDK does not attempt extra network calls per turn.
-        set_default_openai_client(openai_client, use_for_tracing=False)
-        set_tracing_disabled(True)
         self._agent = build_career_os_agent(model)
 
     async def respond(
