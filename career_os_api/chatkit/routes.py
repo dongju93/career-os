@@ -18,6 +18,7 @@ from pydantic import ValidationError
 
 from career_os_api.auth.dependencies import get_current_user
 from career_os_api.chatkit.context import ChatKitRequestContext
+from career_os_api.chatkit.store import ChatKitThreadLimitError
 from career_os_api.config import settings
 from career_os_api.middleware import get_request_id
 from career_os_api.rate_limit import quota, rate_limit
@@ -61,6 +62,11 @@ async def chatkit_endpoint(request: Request, current_user: _CurrentUser) -> Resp
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="대화를 찾을 수 없습니다.",
+        ) from exc
+    except ChatKitThreadLimitError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="대화 개수 상한에 도달했습니다. 기존 대화를 삭제한 뒤 다시 시도해 주세요.",
         ) from exc
 
     if isinstance(result, StreamingResult):

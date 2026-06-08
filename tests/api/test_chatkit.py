@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 import main as main_module
 from career_os_api.auth.jwt import create_access_token
 from career_os_api.chatkit import routes as routes_module
+from career_os_api.chatkit.store import ChatKitThreadLimitError
 from career_os_api.config import settings as app_settings
 from career_os_api.constants import API_V1
 
@@ -88,6 +89,13 @@ class FakeStreamingServer:
             yield b'data: {"type":"thread.item.done"}\n\n'
 
         return StreamingResult(_gen())
+
+
+class FakeThreadLimitServer:
+    """Stand-in ChatKit server: raises the store's thread-limit error."""
+
+    async def process(self, body: bytes, context):  # NOSONAR
+        raise ChatKitThreadLimitError("thread limit 50 reached")
 
 
 @pytest.fixture
@@ -165,6 +173,26 @@ def test_chatkit_authenticated_returns_event_stream(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
     assert b"thread.item.done" in response.content
+
+
+# ── error mapping ─────────────────────────────────────────────────────────────
+
+
+def test_chatkit_thread_limit_returns_409(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    main_module.career_os.state.chatkit_server = FakeThreadLimitServer()
+
+    response = client.post(
+        CHATKIT_URL,
+        content=b'{"op":"threads.create"}',
+        headers={**auth_headers, **WEB_HEADER},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "대화 개수 상한에 도달했습니다. 기존 대화를 삭제한 뒤 다시 시도해 주세요."
+    )
 
 
 # ── feature flag ──────────────────────────────────────────────────────────────
