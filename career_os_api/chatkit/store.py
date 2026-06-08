@@ -150,6 +150,14 @@ class PostgresChatKitStore(Store[ChatKitRequestContext]):
                 )
                 is_new = await cur.fetchone() is None
                 if is_new:
+                    # Serialize concurrent cap checks for this user so two simultaneous
+                    # new-thread saves can't both observe count < max_threads and
+                    # together exceed the cap (TOCTOU between COUNT and INSERT below).
+                    # pg_advisory_xact_lock auto-releases at transaction end.
+                    await cur.execute(
+                        "SELECT pg_advisory_xact_lock(hashtext(%s::text))",
+                        (str(user_id),),
+                    )
                     await cur.execute(
                         "SELECT COUNT(*) FROM chatkit_threads WHERE user_id = %s",
                         (user_id,),
