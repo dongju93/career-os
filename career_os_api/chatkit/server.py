@@ -21,6 +21,7 @@ from chatkit.store import Store
 from chatkit.types import ThreadMetadata, ThreadStreamEvent, UserMessageItem
 
 from career_os_api.chatkit.context import ChatKitRequestContext
+from career_os_api.config import settings
 
 _logger = logging.getLogger(__name__)
 
@@ -73,8 +74,6 @@ class CareerOsChatKitServer(ChatKitServer[ChatKitRequestContext]):
         input_user_message: UserMessageItem | None,
         context: ChatKitRequestContext,
     ) -> AsyncIterator[ThreadStreamEvent]:
-        from career_os_api.config import settings
-
         # Most-recent-N items, then reversed to chronological order for the model.
         items_page = await self.store.load_thread_items(
             thread.id,
