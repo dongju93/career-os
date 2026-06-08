@@ -29,6 +29,12 @@ router = APIRouter()
 
 _CurrentUser = Annotated[dict, Depends(get_current_user)]
 
+# `rate_limit`/`quota` bound request *frequency*, not per-request size, so a
+# single oversized POST would still be buffered into memory in full. Stream the
+# body with a hard cap — mirroring the RISC receiver's `_MAX_RISC_BODY_BYTES`
+# pattern in router.py — to bound memory use on this endpoint.
+_MAX_CHATKIT_BODY_BYTES = 262_144
+
 
 @router.post(
     "/chatkit",
@@ -49,7 +55,17 @@ async def chatkit_endpoint(request: Request, current_user: _CurrentUser) -> Resp
     )
 
     # Raw body is forwarded verbatim to the SDK and never logged.
-    raw_body = await request.body()
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > _MAX_CHATKIT_BODY_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="요청 본문이 허용된 최대 크기를 초과했습니다.",
+            )
+        chunks.append(chunk)
+    raw_body = b"".join(chunks)
 
     try:
         result = await server.process(raw_body, context)

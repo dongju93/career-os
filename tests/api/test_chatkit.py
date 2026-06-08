@@ -175,6 +175,25 @@ def test_chatkit_authenticated_returns_event_stream(
     assert b"thread.item.done" in response.content
 
 
+# ── body size cap ─────────────────────────────────────────────────────────────
+
+
+def test_chatkit_rejects_oversized_body(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    main_module.career_os.state.chatkit_server = FakeStreamingServer()
+    oversized = b"a" * (routes_module._MAX_CHATKIT_BODY_BYTES + 1)
+
+    response = client.post(
+        CHATKIT_URL,
+        content=oversized,
+        headers={**auth_headers, **WEB_HEADER},
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "요청 본문이 허용된 최대 크기를 초과했습니다."
+
+
 # ── error mapping ─────────────────────────────────────────────────────────────
 
 
