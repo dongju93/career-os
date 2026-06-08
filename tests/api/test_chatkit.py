@@ -1,8 +1,9 @@
 """API-level tests for the ChatKit endpoint.
 
-Reuses the FakePool + Bearer-JWT auth pattern from test_job_search_groups.py. The
-streaming path is exercised by swapping app.state.chatkit_server for a stub whose
-process() returns a real chatkit StreamingResult, so no OpenAI call is made.
+Reuses the FakePool + Bearer-JWT auth pattern from test_job_search_groups.py. Both
+response paths are exercised by swapping app.state.chatkit_server for stubs whose
+process() returns a real chatkit StreamingResult or NonStreamingResult, so no
+OpenAI call is made.
 """
 
 import base64
@@ -14,7 +15,7 @@ from contextlib import asynccontextmanager
 
 import itsdangerous
 import pytest
-from chatkit.server import StreamingResult
+from chatkit.server import NonStreamingResult, StreamingResult
 from fastapi.testclient import TestClient
 
 import main as main_module
@@ -89,6 +90,13 @@ class FakeStreamingServer:
             yield b'data: {"type":"thread.item.done"}\n\n'
 
         return StreamingResult(_gen())
+
+
+class FakeNonStreamingServer:
+    """Stand-in ChatKit server: returns a real NonStreamingResult without hitting OpenAI."""
+
+    async def process(self, body: bytes, context) -> NonStreamingResult:  # NOSONAR
+        return NonStreamingResult(b'{"type":"thread.created","thread_id":"th_1"}')
 
 
 class FakeThreadLimitServer:
@@ -173,6 +181,22 @@ def test_chatkit_authenticated_returns_event_stream(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
     assert b"thread.item.done" in response.content
+
+
+def test_chatkit_authenticated_returns_json_for_non_streaming_result(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    main_module.career_os.state.chatkit_server = FakeNonStreamingServer()
+
+    response = client.post(
+        CHATKIT_URL,
+        content=b'{"op":"threads.retrieve"}',
+        headers={**auth_headers, **WEB_HEADER},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json() == {"type": "thread.created", "thread_id": "th_1"}
 
 
 # ── body size cap ─────────────────────────────────────────────────────────────
