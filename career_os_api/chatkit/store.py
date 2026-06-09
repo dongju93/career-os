@@ -325,7 +325,7 @@ class PostgresChatKitStore(Store[ChatKitRequestContext]):
                 )
 
         label = "chatkit.save_item" if upsert else "chatkit.add_thread_item"
-        await self._run(context, operation, idempotent=False, label=label)
+        await self._run(context, operation, idempotent=upsert, label=label)
 
     async def load_item(
         self, thread_id: str, item_id: str, context: ChatKitRequestContext
