@@ -6,7 +6,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
 [![codecov](https://codecov.io/github/dongju93/career-os/graph/badge.svg?flag=frontend&token=48VXFY8C3M)](https://codecov.io/github/dongju93/career-os)
 
-구직 활동을 관리하는 Career OS의 React 기반 프론트엔드 애플리케이션입니다. Google OAuth 인증, 구직 활동 그룹 관리, 채용공고 저장·조회 기능을 제공합니다.
+구직 활동을 관리하는 Career OS의 React 기반 프론트엔드 애플리케이션입니다. Google OAuth 인증, 구직 활동 그룹 관리, 채용공고 저장·조회, AI 채팅 어시스턴트 기능을 제공합니다.
 
 **프로덕션**: [https://career-os-sigma.vercel.app](https://career-os-sigma.vercel.app)
 
@@ -49,13 +49,19 @@ pnpm install
 
 ### 환경 변수
 
-`career_os_web/`에 `.env.local` 파일을 생성합니다.
+`VITE_API_BASE_URL`은 `.env` 파일이 아니라 `vite.config.ts`의 `define` 블록에 빌드 시 직접 치환됩니다. 로컬 API 서버로 전환하려면 `vite.config.ts` 상단의 주석 처리된 줄을 교체하세요.
 
-```dotenv
-VITE_API_BASE_URL=http://localhost:8000
+```ts
+// vite.config.ts
+const VITE_API_BASE_URL = "https://career-os.fastapicloud.dev"; // Production
+// const VITE_API_BASE_URL = 'http://localhost:8000'; // Local
 ```
 
-별도 오버라이드가 없으면 프로덕션 API 주소(`https://career-os.fastapicloud.dev`)를 사용합니다.
+ChatKit 임베드를 사용하려면 `career_os_web/`에 `.env.local` 파일을 생성합니다.
+
+```dotenv
+VITE_CHATKIT_DOMAIN_KEY=<OpenAI ChatKit 도메인 키>
+```
 
 ### 실행
 
@@ -82,6 +88,7 @@ pnpm dev
 | **Biome**                    | 린터·포매터              | 포맷터와 린터를 한 도구로 통합해 ESLint·Prettier 조합보다 설정과 실행 흐름이 단순함. Rust 기반이라 대규모 검사에서도 피드백이 빠름                                           |
 | **Vitest + Testing Library** | 단위·컴포넌트 테스트     | Vite 기반 프로젝트와 설정·변환 파이프라인을 공유해 테스트 환경 구성이 단순함. Testing Library는 구현 세부보다 사용자 관점 검증을 유도함                                      |
 | **Playwright**               | E2E 브라우저 테스트      | 실제 브라우저 기반 검증, auto-wait, trace, 병렬 실행 지원이 강함. 로그인·화면 전환 같은 사용자 흐름 회귀를 단위 테스트보다 현실적으로 확인 가능                              |
+| **@openai/chatkit-react**    | AI 채팅 UI 임베드        | OpenAI ChatKit 프로토콜을 준수하는 React 컴포넌트. 스트리밍 SSE 응답과 대화 이력을 내장 처리해 커스텀 채팅 UI를 구현하는 비용을 줄임                                         |
 
 ---
 
@@ -94,6 +101,7 @@ pnpm dev
 - **채용공고 목록** — `/job-postings`에서 저장한 채용공고를 카드 형태로 조회하고 구직 활동 그룹별로 필터링
 - **채용공고 추가** — `/job-postings/new`에서 URL 입력으로 공고를 추출하고 현재 또는 선택한 구직 활동 그룹에 저장
 - **채용공고 상세** — `/job-postings/:id`에서 저장된 공고의 상세 추출 정보를 조회
+- **AI 채팅 어시스턴트** — 모든 인증 페이지 우하단의 플로팅 버튼으로 AI 어시스턴트를 열어 구직 활동 관련 질문을 한국어로 대화
 
 ---
 
@@ -118,3 +126,50 @@ Playwright 브라우저가 없다면 최초 1회 실행:
 ```bash
 pnpm exec playwright install chromium
 ```
+
+단일 테스트 파일 실행:
+
+```bash
+pnpm vitest run src/path/to/file.test.tsx
+```
+
+커밋 전 기본 검증:
+
+```bash
+pnpm lint:fix
+pnpm build
+```
+
+동작이 변경된 경우 `pnpm test`, 라우팅·브라우저 흐름이 변경된 경우 `pnpm test:e2e`를 추가로 실행하세요.
+
+---
+
+## 아키텍처
+
+### 데이터 흐름
+
+```
+pages/          ← 라우트 단위 화면 (상태 조합 + 사용자 이벤트 처리)
+  └─ services/  ← API 호출 (fetchWithApiRetry → Zod 검증 → ApiError 변환)
+  └─ store/     ← 인증 전역 상태 (Zustand, localStorage 영속)
+  └─ utils/     ← 순수 유틸 (날짜 포맷, URL 안전성 검사 등)
+components/     ← 레이아웃 + 재사용 UI 프리미티브
+```
+
+### 인증
+
+- 백엔드 세션 쿠키 기반. `fetchWithApiRetry`가 모든 요청에 `X-Career-OS-Client: web` 헤더를 자동으로 추가합니다.
+- `useAuthStore`는 현재 사용자 정보를 `localStorage`에 영속합니다. 로그아웃 시 반드시 `resetAuthStore()`를 호출해 메모리 상태와 스토리지를 함께 초기화하세요 (`clearAuth()`는 메모리만 초기화합니다).
+
+### API 응답 검증
+
+모든 서비스 함수는 `src/services/schemas.ts`의 Zod v4 스키마로 응답을 검증합니다. 계약 불일치 시 `ApiError(code: CLIENT_CONTRACT_MISMATCH)`가 발생합니다. 새 서비스 함수 추가 시 이 패턴을 그대로 따르세요.
+
+### ChatKit 어시스턴트
+
+- `ChatKitFloatingAssistant`는 `AppLayout` 안에 마운트되며, 첫 열림 시 `<ChatKit>` 임베드를 로드한 뒤 CSS로 숨겨 상태를 유지합니다 (닫아도 스레드가 사라지지 않음).
+- `chatKitFetch`는 스트리밍 응답이므로 `fetchWithApiRetry`를 우회합니다.
+
+### 프로덕션 배포 (Vercel)
+
+`vercel.json`에 Content Security Policy가 설정되어 있습니다. 새 외부 리소스(CDN, iframe 등)를 추가할 때는 반드시 해당 도메인을 CSP 허용 목록에도 추가하세요.

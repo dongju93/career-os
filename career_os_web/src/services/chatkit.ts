@@ -10,8 +10,9 @@ export function getChatKitApiUrl(): string {
 }
 
 /**
- * Domain key registered with OpenAI for the deployed origin. Injected at build
- * time via the `define` block in `vite.config.ts` (no `.env` file).
+ * Domain key registered with OpenAI for the deployed origin. Supplied via
+ * `.env` as `VITE_CHATKIT_DOMAIN_KEY`; Vite exposes it automatically because
+ * of the `VITE_` prefix. Do not hardcode it in `vite.config.ts`.
  */
 export function getChatKitDomainKey(): string {
   return import.meta.env.VITE_CHATKIT_DOMAIN_KEY;

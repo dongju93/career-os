@@ -1,10 +1,11 @@
 # CareerOS API
 
-![FastAPI](https://img.shields.io/badge/FastAPI-0.136.1-009688?logo=fastapi&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.136.3-009688?logo=fastapi&logoColor=white)
 ![FastAPI Cloud](https://img.shields.io/badge/FastAPI%20Cloud-Deployed-009688?logo=fastapi&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)
-![OpenAI](https://img.shields.io/badge/OpenAI_SDK-2.33-412991?logo=openai&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI_SDK-2.41.0-412991?logo=openai&logoColor=white)
+![openai-chatkit](https://img.shields.io/badge/openai--chatkit-1.6.5-412991?logo=openai&logoColor=white)
 ![Pyrefly](https://img.shields.io/badge/Pyrefly-1.0.0-0668E1?logo=meta&logoColor=white)
 ![Google OAuth](https://img.shields.io/badge/Google_OAuth-Authlib-4285F4?logo=google&logoColor=white)
 [![codecov](https://codecov.io/github/dongju93/career-os/graph/badge.svg?flag=backend&token=48VXFY8C3M)](https://codecov.io/github/dongju93/career-os)
@@ -67,11 +68,19 @@ GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 SECRET_KEY=<충분히 긴 임의 문자열>
 
-# 로컬 개발 시 오버라이드
-REDIRECT_URI=http://localhost:8000/v1/auth/google/callback
+# 로컬 개발 시 — DEV=true 하나로 redirect_uri와 frontend_url을 함께 오버라이드
+DEV=true
+# 또는 개별 설정
+# REDIRECT_URI=http://localhost:8000/v1/auth/google/callback
 
 # 선택 — 미설정 시 사용량 제한 비활성화(fail-open)
 REDIS_URL=redis://localhost:6379/0
+
+# 선택 — ChatKit AI 어시스턴트 (기본값으로 동작)
+CHATKIT_ENABLED=true           # false 시 /v1/chatkit 404 반환
+CHATKIT_MODEL=                 # 미설정 시 OPENAI_MODEL 사용
+CHATKIT_MAX_THREADS_PER_USER=50
+CHATKIT_HISTORY_ITEM_LIMIT=20
 ```
 
 ### 실행
@@ -96,6 +105,7 @@ API 문서: `http://localhost:8000/v1/docs`
 | **Redis (redis-py + hiredis)**           | 사용량 제한 저장소      | 슬라이딩 윈도우(Lua 스크립트, 원자적)와 고정 윈도우 두 전략을 조합. `REDIS_URL` 미설정 시 fail-open으로 동작해 Redis 없이도 서버가 기동됨                                        |
 | **Beautiful Soup 4**                     | HTML 파싱               | 실제 웹 페이지처럼 구조가 일정하지 않은 HTML에서도 탐색·검색 API가 안정적이고 단순함. 브라우저 자동화나 무거운 파서 없이 서버 사이드 텍스트 추출 요구를 충족                     |
 | **OpenAI Python SDK**                    | 구조화 데이터 추출      | OpenAI API의 공식 SDK라 모델·파라미터 변화에 대한 호환성이 가장 높음. async client, 멀티모달 입력, 구조화 출력 지원을 직접 HTTP 래퍼로 관리하지 않아도 됨                        |
+| **openai-chatkit + openai-agents**       | AI 어시스턴트 대화      | `openai-agents`의 `Runner`, `Agent`, 스트리밍을 `openai-chatkit`의 스레드·이력 관리 프로토콜로 감싼 구조. HTTP SSE 스트리밍과 PostgreSQL 대화 이력 저장을 최소 코드로 연결       |
 | **Ruff**                                 | 린터·포매터             | 린트, 포맷, import 정리, pyupgrade 계열 규칙을 단일 Rust 기반 도구로 처리해 빠르고 설정이 단순함. 여러 Python 품질 도구를 조합하는 비용을 줄임                                   |
 | **Pyrefly**                              | 타입 검사               | 빠른 정적 타입 검사와 언어 서버 기능을 제공해 피드백 루프가 짧음. Python 타입 적용 범위를 점진적으로 넓히기 좋고, CI와 IDE 양쪽에서 같은 타입 품질 기준을 유지하기 쉬움          |
 | **pytest + pytest-asyncio + pytest-cov** | 테스트                  | pytest의 fixture·plugin 생태계가 넓어 API, 서비스, DB 경계 테스트를 확장하기 좋음. async 테스트와 커버리지 측정을 표준 플러그인으로 붙일 수 있어 별도 테스트 프레임워크가 불필요 |
@@ -109,6 +119,7 @@ API 문서: `http://localhost:8000/v1/docs`
 - **구직 활동 그룹 관리** — 구직 라운드 생성·조회·수정·종료·삭제, 진행/종료 상태 필터링, 최초 로그인 시 기본 그룹 자동 생성
 - **채용 공고 추출** — 사람인·원티드 URL을 입력하면 OpenAI로 구조화된 데이터 반환
 - **공고 저장·관리** — 공고를 `group_id`에 연결해 저장, 그룹별 목록 필터링, 동일 공고의 다른 그룹별 별도 저장 지원
+- **AI 구직 어시스턴트 (ChatKit)** — 한국어 기반 구직 활동 도우미; 스트리밍 SSE 응답, PostgreSQL 대화 이력 저장, 분당 30회·일별 500회 사용량 제한; `CHATKIT_ENABLED=false` 시 비활성화
 - **사용량 제한** — Redis 슬라이딩 윈도우(분당)와 고정 윈도우(일·월별) 조합; Redis 미설정 시 fail-open
 - **지원 플랫폼** — `saramin.co.kr`, `wanted.co.kr`
 
@@ -129,25 +140,26 @@ OAuth 로그인으로 저장되는 사용자 계정 정보와 Google Cross-Accou
 
 모든 엔드포인트는 `/v1` 접두사를 사용합니다. 보호된 엔드포인트는 브라우저 세션 쿠키와 `X-Career-OS-Client: web` 헤더 또는 `Authorization: Bearer <token>` 헤더가 필요합니다.
 
-| 메서드   | 경로                            | 인증 | 설명                                                             |
-| -------- | ------------------------------- | :--: | ---------------------------------------------------------------- |
-| `GET`    | `/`                             |      | 헬스체크                                                         |
-| `GET`    | `/health/db`                    |      | DB 연결 확인                                                     |
-| `GET`    | `/auth/google`                  |      | Google 로그인 시작 (`?callback_url=` 지원)                       |
-| `GET`    | `/auth/google/callback`         |      | OAuth 콜백, 세션 발급                                            |
-| `POST`   | `/auth/google/risc`             |      | Google RISC 보안 이벤트 수신                                     |
-| `GET`    | `/auth/me`                      |  ✓   | 현재 사용자 조회                                                 |
-| `PATCH`  | `/auth/me`                      |  ✓   | 사용자 이름 수정                                                 |
-| `POST`   | `/auth/logout`                  |  ✓   | 로그아웃                                                         |
-| `GET`    | `/job-postings`                 |  ✓   | 저장된 공고 목록 (`offset`, `limit`, 선택 `group_id`)            |
-| `GET`    | `/job-postings/extraction?url=` |  ✓   | URL에서 공고 추출 (저장 안 함)                                   |
-| `POST`   | `/job-postings`                 |  ✓   | 추출된 공고를 그룹에 저장 (선택 `group_id`, 201 신규 / 200 갱신) |
-| `GET`    | `/job-postings/{id}`            |  ✓   | 저장된 공고 상세 조회                                            |
-| `GET`    | `/job-search-groups`            |  ✓   | 구직 활동 그룹 목록 (`status`, `offset`, `limit`)                |
-| `POST`   | `/job-search-groups`            |  ✓   | 구직 활동 그룹 생성                                              |
-| `GET`    | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 상세 조회                                         |
-| `PATCH`  | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 이름·기간·메모 수정                               |
-| `DELETE` | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 삭제 (마지막 그룹 삭제 불가)                      |
+| 메서드   | 경로                            | 인증 | 설명                                                                                                  |
+| -------- | ------------------------------- | :--: | ----------------------------------------------------------------------------------------------------- |
+| `GET`    | `/`                             |      | 헬스체크                                                                                              |
+| `GET`    | `/health/db`                    |      | DB 연결 확인                                                                                          |
+| `GET`    | `/auth/google`                  |      | Google 로그인 시작 (`?callback_url=` 지원)                                                            |
+| `GET`    | `/auth/google/callback`         |      | OAuth 콜백, 세션 발급                                                                                 |
+| `POST`   | `/auth/google/risc`             |      | Google RISC 보안 이벤트 수신                                                                          |
+| `GET`    | `/auth/me`                      |  ✓   | 현재 사용자 조회                                                                                      |
+| `PATCH`  | `/auth/me`                      |  ✓   | 사용자 이름 수정                                                                                      |
+| `POST`   | `/auth/logout`                  |  ✓   | 로그아웃                                                                                              |
+| `POST`   | `/chatkit`                      |  ✓   | AI 어시스턴트 채팅; 스트리밍 SSE 또는 JSON; 분당 30회·일별 500회 제한; `CHATKIT_ENABLED=false` 시 404 |
+| `GET`    | `/job-postings`                 |  ✓   | 저장된 공고 목록 (`offset`, `limit`, 선택 `group_id`)                                                 |
+| `GET`    | `/job-postings/extraction?url=` |  ✓   | URL에서 공고 추출 (저장 안 함)                                                                        |
+| `POST`   | `/job-postings`                 |  ✓   | 추출된 공고를 그룹에 저장 (선택 `group_id`, 201 신규 / 200 갱신)                                      |
+| `GET`    | `/job-postings/{id}`            |  ✓   | 저장된 공고 상세 조회                                                                                 |
+| `GET`    | `/job-search-groups`            |  ✓   | 구직 활동 그룹 목록 (`status`, `offset`, `limit`)                                                     |
+| `POST`   | `/job-search-groups`            |  ✓   | 구직 활동 그룹 생성                                                                                   |
+| `GET`    | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 상세 조회                                                                              |
+| `PATCH`  | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 이름·기간·메모 수정                                                                    |
+| `DELETE` | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 삭제 (마지막 그룹 삭제 불가)                                                           |
 
 ---
 
@@ -165,7 +177,7 @@ uvx pyrefly check                    # 타입 검사
 
 ### 새 플랫폼 추가
 
-1. `career_os_api/service/job_posting/platform.py` — `Platform` enum, `_DOMAIN_MAP`, `PLATFORM_BASE_URLS`, `extract_posting_id()` 업데이트
+1. `career_os_api/service/job_posting/platform.py` — `Platform` enum에 값 추가, `PLATFORM_REGISTRY`에 `PlatformAdapter(domain, base_url, extract_id)` 항목 추가 (`PLATFORM_BASE_URLS`는 자동 계산됨)
 2. `career_os_api/service/job_posting/<platform>.py` — 플랫폼 전용 fetch 함수 구현
 3. `career_os_api/service/job_posting/fetch.py` — 디스패치 분기 추가
 4. `career_os_api/database/ddl.py` — `CHECK (platform IN (...))` 제약 확장
