@@ -73,7 +73,9 @@ oauth.register(
 _CurrentUser = Annotated[dict, Depends(get_current_user)]
 
 # ChatKit routes live in their own module; mount them under the same /v1 prefix.
-v1_router.include_router(chatkit_router)
+# The runtime dependency on the router also guards against runtime flag changes.
+if settings.chatkit_enabled:
+    v1_router.include_router(chatkit_router)
 
 
 def _resolve_callback_url(

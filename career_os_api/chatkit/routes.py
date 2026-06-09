@@ -25,7 +25,13 @@ from career_os_api.rate_limit import quota, rate_limit
 
 _logger = logging.getLogger(__name__)
 
-router = APIRouter()
+
+def _require_chatkit_enabled() -> None:
+    if not settings.chatkit_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+
+
+router = APIRouter(dependencies=[Depends(_require_chatkit_enabled)])
 
 _CurrentUser = Annotated[dict, Depends(get_current_user)]
 
@@ -42,10 +48,6 @@ _MAX_CHATKIT_BODY_BYTES = 262_144
     dependencies=[rate_limit(30, per="minute"), quota(500, per="day")],
 )
 async def chatkit_endpoint(request: Request, current_user: _CurrentUser) -> Response:
-    if not settings.chatkit_enabled:
-        # Hide the feature entirely when disabled.
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
-
     server = request.app.state.chatkit_server
     context = ChatKitRequestContext(
         user_id=current_user["id"],

@@ -249,3 +249,15 @@ def test_chatkit_returns_404_when_disabled(
     response = client.post(CHATKIT_URL, content=b"{}", headers=auth_headers)
 
     assert response.status_code == 404
+
+
+def test_chatkit_returns_404_unauthenticated_when_disabled(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Unauthenticated requests must receive 404, not 401, when the feature is
+    # disabled — 401 would leak that the route exists.
+    monkeypatch.setattr(routes_module.settings, "chatkit_enabled", False)
+
+    response = client.post(CHATKIT_URL, content=b"{}")
+
+    assert response.status_code == 404
