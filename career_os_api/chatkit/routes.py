@@ -10,6 +10,7 @@ of identity passed into the SDK context.
 import logging
 from typing import Annotated
 
+import psycopg.errors
 from chatkit.server import StreamingResult
 from chatkit.store import NotFoundError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -85,6 +86,11 @@ async def chatkit_endpoint(request: Request, current_user: _CurrentUser) -> Resp
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="대화 개수 상한에 도달했습니다. 기존 대화를 삭제한 뒤 다시 시도해 주세요.",
+        ) from exc
+    except psycopg.errors.UniqueViolation as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요.",
         ) from exc
 
     if isinstance(result, StreamingResult):
