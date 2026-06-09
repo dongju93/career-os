@@ -13,7 +13,7 @@ describe('chatkit service', () => {
   });
 
   it('exposes the configured domain key', () => {
-    expect(getChatKitDomainKey()).toBe('career-os-production');
+    expect(getChatKitDomainKey()).toBe('test-placeholder');
   });
 
   it('sends credentials: include and the X-Career-OS-Client header', async () => {
