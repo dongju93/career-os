@@ -6,5 +6,15 @@
 -- conflicts on this constraint (upsert proceeds), same id + different user
 -- instead hits the `id` PRIMARY KEY and raises UniqueViolation.
 
-ALTER TABLE chatkit_items
-    ADD CONSTRAINT chatkit_items_id_user_id_key UNIQUE (id, user_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'chatkit_items_id_user_id_key'
+          AND conrelid = 'chatkit_items'::regclass
+    ) THEN
+        ALTER TABLE chatkit_items
+            ADD CONSTRAINT chatkit_items_id_user_id_key UNIQUE (id, user_id);
+    END IF;
+END
+$$;

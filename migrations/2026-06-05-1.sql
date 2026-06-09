@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS chatkit_items (
     payload     JSONB       NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL,
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (id, user_id),
     FOREIGN KEY (thread_id, user_id)
         REFERENCES chatkit_threads (id, user_id)
         ON DELETE CASCADE
