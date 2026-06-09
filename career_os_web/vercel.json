@@ -6,7 +6,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' https://cdn.platform.openai.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://career-os.fastapicloud.dev https://cdn.platform.openai.com; font-src 'self'; frame-src https://cdn.platform.openai.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
+          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.platform.openai.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://career-os.fastapicloud.dev https://cdn.platform.openai.com; font-src 'self'; frame-src https://cdn.platform.openai.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; upgrade-insecure-requests"
         },
         {
           "key": "X-Frame-Options",
