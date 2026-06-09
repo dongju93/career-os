@@ -31,6 +31,7 @@
   "dependencies": {
     "@mantine/core": "^9.3.0",
     "@mantine/hooks": "^9.3.0",
+    "@openai/chatkit-react": "^1.5.1",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-slot": "^1.2.4",
     "@vercel/analytics": "^2.0.1",

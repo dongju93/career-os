@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fetchWithApiRetry } from './api-client';
+import { fetchWithApiRetry, withCareerOsSessionHeaders } from './api-client';
 
 function okResponse(body: unknown = {}) {
   return {
@@ -205,5 +205,40 @@ describe('fetchWithApiRetry', () => {
     const res = await promise;
     expect(res.ok).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('withCareerOsSessionHeaders', () => {
+  it('adds the session client header to plain-object headers', () => {
+    expect(
+      withCareerOsSessionHeaders({ 'Content-Type': 'application/json' }),
+    ).toEqual({
+      'X-Career-OS-Client': 'web',
+      'Content-Type': 'application/json',
+    });
+  });
+
+  it('adds the session client header when no headers are provided', () => {
+    expect(withCareerOsSessionHeaders(undefined)).toEqual({
+      'X-Career-OS-Client': 'web',
+    });
+  });
+
+  it('merges a Headers instance', () => {
+    const result = withCareerOsSessionHeaders(
+      new Headers({ Authorization: 'Bearer token' }),
+    );
+    expect(result).toBeInstanceOf(Headers);
+    expect((result as Headers).get('X-Career-OS-Client')).toBe('web');
+    expect((result as Headers).get('Authorization')).toBe('Bearer token');
+  });
+
+  it('merges array-form headers', () => {
+    const result = withCareerOsSessionHeaders([
+      ['Content-Type', 'application/json'],
+    ]);
+    expect(result).toBeInstanceOf(Headers);
+    expect((result as Headers).get('X-Career-OS-Client')).toBe('web');
+    expect((result as Headers).get('Content-Type')).toBe('application/json');
   });
 });

@@ -99,6 +99,16 @@ class Settings(BaseSettings):
     # base64 expands raw bytes by ~33 %, so 10 MB ≈ 7.5 MB of raw image data.
     max_total_image_bytes: int = 10 * 1024 * 1024
 
+    # ChatKit text chat — per-user threads persisted in PostgreSQL.
+    # Feature flag: when False the /v1/chatkit endpoint returns 404.
+    chatkit_enabled: bool = True
+    # Model override for chat; falls back to openai_model when unset.
+    chatkit_model: str | None = None
+    # Hard cap on stored threads per user (new-thread creation is rejected above it).
+    chatkit_max_threads_per_user: int = 50
+    # How many of the most recent thread items are fed to the model as history.
+    chatkit_history_item_limit: int = 20
+
     @model_validator(mode="after")
     def _apply_dev_overrides(self) -> Settings:
         if self.dev:

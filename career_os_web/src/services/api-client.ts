@@ -19,7 +19,7 @@ function shouldRetry(error: unknown): boolean {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-function withSessionClientHeader(headers: HeadersInit | undefined) {
+export function withCareerOsSessionHeaders(headers: HeadersInit | undefined) {
   if (headers instanceof Headers || Array.isArray(headers)) {
     const nextHeaders = new Headers(headers);
     nextHeaders.set(SESSION_CLIENT_HEADER, SESSION_CLIENT_HEADER_VALUE);
@@ -50,7 +50,7 @@ export async function fetchWithApiRetry(
       const response = await fetch(input, {
         ...init,
         credentials: init?.credentials ?? 'include',
-        headers: withSessionClientHeader(init?.headers),
+        headers: withCareerOsSessionHeaders(init?.headers),
       });
       if (response.ok) return response;
 
