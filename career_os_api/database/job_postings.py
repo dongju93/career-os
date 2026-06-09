@@ -224,3 +224,107 @@ async def get_job_posting(
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_DETAIL_SQL, (job_id, user_id))
         return cast("JobPostingDetailRow | None", await cur.fetchone())
+
+
+class JobPostingChatSummaryRow(TypedDict):
+    id: int
+    group_id: UUID
+    platform: str
+    company_name: str
+    job_title: str
+    experience_req: str | None
+    deadline: str | None
+    location: str | None
+    employment_type: str | None
+    salary: str | None
+    tech_stack: list[str] | None
+    job_category: str | None
+    industry: str | None
+    scraped_at: datetime
+
+
+class JobPostingChatDetailRow(JobPostingChatSummaryRow):
+    posting_url: str
+    job_description: str | None
+    responsibilities: str | None
+    qualifications: str | None
+    preferred_points: str | None
+    benefits: str | None
+    hiring_process: str | None
+    education_req: str | None
+    application_method: str | None
+    homepage: str | None
+
+
+# Chat-context queries run with untrusted, model-chosen filters, so user_id
+# scoping is mandatory in every WHERE — ownership is never delegated to callers.
+_CHAT_SEARCH_SQL = """
+SELECT
+    id, group_id, platform, company_name, job_title, experience_req, deadline,
+    location, employment_type, salary, tech_stack, job_category, industry, scraped_at
+FROM job_postings
+WHERE user_id = %(user_id)s
+  AND (%(group_id)s::uuid IS NULL OR group_id = %(group_id)s)
+  AND (
+      %(query)s::text IS NULL
+      OR company_name ILIKE %(pattern)s
+      OR job_title ILIKE %(pattern)s
+      OR experience_req ILIKE %(pattern)s
+      OR location ILIKE %(pattern)s
+      OR employment_type ILIKE %(pattern)s
+      OR salary ILIKE %(pattern)s
+      OR job_category ILIKE %(pattern)s
+      OR industry ILIKE %(pattern)s
+      OR array_to_string(tech_stack, ' ') ILIKE %(pattern)s
+  )
+ORDER BY scraped_at DESC, id DESC
+LIMIT %(limit)s
+"""
+
+# contact_person is intentionally not selected — personal data must not enter
+# model context automatically.
+_CHAT_DETAIL_SQL = """
+SELECT
+    id, group_id, platform, company_name, job_title, experience_req, deadline,
+    location, employment_type, salary, tech_stack, job_category, industry, scraped_at,
+    posting_url, job_description, responsibilities, qualifications,
+    preferred_points, benefits, hiring_process, education_req,
+    application_method, homepage
+FROM job_postings
+WHERE id = %(job_id)s AND user_id = %(user_id)s
+"""
+
+
+async def search_job_postings_for_chat_context(
+    conn: AsyncConnection,
+    *,
+    user_id: UUID,
+    query: str | None,
+    group_id: UUID | None,
+    limit: int,
+) -> list[JobPostingChatSummaryRow]:
+    pattern = f"%{query}%" if query else None
+    async with conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            _CHAT_SEARCH_SQL,
+            {
+                "user_id": user_id,
+                "group_id": group_id,
+                "query": query,
+                "pattern": pattern,
+                "limit": limit,
+            },
+        )
+        rows = await cur.fetchall()
+    return cast(list[JobPostingChatSummaryRow], rows)
+
+
+async def get_job_posting_for_chat_context(
+    conn: AsyncConnection,
+    *,
+    user_id: UUID,
+    job_id: int,
+) -> JobPostingChatDetailRow | None:
+    async with conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(_CHAT_DETAIL_SQL, {"job_id": job_id, "user_id": user_id})
+        return cast("JobPostingChatDetailRow | None", await cur.fetchone())

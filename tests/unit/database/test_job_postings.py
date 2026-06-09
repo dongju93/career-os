@@ -1,6 +1,6 @@
 import uuid
 from datetime import UTC, datetime
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from psycopg import AsyncConnection
@@ -21,7 +21,9 @@ class FakeCursor:
     def __init__(self, *, rows=None, fetchone_results=None):
         self._rows = rows or []
         self._fetchone_results = list(fetchone_results or [])
-        self.execute_calls: list[tuple[str, tuple | None]] = []
+        # Params are positional tuples for the legacy queries and dicts for the
+        # named-parameter chat-context queries.
+        self.execute_calls: list[tuple[str, Any]] = []
 
     async def __aenter__(self):
         return self
@@ -29,7 +31,7 @@ class FakeCursor:
     async def __aexit__(self, exc_type, exc, tb):
         return None
 
-    async def execute(self, query: str, params: tuple | None = None) -> None:
+    async def execute(self, query: str, params: Any = None) -> None:
         self.execute_calls.append((query, params))
 
     async def fetchall(self):
@@ -212,3 +214,93 @@ async def test_get_job_posting_uses_detail_query_and_returns_row() -> None:
     assert cursor.execute_calls == [
         (job_postings_module._DETAIL_SQL, (19, user_id)),
     ]
+
+
+@pytest.mark.asyncio
+async def test_search_chat_context_scopes_by_user_and_wraps_pattern() -> None:
+    user_id = uuid.uuid7()
+    rows = [{"id": 1, "company_name": "Career OS"}]
+    cursor = FakeCursor(rows=rows)
+    conn = FakeConnection(cursor=cursor)
+
+    result = await job_postings_module.search_job_postings_for_chat_context(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        query="backend",
+        group_id=None,
+        limit=5,
+    )
+
+    assert result == rows
+    assert conn.cursor_row_factories == [dict_row]
+    sql, params = cursor.execute_calls[0]
+    assert "user_id = %(user_id)s" in sql
+    assert params == {
+        "user_id": user_id,
+        "group_id": None,
+        "query": "backend",
+        "pattern": "%backend%",
+        "limit": 5,
+    }
+
+
+@pytest.mark.asyncio
+async def test_search_chat_context_without_query_binds_null_filters() -> None:
+    user_id = uuid.uuid7()
+    cursor = FakeCursor(rows=[])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await job_postings_module.search_job_postings_for_chat_context(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        query=None,
+        group_id=None,
+        limit=3,
+    )
+
+    assert result == []
+    _, params = cursor.execute_calls[0]
+    assert params["query"] is None
+    assert params["pattern"] is None
+    assert params["limit"] == 3
+
+
+@pytest.mark.asyncio
+async def test_search_chat_context_group_filter_keeps_user_scope() -> None:
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+    cursor = FakeCursor(rows=[])
+    conn = FakeConnection(cursor=cursor)
+
+    await job_postings_module.search_job_postings_for_chat_context(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        query=None,
+        group_id=group_id,
+        limit=5,
+    )
+
+    sql, params = cursor.execute_calls[0]
+    assert "user_id = %(user_id)s" in sql
+    assert params["group_id"] == group_id
+    assert params["user_id"] == user_id
+
+
+@pytest.mark.asyncio
+async def test_get_chat_context_detail_scopes_by_user() -> None:
+    user_id = uuid.uuid7()
+    row = {"id": 19, "company_name": "Career OS"}
+    cursor = FakeCursor(fetchone_results=[row])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await job_postings_module.get_job_posting_for_chat_context(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        job_id=19,
+    )
+
+    assert result == row
+    assert conn.cursor_row_factories == [dict_row]
+    sql, params = cursor.execute_calls[0]
+    assert "WHERE id = %(job_id)s AND user_id = %(user_id)s" in sql
+    assert params == {"job_id": 19, "user_id": user_id}

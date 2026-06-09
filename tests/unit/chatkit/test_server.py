@@ -1,7 +1,7 @@
 """Unit tests for career_os_api.chatkit.server.
 
-These assert the agent contract (no tools, model selection, Korean instructions) and
-the title-derivation helper, without invoking the model or network.
+These assert the agent contract (saved-posting tools, model selection, Korean
+instructions) and the title-derivation helper, without invoking the model or network.
 """
 
 from datetime import UTC, datetime
@@ -19,9 +19,17 @@ from career_os_api.chatkit.server import _derive_title, build_career_os_agent
 _NOW = datetime(2026, 6, 5, 12, 0, tzinfo=UTC)
 
 
-def test_agent_registers_no_tools() -> None:
+def test_agent_registers_saved_job_posting_tools() -> None:
     agent = build_career_os_agent("gpt-5.4-mini")
-    assert agent.tools == []
+    names = {tool.name for tool in agent.tools}
+    assert names == {"search_saved_job_postings", "get_saved_job_posting_detail"}
+
+
+def test_instructions_allow_saved_posting_lookup() -> None:
+    agent = build_career_os_agent("gpt-test-model")
+    assert isinstance(agent.instructions, str)
+    assert "search_saved_job_postings" in agent.instructions
+    assert "직접 조회할 수 없습니다" not in agent.instructions
 
 
 def test_agent_uses_given_model_and_korean_instructions() -> None:
