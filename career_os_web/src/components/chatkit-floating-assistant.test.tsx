@@ -47,6 +47,9 @@ async function openPanel() {
 describe('ChatKitFloatingAssistant', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // `vi.clearAllMocks()` only resets spies — the captured-options ref must be
+    // cleared manually so a test never asserts on a previous test's render.
+    capturedChatKitOptions.current = null;
   });
 
   it('renders nothing when no user is signed in', () => {

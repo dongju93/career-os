@@ -245,6 +245,24 @@ async def test_search_chat_context_scopes_by_user_and_wraps_pattern() -> None:
 
 
 @pytest.mark.asyncio
+async def test_search_chat_context_escapes_like_wildcards() -> None:
+    # 모델이 고른 query의 %, _, \는 와일드카드가 아니라 literal로 검색돼야 한다.
+    cursor = FakeCursor(rows=[])
+    conn = FakeConnection(cursor=cursor)
+
+    await job_postings_module.search_job_postings_for_chat_context(
+        cast(AsyncConnection, conn),
+        user_id=uuid.uuid7(),
+        query="100%_done\\",
+        group_id=None,
+        limit=5,
+    )
+
+    _, params = cursor.execute_calls[0]
+    assert params["pattern"] == "%100\\%\\_done\\\\%"
+
+
+@pytest.mark.asyncio
 async def test_search_chat_context_without_query_binds_null_filters() -> None:
     user_id = uuid.uuid7()
     cursor = FakeCursor(rows=[])

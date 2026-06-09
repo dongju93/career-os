@@ -295,6 +295,11 @@ WHERE id = %(job_id)s AND user_id = %(user_id)s
 """
 
 
+def _escape_chat_like_pattern(query: str) -> str:
+    """LIKE/ILIKE 와일드카드(%, _)와 escape 문자(\\)를 literal로 검색되도록 이스케이프한다."""
+    return query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 async def search_job_postings_for_chat_context(
     conn: AsyncConnection,
     *,
@@ -303,7 +308,7 @@ async def search_job_postings_for_chat_context(
     group_id: UUID | None,
     limit: int,
 ) -> list[JobPostingChatSummaryRow]:
-    pattern = f"%{query}%" if query else None
+    pattern = f"%{_escape_chat_like_pattern(query)}%" if query else None
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(
             _CHAT_SEARCH_SQL,

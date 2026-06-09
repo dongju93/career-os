@@ -29,6 +29,7 @@ ToolRunContext = RunContextWrapper[AgentContext[ChatKitRequestContext]]
 
 _SUMMARY_FIELDS = (
     "id",
+    "group_id",
     "company_name",
     "job_title",
     "platform",
@@ -63,6 +64,7 @@ def _trim_chat_field(value: str | None, limit: int) -> str | None:
 def _build_chat_detail_payload(row: JobPostingChatDetailRow) -> dict[str, Any]:
     posting: dict[str, Any] = {
         "id": row["id"],
+        "group_id": row["group_id"],
         "platform": row["platform"],
         "company_name": row["company_name"],
         "job_title": row["job_title"],
@@ -96,15 +98,17 @@ def _build_chat_detail_payload(row: JobPostingChatDetailRow) -> dict[str, Any]:
         "industry": row["industry"],
         "scraped_at": row["scraped_at"],
     }
-    _enforce_chat_detail_budget(posting)
     return posting
 
 
-def _enforce_chat_detail_budget(posting: dict[str, Any]) -> None:
-    """전체 JSON 길이가 _MAX_DETAIL_TOTAL_CHARS를 넘으면 heavy field를 순서대로 줄인다."""
+def _enforce_chat_detail_budget(
+    envelope: dict[str, Any], posting: dict[str, Any]
+) -> None:
+    """직렬화된 envelope 전체가 _MAX_DETAIL_TOTAL_CHARS를 넘으면 posting의 heavy field를
+    순서대로 줄인다. 예산은 실제 도구 출력(envelope) 기준으로 측정한다."""
 
     def total() -> int:
-        return len(json.dumps(posting, ensure_ascii=False, default=str))
+        return len(json.dumps(envelope, ensure_ascii=False, default=str))
 
     for field in _DETAIL_HEAVY_FIELDS:
         if total() <= _MAX_DETAIL_TOTAL_CHARS:
@@ -125,6 +129,8 @@ async def _search_saved_job_postings_impl(
 ) -> str:
     normalized_query = (query.strip()[:_MAX_QUERY_CHARS] or None) if query else None
     clamped_limit = max(1, min(limit, _MAX_SEARCH_LIMIT))
+    # 한 건 더 조회해 "정확히 limit건만 존재"하는 경우의 truncated 오탐을 막는다.
+    fetch_limit = clamped_limit + 1
 
     parsed_group_id: UUID | None = None
     if group_id:
@@ -139,18 +145,21 @@ async def _search_saved_job_postings_impl(
             user_id=request_context.user_id,
             query=normalized_query,
             group_id=parsed_group_id,
-            limit=clamped_limit,
+            limit=fetch_limit,
         )
 
     rows = await run_database_operation(
         request_context.pool, operation, label="chatkit.search_saved_job_postings"
     )
 
-    items = [{field: row.get(field) for field in _SUMMARY_FIELDS} for row in rows]
+    items = [
+        {field: row.get(field) for field in _SUMMARY_FIELDS}
+        for row in rows[:clamped_limit]
+    ]
     payload = {
         "items": items,
         "count": len(items),
-        "truncated": len(items) >= clamped_limit,
+        "truncated": len(rows) > clamped_limit,
         "query": normalized_query,
         "group_id": str(parsed_group_id) if parsed_group_id else None,
     }
@@ -175,11 +184,10 @@ async def _get_saved_job_posting_detail_impl(
     )
     if row is None:
         return json.dumps({"found": False}, ensure_ascii=False)
-    return json.dumps(
-        {"found": True, "posting": _build_chat_detail_payload(row)},
-        ensure_ascii=False,
-        default=str,
-    )
+    posting = _build_chat_detail_payload(row)
+    envelope: dict[str, Any] = {"found": True, "posting": posting}
+    _enforce_chat_detail_budget(envelope, posting)
+    return json.dumps(envelope, ensure_ascii=False, default=str)
 
 
 @function_tool(

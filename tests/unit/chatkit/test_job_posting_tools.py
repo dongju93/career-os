@@ -17,7 +17,9 @@ import pytest
 
 from career_os_api.chatkit.context import ChatKitRequestContext
 from career_os_api.chatkit.job_posting_tools import (
+    _DETAIL_HEAVY_FIELDS,
     _MAX_DETAIL_FIELD_CHARS,
+    _MAX_DETAIL_TOTAL_CHARS,
     _SUMMARY_FIELDS,
     _get_saved_job_posting_detail_impl,
     _search_saved_job_postings_impl,
@@ -82,6 +84,26 @@ def _make_context(
     return ChatKitRequestContext(user_id=user_id, pool=cast(Any, pool))
 
 
+def _summary_row(posting_id: int) -> dict[str, Any]:
+    """JobPostingChatSummaryRow shape for search results."""
+    return {
+        "id": posting_id,
+        "group_id": uuid.uuid7(),
+        "platform": "saramin",
+        "company_name": "Career OS",
+        "job_title": "Backend Engineer",
+        "experience_req": None,
+        "deadline": None,
+        "location": "Seoul",
+        "employment_type": None,
+        "salary": None,
+        "tech_stack": ["Python"],
+        "job_category": None,
+        "industry": None,
+        "scraped_at": _NOW,
+    }
+
+
 def _detail_row(**overrides: Any) -> dict[str, Any]:
     """Full JobPostingChatDetailRow shape — the payload builder subscripts every key."""
     row: dict[str, Any] = {
@@ -120,23 +142,7 @@ def _detail_row(**overrides: Any) -> dict[str, Any]:
 @pytest.mark.asyncio
 async def test_search_impl_scopes_by_request_user_and_projects_summary() -> None:
     user_id = uuid.uuid7()
-    summary_row = {
-        "id": 1,
-        "group_id": uuid.uuid7(),
-        "platform": "saramin",
-        "company_name": "Career OS",
-        "job_title": "Backend Engineer",
-        "experience_req": None,
-        "deadline": None,
-        "location": "Seoul",
-        "employment_type": None,
-        "salary": None,
-        "tech_stack": ["Python"],
-        "job_category": None,
-        "industry": None,
-        "scraped_at": _NOW,
-    }
-    cursor = FakeCursor(fetchall=[[summary_row]])
+    cursor = FakeCursor(fetchall=[[_summary_row(1)]])
     context = _make_context(user_id, [cursor])
 
     out = await _search_saved_job_postings_impl(
@@ -174,7 +180,48 @@ async def test_search_impl_clamps_limit_to_maximum() -> None:
     await _search_saved_job_postings_impl(context, query=None, group_id=None, limit=999)
 
     _, params = cursor.executed[0]
-    assert params["limit"] == 8
+    assert params["limit"] == 9  # clamped 8 + truncation probe 1
+
+
+@pytest.mark.asyncio
+async def test_search_impl_clamps_limit_to_minimum() -> None:
+    cursor = FakeCursor(fetchall=[[]])
+    context = _make_context(uuid.uuid7(), [cursor])
+
+    await _search_saved_job_postings_impl(context, query=None, group_id=None, limit=0)
+
+    _, params = cursor.executed[0]
+    assert params["limit"] == 2  # clamped 1 + truncation probe 1
+
+
+@pytest.mark.asyncio
+async def test_search_impl_truncated_false_when_results_fit_limit() -> None:
+    cursor = FakeCursor(fetchall=[[_summary_row(i) for i in range(1, 6)]])
+    context = _make_context(uuid.uuid7(), [cursor])
+
+    out = await _search_saved_job_postings_impl(
+        context, query=None, group_id=None, limit=5
+    )
+
+    payload = json.loads(out)
+    assert payload["count"] == 5
+    assert payload["truncated"] is False
+
+
+@pytest.mark.asyncio
+async def test_search_impl_truncated_true_drops_probe_row() -> None:
+    # fetch_limit(=limit+1)이 6건을 돌려주면 5건만 노출하고 truncated를 켠다.
+    cursor = FakeCursor(fetchall=[[_summary_row(i) for i in range(1, 7)]])
+    context = _make_context(uuid.uuid7(), [cursor])
+
+    out = await _search_saved_job_postings_impl(
+        context, query=None, group_id=None, limit=5
+    )
+
+    payload = json.loads(out)
+    assert payload["count"] == 5
+    assert [item["id"] for item in payload["items"]] == [1, 2, 3, 4, 5]
+    assert payload["truncated"] is True
 
 
 # ── detail tool ───────────────────────────────────────────────────────────────
@@ -200,6 +247,20 @@ async def test_detail_impl_trims_long_job_description() -> None:
     payload = json.loads(out)
     assert payload["found"] is True
     assert len(payload["posting"]["job_description"]) <= _MAX_DETAIL_FIELD_CHARS
+
+
+@pytest.mark.asyncio
+async def test_detail_impl_enforces_total_budget_on_tool_output() -> None:
+    # 모든 heavy field가 per-field 한도(1,500자)까지 차도 직렬화된 도구 출력 전체가
+    # _MAX_DETAIL_TOTAL_CHARS를 넘지 않아야 한다.
+    heavy = dict.fromkeys(_DETAIL_HEAVY_FIELDS, "가" * 5_000)
+    cursor = FakeCursor(fetchone=[_detail_row(**heavy)])
+    context = _make_context(uuid.uuid7(), [cursor])
+
+    out = await _get_saved_job_posting_detail_impl(context, job_id=19)
+
+    assert json.loads(out)["found"] is True
+    assert len(out) <= _MAX_DETAIL_TOTAL_CHARS
 
 
 @pytest.mark.asyncio
