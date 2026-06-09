@@ -51,7 +51,23 @@ export function ChatKitFloatingAssistant() {
       },
       header: { enabled: false },
       history: { enabled: true, showDelete: true, showRename: false },
-      startScreen: { greeting: '새 대화', prompts: [] },
+      startScreen: {
+        greeting: '새 대화',
+        prompts: [
+          {
+            label: '최근 저장 공고 비교',
+            prompt: '최근에 저장한 공고들을 비교해줘',
+          },
+          {
+            label: '지원 우선순위 정리',
+            prompt: '저장한 공고들로 지원 우선순위를 정해줘',
+          },
+          {
+            label: '저장 공고에서 찾기',
+            prompt: '저장한 공고 중 신입 지원 가능한 공고를 찾아줘',
+          },
+        ],
+      },
       composer: { placeholder: '무엇을 도와드릴까요?' },
       locale: 'ko-KR',
       theme: {

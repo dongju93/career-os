@@ -13,10 +13,19 @@ const chatkitMocks = vi.hoisted(() => ({
   focusComposer: vi.fn(),
 }));
 
+// Captures the options passed to `useChatKit` so tests can assert on our
+// configuration without coupling to ChatKit's internal UI.
+const capturedChatKitOptions = vi.hoisted(() => ({
+  current: null as { startScreen?: { prompts?: unknown[] } } | null,
+}));
+
 // ChatKit renders an opaque embed; mock the binding so tests cover only our
 // shell and the control wiring, not ChatKit's internal UI.
 vi.mock('@openai/chatkit-react', () => ({
-  useChatKit: () => ({ control: {}, ...chatkitMocks }),
+  useChatKit: (options: { startScreen?: { prompts?: unknown[] } }) => {
+    capturedChatKitOptions.current = options;
+    return { control: {}, ...chatkitMocks };
+  },
   ChatKit: () => <div data-testid="chatkit-embed" />,
 }));
 
@@ -38,6 +47,9 @@ async function openPanel() {
 describe('ChatKitFloatingAssistant', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // `vi.clearAllMocks()` only resets spies — the captured-options ref must be
+    // cleared manually so a test never asserts on a previous test's render.
+    capturedChatKitOptions.current = null;
   });
 
   it('renders nothing when no user is signed in', () => {
@@ -95,6 +107,15 @@ describe('ChatKitFloatingAssistant', () => {
     await userEvent.click(screen.getByRole('button', { name: '새 채팅' }));
 
     expect(chatkitMocks.setThreadId).toHaveBeenCalledWith(null);
+  });
+
+  it('configures non-empty starter prompts on the start screen', () => {
+    signIn();
+    render(<ChatKitFloatingAssistant />);
+
+    const prompts = capturedChatKitOptions.current?.startScreen?.prompts;
+    expect(prompts).toBeDefined();
+    expect(prompts?.length).toBeGreaterThan(0);
   });
 
   it('opens the history view via showHistory()', async () => {
