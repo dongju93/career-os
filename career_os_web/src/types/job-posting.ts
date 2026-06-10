@@ -1,5 +1,13 @@
 export type Platform = 'saramin' | 'wanted';
 
+export type ApplicationStatus =
+  | 'saved'
+  | 'applied'
+  | 'interviewing'
+  | 'offer'
+  | 'rejected'
+  | 'withdrawn';
+
 export interface JobPostingExtracted {
   platform: Platform;
   posting_id: string;
@@ -45,9 +53,17 @@ export interface JobPostingListItem {
   job_category: string | null;
   industry: string | null;
   group_id: string;
+  application_status: ApplicationStatus;
+  status_updated_at: string | null;
   scraped_at: string;
   created_at: string;
   updated_at: string;
+}
+
+// Partial PATCH body for /v1/job-postings/{id}. Phase 0 exposes only
+// `application_status`; `group_id`/`memo` arrive in Phase 2.
+export interface JobPostingUpdate {
+  application_status?: ApplicationStatus;
 }
 
 export interface JobPostingDetail extends JobPostingListItem {

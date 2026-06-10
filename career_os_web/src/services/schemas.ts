@@ -2,6 +2,15 @@ import { z } from 'zod/v4';
 
 const platformSchema = z.enum(['saramin', 'wanted']);
 
+export const applicationStatusSchema = z.enum([
+  'saved',
+  'applied',
+  'interviewing',
+  'offer',
+  'rejected',
+  'withdrawn',
+]);
+
 export const jobPostingExtractedSchema = z.object({
   platform: platformSchema,
   posting_id: z.string(),
@@ -47,6 +56,8 @@ const jobPostingListItemSchema = z.object({
   job_category: z.string().nullable(),
   industry: z.string().nullable(),
   group_id: z.string().uuid(),
+  application_status: applicationStatusSchema,
+  status_updated_at: z.string().nullable(),
   scraped_at: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -129,3 +140,18 @@ export const jobSearchGroupApiResponseSchema =
 export const jobSearchGroupPageApiResponseSchema = apiResponseSchema(
   jobSearchGroupPageSchema,
 );
+
+const userProfileSchema = z.object({
+  headline: z.string().nullable(),
+  years_experience: z.number().nullable(),
+  target_roles: z.array(z.string()).nullable(),
+  skills: z.array(z.string()).nullable(),
+  locations: z.array(z.string()).nullable(),
+  salary_expectation: z.string().nullable(),
+  summary: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const userProfileApiResponseSchema =
+  apiResponseSchema(userProfileSchema);

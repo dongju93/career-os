@@ -6,6 +6,7 @@ import {
   fetchJobPosting,
   fetchJobPostings,
   saveJobPosting,
+  updateJobPosting,
 } from './job-postings';
 
 function okResponse(body: unknown, status = 200) {
@@ -70,6 +71,8 @@ const minimalDetail = {
   job_category: null,
   industry: null,
   group_id: '00000000-0000-7000-8000-000000000001',
+  application_status: 'saved' as const,
+  status_updated_at: null,
   scraped_at: '2026-01-01T00:00:00Z',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
@@ -201,6 +204,50 @@ describe('fetchJobPosting', () => {
     await expect(fetchJobPosting(1)).rejects.toMatchObject({
       code: CLIENT_CONTRACT_MISMATCH,
     });
+  });
+});
+
+describe('updateJobPosting', () => {
+  it('sends a PATCH with the patch body and returns the updated detail', async () => {
+    const updated = {
+      ...minimalDetail,
+      application_status: 'interviewing' as const,
+      status_updated_at: '2026-02-01T00:00:00Z',
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(okResponse(apiResponse(updated)));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await updateJobPosting(1, {
+      application_status: 'interviewing',
+    });
+
+    expect(result.application_status).toBe('interviewing');
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`,
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ application_status: 'interviewing' }),
+      }),
+    );
+    // Single-attempt: a status PATCH must not be retried.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws ApiError with CLIENT_CONTRACT_MISMATCH on schema mismatch', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          okResponse({ status: 200, message: 'ok', data: { id: 'nope' } }),
+        ),
+    );
+
+    await expect(
+      updateJobPosting(1, { application_status: 'applied' }),
+    ).rejects.toMatchObject({ code: CLIENT_CONTRACT_MISMATCH });
   });
 });
 

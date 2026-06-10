@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../store/auth-store';
@@ -49,6 +49,8 @@ function buildJobPostingDetail(
     job_category: 'Engineering',
     industry: 'Software',
     group_id: TEST_GROUP_ID,
+    application_status: 'saved',
+    status_updated_at: null,
     scraped_at: '2026-04-20T12:00:00Z',
     created_at: '2026-04-20T12:00:00Z',
     updated_at: '2026-04-20T12:00:00Z',
@@ -87,6 +89,8 @@ function buildJobPostingPage(detail = buildJobPostingDetail()): JobPostingPage {
         job_category: detail.job_category,
         industry: detail.industry,
         group_id: detail.group_id,
+        application_status: detail.application_status,
+        status_updated_at: detail.status_updated_at,
         scraped_at: detail.scraped_at,
         created_at: detail.created_at,
         updated_at: detail.updated_at,
@@ -260,6 +264,112 @@ describe('JobPostingDetailPage', () => {
     await user.keyboard('{Enter}');
 
     expect(router.state.location.pathname).toBe('/job-postings/1');
+  });
+
+  it('changes application status via the selector and reflects the server response', async () => {
+    const user = userEvent.setup();
+    const detail = buildJobPostingDetail();
+    let patchBody: Record<string, unknown> | null = null;
+
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+        if (init?.method === 'PATCH') {
+          patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          return jsonResponse(
+            apiResponse({
+              ...detail,
+              application_status: 'interviewing',
+              status_updated_at: '2026-04-25T09:00:00Z',
+            }),
+          );
+        }
+        return jsonResponse(apiResponse(detail));
+      }
+
+      throw new Error(`Unexpected fetch request: ${input}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings/1');
+
+    await screen.findByRole('heading', { name: 'Frontend Engineer' });
+
+    const statusSelect =
+      screen.getByLabelText<HTMLSelectElement>('지원 상태 변경');
+    expect(statusSelect.value).toBe('saved');
+
+    await user.selectOptions(statusSelect, 'interviewing');
+
+    await waitFor(() => {
+      expect(patchBody).toEqual({ application_status: 'interviewing' });
+    });
+    await waitFor(() => {
+      expect(statusSelect.value).toBe('interviewing');
+    });
+  });
+
+  it('surfaces a failure when the status update is rejected', async () => {
+    const user = userEvent.setup();
+    const detail = buildJobPostingDetail();
+
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+        if (init?.method === 'PATCH') {
+          return jsonResponse(
+            {
+              type: 'about:blank',
+              title: 'Unprocessable Entity',
+              status: 422,
+              detail: '상태 값이 올바르지 않습니다.',
+              instance: '/v1/job-postings/1',
+            },
+            422,
+          );
+        }
+        return jsonResponse(apiResponse(detail));
+      }
+
+      throw new Error(`Unexpected fetch request: ${input}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings/1');
+
+    await screen.findByRole('heading', { name: 'Frontend Engineer' });
+
+    const statusSelect =
+      screen.getByLabelText<HTMLSelectElement>('지원 상태 변경');
+    await user.selectOptions(statusSelect, 'applied');
+
+    expect(
+      await screen.findByText('상태 값이 올바르지 않습니다.'),
+    ).toBeInTheDocument();
+    // No optimistic write: the controlled selector reverts to the server value.
+    expect(statusSelect.value).toBe('saved');
   });
 
   it('shows a structured API error and retries the same detail request', async () => {

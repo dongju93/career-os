@@ -27,6 +27,11 @@ const JobSearchGroupsPage = lazy(() =>
     default: m.JobSearchGroupsPage,
   })),
 );
+const ProfilePage = lazy(() =>
+  import('../pages/profile-page').then((m) => ({
+    default: m.ProfilePage,
+  })),
+);
 
 export const appRoutes = [
   {
@@ -65,6 +70,10 @@ export const appRoutes = [
           {
             path: 'job-search-groups',
             element: <JobSearchGroupsPage />,
+          },
+          {
+            path: 'profile',
+            element: <ProfilePage />,
           },
           {
             path: '*',

@@ -5,6 +5,7 @@ import {
   Building2,
   Calendar,
   CheckCircle,
+  ClipboardList,
   Clock,
   Code2,
   DollarSign,
@@ -21,17 +22,25 @@ import {
 import type { ComponentType } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
-import { fetchJobPosting } from '../services/job-postings';
-import type { JobPostingDetail } from '../types/job-posting';
+import { fetchJobPosting, updateJobPosting } from '../services/job-postings';
+import type { ApplicationStatus, JobPostingDetail } from '../types/job-posting';
 import {
+  APPLICATION_STATUS_LABELS,
+  applicationStatusVariant,
   formatRelativeDate,
   platformVariant,
 } from '../utils/job-posting-formatters';
+
+const APPLICATION_STATUS_OPTIONS = Object.keys(
+  APPLICATION_STATUS_LABELS,
+) as ApplicationStatus[];
+
 import { toSafeExternalUrl } from '../utils/url';
 
 function SectionHeading({
@@ -105,6 +114,8 @@ export function JobPostingDetailPage() {
   const [detail, setDetail] = useState<JobPostingDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<UserFacingError | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusError, setStatusError] = useState<UserFacingError | null>(null);
 
   const loadDetail = useCallback(
     (signal?: AbortSignal) => {
@@ -131,6 +142,25 @@ export function JobPostingDetailPage() {
     loadDetail(controller.signal);
     return () => controller.abort();
   }, [loadDetail]);
+
+  async function handleStatusChange(next: ApplicationStatus) {
+    if (!detail || next === detail.application_status) return;
+
+    setIsUpdatingStatus(true);
+    setStatusError(null);
+
+    try {
+      const updated = await updateJobPosting(detail.id, {
+        application_status: next,
+      });
+      // Server response is the source of truth (no optimistic write).
+      setDetail(updated);
+    } catch (err) {
+      setStatusError(toUserFacingError(err, '상태를 변경하지 못했습니다.'));
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  }
 
   const backLink = (
     <Button variant="ghost" size="sm" asChild>
@@ -229,6 +259,49 @@ export function JobPostingDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Application status */}
+      <Card>
+        <CardContent className="p-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <SectionHeading icon={ClipboardList} title="지원 상태" />
+            <Badge
+              variant={applicationStatusVariant(detail.application_status)}
+            >
+              {APPLICATION_STATUS_LABELS[detail.application_status]}
+            </Badge>
+            <label className="sr-only" htmlFor="application-status">
+              지원 상태 변경
+            </label>
+            <select
+              className="input-clean h-10 rounded-xl px-3 text-sm focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+              disabled={isUpdatingStatus}
+              id="application-status"
+              value={detail.application_status}
+              onChange={(e) =>
+                handleStatusChange(e.target.value as ApplicationStatus)
+              }
+            >
+              {APPLICATION_STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>
+                  {APPLICATION_STATUS_LABELS[status]}
+                </option>
+              ))}
+            </select>
+            {detail.status_updated_at && (
+              <span className="text-xs text-gray-500">
+                {formatRelativeDate(detail.status_updated_at)} 업데이트
+              </span>
+            )}
+          </div>
+          {statusError && (
+            <Alert className="mt-3" variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{statusError.message}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Metadata */}
       {hasMetadata && (

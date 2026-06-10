@@ -10,6 +10,8 @@ const badgeVariants = cva(
         default: 'glass-light text-primary border',
         secondary: 'glass-light text-gray-600 border',
         destructive: 'bg-red-500/15 text-red-300 border-red-400/25',
+        success: 'bg-emerald-500/15 text-emerald-300 border-emerald-400/25',
+        warning: 'bg-amber-500/15 text-amber-300 border-amber-400/25',
         outline: 'glass-light text-foreground border-white/15',
         saramin: 'bg-orange-400/15 text-orange-300 border-orange-400/25',
         wanted: 'bg-teal-400/15 text-teal-300 border-teal-400/25',
