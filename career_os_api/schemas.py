@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from enum import StrEnum
 from typing import Annotated
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID
@@ -44,6 +45,19 @@ class UpdateCurrentUserRequest(BaseModel):
 
 
 # ── Job Postings ──────────────────────────────────────────────────────────────
+
+
+class ApplicationStatus(StrEnum):
+    """Lifecycle of a saved posting. Mirrors the job_postings.application_status
+    CHECK constraint — the DDL string stays literal (the Platform CHECK is the
+    precedent); a drift test guards the two against silent divergence."""
+
+    saved = "saved"
+    applied = "applied"
+    interviewing = "interviewing"
+    offer = "offer"
+    rejected = "rejected"
+    withdrawn = "withdrawn"
 
 
 class _JobPostingBase(BaseModel):
@@ -167,9 +181,31 @@ class JobPostingStored(_JobPostingBase):
 
     id: int
     group_id: UUID
+    application_status: ApplicationStatus
+    status_updated_at: datetime | None = None
     scraped_at: datetime
     created_at: datetime
     updated_at: datetime
+
+
+class JobPostingUpdateRequest(BaseModel):
+    """PATCH /v1/job-postings/{job_id} body — partial update of a saved posting.
+
+    At least one field must be provided. NOT NULL columns may not be set to an
+    explicit null (mirrors the null-rejection guard in the groups PATCH handler).
+    Phase 2 adds group_id and memo.
+    """
+
+    application_status: ApplicationStatus | None = None
+
+    @model_validator(mode="after")
+    def reject_empty_or_null_not_null_columns(self) -> JobPostingUpdateRequest:
+        if not self.model_fields_set:
+            raise ValueError("At least one field must be provided")
+        for field in ("application_status",):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} cannot be null")
+        return self
 
 
 class JobPostingListItem(BaseModel):
@@ -191,6 +227,8 @@ class JobPostingListItem(BaseModel):
     tags: list[str] | None = None
     job_category: str | None = None
     industry: str | None = None
+    application_status: ApplicationStatus
+    status_updated_at: datetime | None = None
     scraped_at: datetime
     created_at: datetime
     updated_at: datetime
@@ -263,3 +301,50 @@ class JobSearchGroupPage(BaseModel):
     total: int
     offset: int
     limit: int
+
+
+# ── Career Profile ──────────────────────────────────────────────────────────────
+
+
+# Each array entry is capped so a single oversized item fails at the API boundary,
+# not at the TEXT[] insert. List-level Field(max_length=...) bounds the item count.
+_ProfileTag = Annotated[str, Field(max_length=100)]
+
+
+class UserProfileUpsertRequest(BaseModel):
+    """PUT /v1/profile body — full-replace upsert.
+
+    Every field is optional and nullable; fields omitted on a replace are stored
+    as NULL. String lengths mirror the user_profiles VARCHAR/TEXT limits so
+    validation fails before the DB insert.
+    """
+
+    headline: Annotated[str, Field(max_length=200)] | None = None
+    years_experience: Annotated[int, Field(ge=0, le=60)] | None = None
+    target_roles: Annotated[list[_ProfileTag], Field(max_length=20)] | None = None
+    skills: Annotated[list[_ProfileTag], Field(max_length=50)] | None = None
+    locations: Annotated[list[_ProfileTag], Field(max_length=20)] | None = None
+    salary_expectation: Annotated[str, Field(max_length=200)] | None = None
+    summary: Annotated[str, Field(max_length=8000)] | None = None
+
+    @field_validator("headline")
+    @classmethod
+    def normalize_headline(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return v.strip() or None
+
+    @field_validator("target_roles", "skills", "locations", mode="before")
+    @classmethod
+    def drop_empty_profile_entries(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        cleaned = [item for item in v if isinstance(item, str) and item.strip()]
+        return cleaned or None
+
+
+class UserProfile(UserProfileUpsertRequest):
+    """GET/PUT /v1/profile response — the seven content fields plus timestamps."""
+
+    created_at: datetime
+    updated_at: datetime

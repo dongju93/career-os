@@ -1,12 +1,15 @@
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
+from career_os_api.database import ddl as ddl_module
 from career_os_api.database import job_postings as job_postings_module
+from career_os_api.schemas import ApplicationStatus
 
 
 class FakeExecuteResult:
@@ -302,6 +305,79 @@ async def test_search_chat_context_group_filter_keeps_user_scope() -> None:
     assert "user_id = %(user_id)s" in sql
     assert params["group_id"] == group_id
     assert params["user_id"] == user_id
+
+
+@pytest.mark.asyncio
+async def test_update_job_posting_fields_stamps_status_updated_at() -> None:
+    user_id = uuid.uuid7()
+    row = {"id": 7, "application_status": "applied"}
+    cursor = FakeCursor(fetchone_results=[row])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await job_postings_module.update_job_posting_fields(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        job_id=7,
+        fields={"application_status": "applied"},
+    )
+
+    assert result == row
+    assert conn.cursor_row_factories == [dict_row]
+    sql, params = cursor.execute_calls[0]
+    assert "application_status = %s" in sql
+    # A status change must also bump status_updated_at in the same statement.
+    assert "status_updated_at = NOW()" in sql
+    assert "WHERE id = %s AND user_id = %s" in sql
+    assert params == ("applied", 7, user_id)
+
+
+@pytest.mark.asyncio
+async def test_update_job_posting_fields_returns_none_when_no_row_matches() -> None:
+    # Foreign / unknown id matches no row under the user_id-scoped WHERE.
+    cursor = FakeCursor(fetchone_results=[None])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await job_postings_module.update_job_posting_fields(
+        cast(AsyncConnection, conn),
+        user_id=uuid.uuid7(),
+        job_id=999,
+        fields={"application_status": "applied"},
+    )
+
+    assert result is None
+
+
+def test_list_and_detail_sql_project_application_lifecycle_columns() -> None:
+    for sql in (
+        job_postings_module._DETAIL_SQL,
+        job_postings_module._LIST_BY_USER_SQL,
+        job_postings_module._LIST_BY_GROUP_SQL,
+    ):
+        assert "application_status" in sql
+        assert "status_updated_at" in sql
+
+
+def test_upsert_do_update_set_preserves_status_but_returns_it() -> None:
+    # Re-saving a posting must not reset its lifecycle columns, so they must be
+    # absent from DO UPDATE SET — yet still projected in RETURNING.
+    after_conflict = job_postings_module._UPSERT_SQL.split("DO UPDATE SET", 1)[1]
+    set_clause, returning_clause = after_conflict.split("RETURNING", 1)
+    assert "application_status" not in set_clause
+    assert "status_updated_at" not in set_clause
+    assert "application_status" in returning_clause
+    assert "status_updated_at" in returning_clause
+
+
+def test_application_status_enum_matches_ddl_check_constraints() -> None:
+    # Guards against silent drift between the StrEnum and the literal CHECK lists
+    # in both the CREATE TABLE and the migration for existing databases.
+    migration_sql = (
+        Path(__file__).parents[3] / "migrations/2026-06-10-1.sql"
+    ).read_text()
+    for member in ApplicationStatus:
+        token = f"'{member.value}'"
+        assert token in ddl_module.CREATE_JOB_POSTINGS_TABLE
+        assert token in migration_sql
 
 
 @pytest.mark.asyncio

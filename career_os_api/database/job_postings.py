@@ -11,6 +11,8 @@ from career_os_api.schemas import JobPostingExtracted
 class UpsertResult(TypedDict):
     id: int
     group_id: UUID
+    application_status: str
+    status_updated_at: datetime | None
     scraped_at: datetime
     created_at: datetime
     updated_at: datetime
@@ -34,6 +36,8 @@ class JobPostingListRow(TypedDict):
     tags: list[str] | None
     job_category: str | None
     industry: str | None
+    application_status: str
+    status_updated_at: datetime | None
     scraped_at: datetime
     created_at: datetime
     updated_at: datetime
@@ -93,7 +97,9 @@ ON CONFLICT (group_id, platform, posting_id) DO UPDATE SET
     industry           = EXCLUDED.industry,
     scraped_at         = NOW(),
     updated_at         = NOW()
-RETURNING id, group_id, scraped_at, created_at, updated_at, (xmax = 0) AS inserted
+RETURNING
+    id, group_id, application_status, status_updated_at,
+    scraped_at, created_at, updated_at, (xmax = 0) AS inserted
 """
 
 # Selects only summary-level columns — heavy text fields are intentionally omitted.
@@ -102,7 +108,8 @@ SELECT
     id, group_id, platform, posting_id, posting_url,
     company_name, job_title, experience_req, deadline, location,
     employment_type, salary, tech_stack, tags,
-    job_category, industry, scraped_at, created_at, updated_at
+    job_category, industry, application_status, status_updated_at,
+    scraped_at, created_at, updated_at
 FROM job_postings
 WHERE user_id = %s
 ORDER BY scraped_at DESC
@@ -120,7 +127,8 @@ SELECT
     id, group_id, platform, posting_id, posting_url,
     company_name, job_title, experience_req, deadline, location,
     employment_type, salary, tech_stack, tags,
-    job_category, industry, scraped_at, created_at, updated_at
+    job_category, industry, application_status, status_updated_at,
+    scraped_at, created_at, updated_at
 FROM job_postings
 WHERE group_id = %s
 ORDER BY scraped_at DESC
@@ -133,8 +141,9 @@ FROM job_postings
 WHERE group_id = %s
 """
 
-_DETAIL_SQL = """
-SELECT
+# Shared by the detail SELECT and the update RETURNING so both always project the
+# full JobPostingDetailRow shape and cannot drift apart when columns are added.
+_DETAIL_COLUMNS = """
     id, group_id, platform, posting_id, posting_url,
     company_name, job_title, experience_req, deadline, location,
     employment_type, job_description, responsibilities, qualifications,
@@ -142,7 +151,12 @@ SELECT
     education_req, salary, tech_stack, tags,
     application_method, application_form, contact_person,
     homepage, job_category, industry,
+    application_status, status_updated_at,
     scraped_at, created_at, updated_at
+"""
+
+_DETAIL_SQL = f"""
+SELECT {_DETAIL_COLUMNS}
 FROM job_postings
 WHERE id = %s
   AND user_id = %s
@@ -223,6 +237,39 @@ async def get_job_posting(
 ) -> JobPostingDetailRow | None:
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_DETAIL_SQL, (job_id, user_id))
+        return cast("JobPostingDetailRow | None", await cur.fetchone())
+
+
+async def update_job_posting_fields(
+    conn: AsyncConnection,
+    *,
+    user_id: UUID,
+    job_id: int,
+    fields: dict[str, object],
+) -> JobPostingDetailRow | None:
+    """Update only the columns present in `fields`, returning the full detail row.
+
+    Builds a dynamic SET like update_job_search_group. When application_status is
+    among the updated fields, status_updated_at is stamped in the same statement.
+    The WHERE is scoped by user_id, so a foreign or unknown id matches no row and
+    yields None (the route maps that to 404).
+    """
+    if not fields:
+        return await get_job_posting(conn, job_id, user_id=user_id)
+
+    set_clauses = [f"{key} = %s" for key in fields]
+    values = list(fields.values())
+    if "application_status" in fields:
+        set_clauses.append("status_updated_at = NOW()")
+    set_sql = ", ".join(set_clauses)
+    sql = f"""
+UPDATE job_postings
+SET {set_sql}, updated_at = NOW()
+WHERE id = %s AND user_id = %s
+RETURNING {_DETAIL_COLUMNS}
+"""
+    async with conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(sql, (*values, job_id, user_id))  # type: ignore[arg-type]
         return cast("JobPostingDetailRow | None", await cur.fetchone())
 
 
