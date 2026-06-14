@@ -357,6 +357,75 @@ def test_list_and_detail_sql_project_application_lifecycle_columns() -> None:
         assert "status_updated_at" in sql
 
 
+def test_detail_sql_projects_memo_but_list_sql_does_not() -> None:
+    # memo is a detail-only field — present in the detail/update projection, absent
+    # from the lightweight list projections.
+    assert "memo" in job_postings_module._DETAIL_COLUMNS
+    assert "memo" in job_postings_module._DETAIL_SQL
+    for sql in (
+        job_postings_module._LIST_BY_USER_SQL,
+        job_postings_module._LIST_BY_GROUP_SQL,
+    ):
+        assert "memo" not in sql
+
+
+def test_upsert_do_update_set_preserves_memo() -> None:
+    # Re-saving / re-extracting a posting must not wipe a user-entered memo, so memo
+    # must be absent from DO UPDATE SET (same preservation rule as the status cols).
+    set_clause = job_postings_module._UPSERT_SQL.split("DO UPDATE SET", 1)[1].split(
+        "RETURNING", 1
+    )[0]
+    assert "memo" not in set_clause
+
+
+@pytest.mark.asyncio
+async def test_update_job_posting_fields_verifies_target_group_then_updates() -> None:
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+    updated_row = {"id": 7, "group_id": group_id}
+    # First fetchone answers the ownership check (truthy), second the UPDATE RETURNING.
+    cursor = FakeCursor(fetchone_results=[{"exists": 1}, updated_row])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await job_postings_module.update_job_posting_fields(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        job_id=7,
+        fields={"group_id": group_id},
+    )
+
+    assert result == updated_row
+    # Ownership check runs first, scoped by both group id and user id.
+    check_sql, check_params = cursor.execute_calls[0]
+    assert check_sql == job_postings_module._GROUP_OWNED_BY_USER_SQL
+    assert check_params == (group_id, user_id)
+    # Then the UPDATE writes group_id under the user-scoped WHERE.
+    update_sql, update_params = cursor.execute_calls[1]
+    assert "group_id = %s" in update_sql
+    assert update_params == (group_id, 7, user_id)
+
+
+@pytest.mark.asyncio
+async def test_update_job_posting_fields_raises_for_foreign_target_group() -> None:
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+    # Ownership check returns no row → the target group is foreign / unknown.
+    cursor = FakeCursor(fetchone_results=[None])
+    conn = FakeConnection(cursor=cursor)
+
+    with pytest.raises(job_postings_module.TargetGroupNotFoundError):
+        await job_postings_module.update_job_posting_fields(
+            cast(AsyncConnection, conn),
+            user_id=user_id,
+            job_id=7,
+            fields={"group_id": group_id},
+        )
+
+    # The UPDATE must never run when ownership fails.
+    assert len(cursor.execute_calls) == 1
+    assert cursor.execute_calls[0][0] == job_postings_module._GROUP_OWNED_BY_USER_SQL
+
+
 def test_upsert_do_update_set_preserves_status_but_returns_it() -> None:
     # Re-saving a posting must not reset its lifecycle columns, so they must be
     # absent from DO UPDATE SET — yet still projected in RETURNING.

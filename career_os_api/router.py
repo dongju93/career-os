@@ -8,6 +8,7 @@ from uuid import UUID
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from psycopg.errors import UniqueViolation
 
 from career_os_api.auth.dependencies import get_current_user
 from career_os_api.auth.risc import (
@@ -21,6 +22,7 @@ from career_os_api.chatkit.routes import router as chatkit_router
 from career_os_api.config import settings
 from career_os_api.constants import API_V1
 from career_os_api.database.job_postings import (
+    TargetGroupNotFoundError,
     get_job_posting,
     get_job_postings,
     update_job_posting_fields,
@@ -531,7 +533,10 @@ async def get_job_posting_detail(
     "/job-postings/{job_id}",
     tags=["job-postings"],
     dependencies=[rate_limit(30, per="minute")],
-    responses={404: {"description": "Job posting not found"}},
+    responses={
+        404: {"description": "Job posting or target group not found"},
+        409: {"description": "Target group already contains this posting"},
+    },
 )
 async def update_job_posting(
     job_id: int,
@@ -541,9 +546,15 @@ async def update_job_posting(
 ) -> ApiResponse[JobPostingStored]:
     # Only the fields the client actually sent are written. The schema validator
     # already rejected an empty body and explicit nulls on NOT NULL columns.
+    # memo is the one nullable column, so an explicit null must still be written
+    # (it clears the memo) — hence the model_fields_set check rather than `is not None`.
     update_fields: dict[str, object] = {}
     if data.application_status is not None:
         update_fields["application_status"] = data.application_status.value
+    if data.group_id is not None:
+        update_fields["group_id"] = data.group_id
+    if "memo" in data.model_fields_set:
+        update_fields["memo"] = data.memo
 
     async def operation(conn):
         return await update_job_posting_fields(
@@ -553,7 +564,19 @@ async def update_job_posting(
             fields=update_fields,
         )
 
-    row = await run_database_operation(request.app.state.pool, operation)
+    try:
+        row = await run_database_operation(request.app.state.pool, operation)
+    except TargetGroupNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="대상 구직 활동 그룹을 찾을 수 없습니다.",
+        ) from exc
+    except UniqueViolation as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 대상 그룹에 같은 공고가 저장되어 있습니다.",
+        ) from exc
+
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

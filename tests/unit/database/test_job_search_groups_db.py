@@ -248,6 +248,44 @@ async def test_update_job_search_group_with_empty_fields_fetches_existing() -> N
 
 
 @pytest.mark.asyncio
+async def test_filter_owned_group_ids_returns_matching_subset() -> None:
+    user_id = uuid.uuid7()
+    owned_a = uuid.uuid7()
+    owned_b = uuid.uuid7()
+    foreign = uuid.uuid7()
+    cursor = FakeCursor(rows=[{"id": owned_a}, {"id": owned_b}])
+    conn = FakeConnection(cursor=cursor)
+
+    owned = await groups_module.filter_owned_group_ids(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        group_ids=[owned_a, owned_b, foreign],
+    )
+
+    assert owned == {owned_a, owned_b}
+    assert conn.cursor_row_factories == [dict_row]
+    sql, params = cursor.execute_calls[0]
+    assert "user_id = %s AND id = ANY(%s)" in sql
+    assert params == (user_id, [owned_a, owned_b, foreign])
+
+
+@pytest.mark.asyncio
+async def test_filter_owned_group_ids_short_circuits_on_empty_input() -> None:
+    cursor = FakeCursor(rows=[{"id": uuid.uuid7()}])
+    conn = FakeConnection(cursor=cursor)
+
+    owned = await groups_module.filter_owned_group_ids(
+        cast(AsyncConnection, conn),
+        user_id=uuid.uuid7(),
+        group_ids=[],
+    )
+
+    # No ids → no query at all.
+    assert owned == set()
+    assert cursor.execute_calls == []
+
+
+@pytest.mark.asyncio
 async def test_create_initial_group_uses_korean_name() -> None:
     user_id = uuid.uuid7()
     returned = _make_row(user_id)

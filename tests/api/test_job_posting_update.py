@@ -12,11 +12,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
+from psycopg.errors import UniqueViolation
 
 import career_os_api.router as app_module
 import main as main_module
 from career_os_api.auth.jwt import create_access_token
 from career_os_api.constants import API_V1
+from career_os_api.database.job_postings import TargetGroupNotFoundError
 
 API_PREFIX = f"/{API_V1}"
 
@@ -221,6 +223,165 @@ def test_patch_rejects_invalid_status_value(
     response = client.patch(
         f"{API_PREFIX}/job-postings/7",
         json={"application_status": "not-a-status"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 422
+    assert update.await_count == 0
+
+
+# ── Phase 2: memo set / clear ─────────────────────────────────────────────────
+
+
+def test_patch_sets_memo(
+    client: TestClient,
+    fake_pool: FakePool,
+    current_user: dict,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_posting,
+) -> None:
+    row = make_detail_row(sample_job_posting, status="saved", status_at=None)
+    row["memo"] = "지원 전 포트폴리오 정리"
+    update = AsyncMock(return_value=row)
+    monkeypatch.setattr(app_module, "update_job_posting_fields", update)
+
+    response = client.patch(
+        f"{API_PREFIX}/job-postings/7",
+        json={"memo": "지원 전 포트폴리오 정리"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["memo"] == "지원 전 포트폴리오 정리"
+    update.assert_awaited_once_with(
+        fake_pool.connection_obj,
+        user_id=current_user["id"],
+        job_id=7,
+        fields={"memo": "지원 전 포트폴리오 정리"},
+    )
+
+
+def test_patch_clears_memo_with_explicit_null(
+    client: TestClient,
+    fake_pool: FakePool,
+    current_user: dict,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_posting,
+) -> None:
+    # An explicit null memo is a valid "clear" — it must be written, not ignored.
+    row = make_detail_row(sample_job_posting, status="saved", status_at=None)
+    row["memo"] = None
+    update = AsyncMock(return_value=row)
+    monkeypatch.setattr(app_module, "update_job_posting_fields", update)
+
+    response = client.patch(
+        f"{API_PREFIX}/job-postings/7",
+        json={"memo": None},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["memo"] is None
+    update.assert_awaited_once_with(
+        fake_pool.connection_obj,
+        user_id=current_user["id"],
+        job_id=7,
+        fields={"memo": None},
+    )
+
+
+# ── Phase 2: group move ───────────────────────────────────────────────────────
+
+
+def test_patch_moves_posting_to_another_group(
+    client: TestClient,
+    fake_pool: FakePool,
+    current_user: dict,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    sample_job_posting,
+) -> None:
+    target_group = uuid.uuid7()
+    row = make_detail_row(sample_job_posting, status="saved", status_at=None)
+    row["group_id"] = target_group
+    update = AsyncMock(return_value=row)
+    monkeypatch.setattr(app_module, "update_job_posting_fields", update)
+
+    response = client.patch(
+        f"{API_PREFIX}/job-postings/7",
+        json={"group_id": str(target_group)},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["group_id"] == str(target_group)
+    update.assert_awaited_once_with(
+        fake_pool.connection_obj,
+        user_id=current_user["id"],
+        job_id=7,
+        fields={"group_id": target_group},
+    )
+
+
+def test_patch_returns_404_for_foreign_target_group(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        app_module,
+        "update_job_posting_fields",
+        AsyncMock(side_effect=TargetGroupNotFoundError()),
+    )
+
+    response = client.patch(
+        f"{API_PREFIX}/job-postings/7",
+        json={"group_id": str(uuid.uuid7())},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "대상 구직 활동 그룹을 찾을 수 없습니다."
+
+
+def test_patch_returns_409_when_target_group_already_has_posting(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The uq_job_postings_group_id unique index collides on a cross-group move.
+    monkeypatch.setattr(
+        app_module,
+        "update_job_posting_fields",
+        AsyncMock(side_effect=UniqueViolation("duplicate posting in group")),
+    )
+
+    response = client.patch(
+        f"{API_PREFIX}/job-postings/7",
+        json={"group_id": str(uuid.uuid7())},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 409
+    assert (
+        response.json()["detail"] == "이미 대상 그룹에 같은 공고가 저장되어 있습니다."
+    )
+
+
+def test_patch_rejects_explicit_null_group_id(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # group_id maps to a NOT NULL column — explicit null is rejected at the schema.
+    update = AsyncMock()
+    monkeypatch.setattr(app_module, "update_job_posting_fields", update)
+
+    response = client.patch(
+        f"{API_PREFIX}/job-postings/7",
+        json={"group_id": None},
         headers=auth_headers,
     )
 

@@ -183,6 +183,7 @@ class JobPostingStored(_JobPostingBase):
     group_id: UUID
     application_status: ApplicationStatus
     status_updated_at: datetime | None = None
+    memo: Annotated[str, Field(max_length=2000)] | None = None
     scraped_at: datetime
     created_at: datetime
     updated_at: datetime
@@ -191,18 +192,22 @@ class JobPostingStored(_JobPostingBase):
 class JobPostingUpdateRequest(BaseModel):
     """PATCH /v1/job-postings/{job_id} body — partial update of a saved posting.
 
-    At least one field must be provided. NOT NULL columns may not be set to an
-    explicit null (mirrors the null-rejection guard in the groups PATCH handler).
-    Phase 2 adds group_id and memo.
+    At least one field must be provided. NOT NULL columns (application_status,
+    group_id) may not be set to an explicit null (mirrors the null-rejection guard
+    in the groups PATCH handler). memo is a nullable column, so an explicit null
+    is a valid "clear the memo" instruction and is allowed.
     """
 
     application_status: ApplicationStatus | None = None
+    group_id: UUID | None = None
+    memo: Annotated[str, Field(max_length=2000)] | None = None
 
     @model_validator(mode="after")
     def reject_empty_or_null_not_null_columns(self) -> JobPostingUpdateRequest:
         if not self.model_fields_set:
             raise ValueError("At least one field must be provided")
-        for field in ("application_status",):
+        # memo is intentionally absent: an explicit null clears the memo.
+        for field in ("application_status", "group_id"):
             if field in self.model_fields_set and getattr(self, field) is None:
                 raise ValueError(f"{field} cannot be null")
         return self
@@ -379,15 +384,47 @@ class PlanItem(BaseModel):
     rationale: str
 
 
+ProposedActionType = Literal["set_status", "assign_group", "save_memo"]
+
+
+class ProposedAction(BaseModel):
+    """A propose-then-confirm app action the model suggests but never executes.
+
+    The agent has no write tools: it only proposes. The client applies a proposal
+    by calling PATCH /v1/job-postings/{job_id} with the matching field; rejection is
+    a client-side dismissal with no API call. job_id and target_group_id are
+    model-emitted and therefore untrusted — the route re-verifies both against the
+    caller's own postings/groups before this reaches the client.
+
+    Which field carries the payload depends on action_type:
+      - set_status   → application_status
+      - assign_group → target_group_id
+      - save_memo    → memo
+    """
+
+    action_type: ProposedActionType
+    job_id: int
+    application_status: ApplicationStatus | None = Field(
+        default=None, description="set_status 액션의 목표 상태"
+    )
+    target_group_id: str | None = Field(
+        default=None, description="assign_group 액션의 목표 그룹 UUID"
+    )
+    memo: str | None = Field(default=None, description="save_memo 액션의 메모 내용")
+    reason: str
+
+
 class ApplicationPlan(BaseModel):
     """POST /v1/agent/plan response payload AND the Agents-SDK output_type.
 
     Kept free of any server-only fields because it doubles as the model's required
-    output contract. Phase 2 will add `proposed_actions` here.
+    output contract. proposed_actions defaults to [] so the model may omit it and
+    clients can always treat it as optional.
     """
 
     summary: str
     items: Annotated[list[PlanItem], Field(max_length=10)]
+    proposed_actions: list[ProposedAction] = []
 
 
 class ApplicationPlanRequest(BaseModel):

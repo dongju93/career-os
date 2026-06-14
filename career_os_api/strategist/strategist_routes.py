@@ -10,6 +10,7 @@ dependencies, and identity sourced only from `get_current_user`.
 import logging
 from datetime import date
 from typing import Annotated, Any
+from uuid import UUID
 
 from agents import Agent, Runner
 from agents.exceptions import AgentsException
@@ -22,6 +23,7 @@ from career_os_api.database.job_postings import (
     filter_owned_job_posting_ids,
 )
 from career_os_api.database.job_search_groups import (
+    filter_owned_group_ids,
     get_current_group_id,
     get_job_search_group,
 )
@@ -30,7 +32,11 @@ from career_os_api.database.user_profiles import get_user_profile
 from career_os_api.middleware import get_request_id
 from career_os_api.rate_limit import quota, rate_limit
 from career_os_api.responses import ApiResponse
-from career_os_api.schemas import ApplicationPlan, ApplicationPlanRequest
+from career_os_api.schemas import (
+    ApplicationPlan,
+    ApplicationPlanRequest,
+    ProposedAction,
+)
 from career_os_api.strategist.strategist_agent import build_strategist_agent
 from career_os_api.strategist.strategist_context import StrategistRunContext
 
@@ -151,9 +157,9 @@ async def create_application_plan(
             detail="플랜 생성에 실패했습니다. 잠시 후 다시 시도해주세요.",
         ) from exc
 
-    # Step 6: model output is untrusted — drop any item whose job_id is not one of
-    # the caller's own postings (hallucinated or cross-tenant).
-    plan = await _drop_unowned_plan_items(pool, user_id, plan)
+    # Step 6: model output is untrusted — drop any item or proposed action whose
+    # job_id (or assign_group target group) is not the caller's own.
+    plan = await _filter_owned_plan_output(pool, user_id, plan)
 
     # Step 7.
     return ApiResponse(
@@ -163,28 +169,74 @@ async def create_application_plan(
     )
 
 
-async def _drop_unowned_plan_items(
+def _is_proposed_action_owned(
+    action: ProposedAction, owned_ids: set[int], owned_groups: set[UUID]
+) -> bool:
+    """An action survives only if its posting is owned, and — for assign_group — its
+    target group is owned and is a parseable UUID."""
+    if action.job_id not in owned_ids:
+        return False
+    if action.action_type == "assign_group":
+        if not action.target_group_id:
+            return False
+        try:
+            return UUID(action.target_group_id) in owned_groups
+        except ValueError:
+            return False
+    return True
+
+
+async def _filter_owned_plan_output(
     pool: Any, user_id: Any, plan: ApplicationPlan
 ) -> ApplicationPlan:
-    """Last line of defense against hallucinated / cross-tenant ids reaching the
-    client. One scoped query; items with unverified job_ids are dropped."""
-    job_ids = [item.job_id for item in plan.items]
+    """Last line of defense against hallucinated / cross-tenant references reaching
+    the client. Drops any plan item or proposed action whose job_id is not one of the
+    caller's postings, plus any assign_group action whose target_group_id is not one
+    of the caller's groups."""
+    # One id space for items and actions so a single query verifies every job_id.
+    job_ids = {item.job_id for item in plan.items}
+    job_ids.update(action.job_id for action in plan.proposed_actions)
 
-    async def operation(conn: Any) -> set[int]:
-        return await filter_owned_job_posting_ids(
-            conn, user_id=user_id, job_ids=job_ids
+    # Candidate target groups come only from assign_group actions; non-UUID strings
+    # are skipped here and the owning action is dropped by _is_proposed_action_owned.
+    target_group_ids: set[UUID] = set()
+    for action in plan.proposed_actions:
+        if action.action_type == "assign_group" and action.target_group_id:
+            try:
+                target_group_ids.add(UUID(action.target_group_id))
+            except ValueError:
+                continue
+
+    async def operation(conn: Any) -> tuple[set[int], set[UUID]]:
+        owned_ids = await filter_owned_job_posting_ids(
+            conn, user_id=user_id, job_ids=list(job_ids)
         )
+        owned_groups = await filter_owned_group_ids(
+            conn, user_id=user_id, group_ids=list(target_group_ids)
+        )
+        return owned_ids, owned_groups
 
-    owned_ids = await run_database_operation(
+    owned_ids, owned_groups = await run_database_operation(
         pool, operation, label="strategist.plan.verify_ids"
     )
-    kept = [item for item in plan.items if item.job_id in owned_ids]
-    dropped = len(plan.items) - len(kept)
-    if dropped:
+
+    kept_items = [item for item in plan.items if item.job_id in owned_ids]
+    kept_actions = [
+        action
+        for action in plan.proposed_actions
+        if _is_proposed_action_owned(action, owned_ids, owned_groups)
+    ]
+
+    dropped_items = len(plan.items) - len(kept_items)
+    dropped_actions = len(plan.proposed_actions) - len(kept_actions)
+    if dropped_items or dropped_actions:
         _logger.warning(
-            "strategist.plan.dropped_unowned_items user_id=%s dropped=%d",
+            "strategist.plan.dropped_unowned user_id=%s items=%d actions=%d",
             user_id,
-            dropped,
+            dropped_items,
+            dropped_actions,
         )
-        return plan.model_copy(update={"items": kept})
+        return plan.model_copy(
+            update={"items": kept_items, "proposed_actions": kept_actions}
+        )
     return plan

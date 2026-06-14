@@ -55,6 +55,7 @@ class JobPostingDetailRow(JobPostingListRow):
     application_form: str | None
     contact_person: str | None
     homepage: str | None
+    memo: str | None
 
 
 _UPSERT_SQL = """
@@ -151,7 +152,7 @@ _DETAIL_COLUMNS = """
     education_req, salary, tech_stack, tags,
     application_method, application_form, contact_person,
     homepage, job_category, industry,
-    application_status, status_updated_at,
+    application_status, status_updated_at, memo,
     scraped_at, created_at, updated_at
 """
 
@@ -161,6 +162,22 @@ FROM job_postings
 WHERE id = %s
   AND user_id = %s
 """
+
+# Existence-by-ownership check for a PATCH group move. Scoped by user_id so a group
+# that exists but belongs to someone else returns no row (the FK on the UPDATE only
+# enforces that the group exists, never that the caller owns it).
+_GROUP_OWNED_BY_USER_SQL = """
+SELECT 1
+FROM job_search_groups
+WHERE id = %s AND user_id = %s
+"""
+
+
+class TargetGroupNotFoundError(Exception):
+    """A PATCH tried to move a posting into a group the caller does not own.
+
+    Raised by update_job_posting_fields so the route can map it to 404 distinctly
+    from a missing posting (which surfaces as a None return)."""
 
 
 async def upsert_job_posting(
@@ -253,9 +270,21 @@ async def update_job_posting_fields(
     among the updated fields, status_updated_at is stamped in the same statement.
     The WHERE is scoped by user_id, so a foreign or unknown id matches no row and
     yields None (the route maps that to 404).
+
+    A group move (group_id in fields) first verifies — on this same connection, so
+    within one transaction — that the target group belongs to the caller; a foreign
+    or unknown group raises TargetGroupNotFoundError. A move that would duplicate a
+    posting in the target group (the uq_job_postings_group_id unique index) surfaces
+    as psycopg's UniqueViolation, which the route maps to 409.
     """
     if not fields:
         return await get_job_posting(conn, job_id, user_id=user_id)
+
+    if "group_id" in fields:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(_GROUP_OWNED_BY_USER_SQL, (fields["group_id"], user_id))
+            if await cur.fetchone() is None:
+                raise TargetGroupNotFoundError
 
     set_clauses = [f"{key} = %s" for key in fields]
     values = list(fields.values())

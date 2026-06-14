@@ -18,7 +18,7 @@ import career_os_api.strategist.strategist_routes as routes_module
 import main as main_module
 from career_os_api.auth.jwt import create_access_token
 from career_os_api.constants import API_V1
-from career_os_api.schemas import ApplicationPlan, PlanItem
+from career_os_api.schemas import ApplicationPlan, PlanItem, ProposedAction
 
 API_PREFIX = f"/{API_V1}"
 PLAN_URL = f"{API_PREFIX}/agent/plan"
@@ -331,6 +331,100 @@ def test_plan_drops_hallucinated_job_ids(
 
     assert response.status_code == 200
     assert [item["job_id"] for item in response.json()["data"]["items"]] == [101]
+
+
+# ── Phase 2: proposed-action post-validation ──────────────────────────────────
+
+
+def test_plan_filters_unowned_proposed_actions(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    enabled: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owned_group = uuid.uuid7()
+    foreign_group = uuid.uuid7()
+    actions = [
+        # kept: owned posting, status-only action
+        ProposedAction(
+            action_type="set_status",
+            job_id=101,
+            application_status="applied",
+            reason="지원 완료 표시",
+        ),
+        # dropped: posting not owned by the caller
+        ProposedAction(
+            action_type="set_status",
+            job_id=999,
+            application_status="applied",
+            reason="환각 id",
+        ),
+        # kept: owned posting moved into an owned group
+        ProposedAction(
+            action_type="assign_group",
+            job_id=101,
+            target_group_id=str(owned_group),
+            reason="정리",
+        ),
+        # dropped: target group is not the caller's
+        ProposedAction(
+            action_type="assign_group",
+            job_id=101,
+            target_group_id=str(foreign_group),
+            reason="잘못된 그룹",
+        ),
+        # dropped: target group is not even a valid UUID
+        ProposedAction(
+            action_type="assign_group",
+            job_id=101,
+            target_group_id="not-a-uuid",
+            reason="깨진 그룹 id",
+        ),
+        # kept: owned posting, memo action
+        ProposedAction(
+            action_type="save_memo",
+            job_id=101,
+            memo="포트폴리오 업데이트",
+            reason="준비",
+        ),
+    ]
+    plan = ApplicationPlan(
+        summary="요약", items=make_plan([101]).items, proposed_actions=actions
+    )
+
+    monkeypatch.setattr(
+        routes_module, "get_current_group_id", AsyncMock(return_value=uuid.uuid7())
+    )
+    monkeypatch.setattr(
+        routes_module, "get_user_profile", AsyncMock(return_value=make_profile())
+    )
+    monkeypatch.setattr(
+        routes_module, "count_job_postings_for_strategist", AsyncMock(return_value=1)
+    )
+    monkeypatch.setattr(
+        routes_module, "run_strategist_plan", AsyncMock(return_value=plan)
+    )
+    monkeypatch.setattr(
+        routes_module, "filter_owned_job_posting_ids", AsyncMock(return_value={101})
+    )
+    monkeypatch.setattr(
+        routes_module, "filter_owned_group_ids", AsyncMock(return_value={owned_group})
+    )
+
+    response = client.post(PLAN_URL, json={}, headers=auth_headers)
+
+    assert response.status_code == 200
+    kept = response.json()["data"]["proposed_actions"]
+    assert len(kept) == 3
+    assert [a["action_type"] for a in kept] == [
+        "set_status",
+        "assign_group",
+        "save_memo",
+    ]
+    # The only surviving assign_group points at the owned group.
+    assign = next(a for a in kept if a["action_type"] == "assign_group")
+    assert assign["target_group_id"] == str(owned_group)
+    assert all(a["job_id"] == 101 for a in kept)
 
 
 def test_plan_returns_502_on_agent_failure(

@@ -65,6 +65,9 @@ CREATE TABLE IF NOT EXISTS job_postings (
             ('saved', 'applied', 'interviewing', 'offer', 'rejected', 'withdrawn')),
     status_updated_at     TIMESTAMPTZ,
 
+    -- User annotation
+    memo                  TEXT,
+
     -- Metadata
     scraped_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     created_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -193,6 +196,7 @@ COMMENT ON COLUMN job_postings.tech_stack  IS '기술스택 배열 (원티드: �
 COMMENT ON COLUMN job_postings.tags        IS '원티드 회사 태그 배열';
 COMMENT ON COLUMN job_postings.application_status IS '지원 진행 상태 (saved → applied → interviewing → offer/rejected/withdrawn)';
 COMMENT ON COLUMN job_postings.status_updated_at  IS 'application_status가 마지막으로 변경된 시각';
+COMMENT ON COLUMN job_postings.memo        IS '사용자가 공고에 남긴 자유 메모 (NULL = 메모 없음)';
 COMMENT ON COLUMN job_postings.scraped_at  IS '데이터 수집 시각';
 
 COMMENT ON TABLE  user_profiles                    IS '지원 전략 에이전트가 참조하는 사용자 커리어 프로필 (사용자당 1행)';
