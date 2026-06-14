@@ -65,6 +65,7 @@ function buildJobPostingDetail(
     application_form: 'Resume',
     contact_person: 'Hiring Team',
     homepage: 'https://career-os.example.com',
+    memo: null,
     ...overrides,
   };
 }
@@ -430,5 +431,98 @@ describe('JobPostingDetailPage', () => {
       await screen.findByRole('heading', { name: 'Frontend Engineer' }),
     ).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('saves a memo and reflects the server response', async () => {
+    const user = userEvent.setup();
+    const detail = buildJobPostingDetail();
+    let patchBody: Record<string, unknown> | null = null;
+
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+        if (init?.method === 'PATCH') {
+          patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          return jsonResponse(
+            apiResponse({ ...detail, memo: '관심 있는 공고' }),
+          );
+        }
+        return jsonResponse(apiResponse(detail));
+      }
+
+      throw new Error(`Unexpected fetch request: ${input}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings/1');
+
+    await screen.findByRole('heading', { name: 'Frontend Engineer' });
+
+    const memoBox = screen.getByLabelText<HTMLTextAreaElement>('메모');
+    await user.type(memoBox, '관심 있는 공고');
+    await user.click(screen.getByRole('button', { name: '메모 저장' }));
+
+    await waitFor(() => {
+      expect(patchBody).toEqual({ memo: '관심 있는 공고' });
+    });
+    expect(await screen.findByText('메모를 저장했습니다.')).toBeInTheDocument();
+    expect(memoBox.value).toBe('관심 있는 공고');
+  });
+
+  it('clears a memo by saving an empty draft (memo: null)', async () => {
+    const user = userEvent.setup();
+    const detail = buildJobPostingDetail({ memo: '기존 메모' });
+    let patchBody: Record<string, unknown> | null = null;
+
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+        if (init?.method === 'PATCH') {
+          patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          return jsonResponse(apiResponse({ ...detail, memo: null }));
+        }
+        return jsonResponse(apiResponse(detail));
+      }
+
+      throw new Error(`Unexpected fetch request: ${input}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings/1');
+
+    await screen.findByRole('heading', { name: 'Frontend Engineer' });
+
+    const memoBox = screen.getByLabelText<HTMLTextAreaElement>('메모');
+    expect(memoBox.value).toBe('기존 메모');
+
+    await user.clear(memoBox);
+    await user.click(screen.getByRole('button', { name: '메모 저장' }));
+
+    // An emptied draft is an explicit clear: the PATCH carries memo: null.
+    await waitFor(() => {
+      expect(patchBody).toEqual({ memo: null });
+    });
   });
 });

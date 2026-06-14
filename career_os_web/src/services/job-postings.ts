@@ -78,9 +78,9 @@ export async function fetchJobPosting(
     .data;
 }
 
-// Partial update of a saved posting (Phase 0: application_status). Deliberately
-// single-attempt — never pass `retryable`: a status PATCH is not idempotent and
-// must not be silently re-sent.
+// Partial update of a saved posting (application_status / group_id / memo).
+// Deliberately single-attempt — never pass `retryable`: the PATCH is not
+// idempotent and must not be silently re-sent.
 export async function updateJobPosting(
   id: number,
   patch: JobPostingUpdate,

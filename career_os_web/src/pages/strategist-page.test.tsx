@@ -1,9 +1,10 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../store/auth-store';
 import { renderRoute } from '../test/test-utils';
 import type { ApplicationPlan } from '../types/application-plan';
+import type { JobPostingDetail } from '../types/job-posting';
 import type { JobSearchGroupItem } from '../types/job-search-group';
 import type { UserProfile } from '../types/user-profile';
 
@@ -82,6 +83,63 @@ const emptyPlan: ApplicationPlan = {
   items: [],
 };
 
+// A plan carrying a single propose-then-execute action over its first item.
+const planWithActions: ApplicationPlan = {
+  ...samplePlan,
+  proposed_actions: [
+    {
+      action_type: 'set_status',
+      job_id: 12,
+      application_status: 'applied',
+      target_group_id: null,
+      memo: null,
+      reason: '지원을 완료했다면 상태를 업데이트하세요.',
+    },
+  ],
+};
+
+// Valid detail returned by the PATCH that confirming the action triggers —
+// updateJobPosting validates the response against the detail schema.
+const updatedPosting: JobPostingDetail = {
+  id: 12,
+  platform: 'wanted',
+  posting_id: 'wd-12',
+  posting_url: 'https://www.wanted.co.kr/wd/12',
+  company_name: '토스',
+  job_title: '백엔드 엔지니어',
+  experience_req: null,
+  deadline: null,
+  location: null,
+  employment_type: null,
+  salary: null,
+  tech_stack: null,
+  tags: null,
+  job_category: null,
+  industry: null,
+  group_id: activeGroup.id,
+  application_status: 'applied',
+  status_updated_at: '2026-06-15T00:00:00Z',
+  scraped_at: '2026-01-01T00:00:00Z',
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  job_description: null,
+  responsibilities: null,
+  qualifications: null,
+  preferred_points: null,
+  benefits: null,
+  hiring_process: null,
+  education_req: null,
+  application_method: null,
+  application_form: null,
+  contact_person: null,
+  homepage: null,
+  memo: null,
+};
+
+// The exact human-readable description the set_status card renders (§6):
+// job title resolved from the plan item, status label from the canonical map.
+const ACTION_DESCRIPTION = "'백엔드 엔지니어' 상태를 '지원 완료'(으)로 변경";
+
 // Builds a global fetch stub that always satisfies ProtectedRoute's /v1/auth/me
 // and the bootstrap calls (profile + groups), then delegates POST /v1/agent/plan
 // to the per-test `planHandler`.
@@ -89,6 +147,10 @@ function makeFetchMock(options: {
   profile: UserProfile | 'notfound';
   groups: JobSearchGroupItem[];
   planHandler?: (init?: RequestInit) => ReturnType<typeof jsonResponse>;
+  patchHandler?: (
+    input: string,
+    init?: RequestInit,
+  ) => ReturnType<typeof jsonResponse>;
 }) {
   return vi.fn(async (input: string, init?: RequestInit) => {
     if (input === `${BASE}/v1/auth/me`) {
@@ -112,6 +174,14 @@ function makeFetchMock(options: {
     if (input === `${BASE}/v1/agent/plan` && init?.method === 'POST') {
       if (!options.planHandler) throw new Error('unexpected plan call');
       return options.planHandler(init);
+    }
+    // Confirming a proposed action issues PATCH /v1/job-postings/{id}.
+    if (
+      input.startsWith(`${BASE}/v1/job-postings/`) &&
+      init?.method === 'PATCH'
+    ) {
+      if (!options.patchHandler) throw new Error('unexpected patch call');
+      return options.patchHandler(input, init);
     }
     throw new Error(`Unexpected fetch: ${input}`);
   });
@@ -264,5 +334,71 @@ describe('StrategistPage', () => {
     expect(
       screen.getByRole('button', { name: '다시 시도' }),
     ).toBeInTheDocument();
+  });
+
+  it('applies a proposed action with exactly one PATCH field', async () => {
+    const user = userEvent.setup();
+    let patchUrl: string | null = null;
+    let patchBody: Record<string, unknown> | null = null;
+
+    vi.stubGlobal(
+      'fetch',
+      makeFetchMock({
+        profile: existingProfile,
+        groups: [activeGroup],
+        planHandler: () => jsonResponse(apiResponse(planWithActions)),
+        patchHandler: (input, init) => {
+          patchUrl = input;
+          patchBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+          return jsonResponse(apiResponse(updatedPosting));
+        },
+      }),
+    );
+
+    renderRoute('/strategist');
+
+    await user.click(await screen.findByRole('button', { name: '플랜 생성' }));
+    await screen.findByText(ACTION_DESCRIPTION);
+
+    await user.click(screen.getByRole('button', { name: '적용' }));
+
+    // Confirmation sends exactly the one corresponding field, nothing more.
+    await waitFor(() => {
+      expect(patchBody).toEqual({ application_status: 'applied' });
+    });
+    expect(patchUrl).toBe(`${BASE}/v1/job-postings/12`);
+    // The card collapses to its applied state.
+    expect(await screen.findByText('적용됨')).toBeInTheDocument();
+  });
+
+  it('dismisses a proposed action locally without any API call', async () => {
+    const user = userEvent.setup();
+    let patchCalled = false;
+
+    vi.stubGlobal(
+      'fetch',
+      makeFetchMock({
+        profile: existingProfile,
+        groups: [activeGroup],
+        planHandler: () => jsonResponse(apiResponse(planWithActions)),
+        patchHandler: () => {
+          patchCalled = true;
+          return jsonResponse(apiResponse(updatedPosting));
+        },
+      }),
+    );
+
+    renderRoute('/strategist');
+
+    await user.click(await screen.findByRole('button', { name: '플랜 생성' }));
+    await screen.findByText(ACTION_DESCRIPTION);
+
+    await user.click(screen.getByRole('button', { name: '무시' }));
+
+    // Dismissal is purely local: the card is gone and nothing was PATCHed.
+    await waitFor(() => {
+      expect(screen.queryByText(ACTION_DESCRIPTION)).not.toBeInTheDocument();
+    });
+    expect(patchCalled).toBe(false);
   });
 });

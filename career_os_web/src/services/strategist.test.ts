@@ -92,4 +92,46 @@ describe('generateApplicationPlan', () => {
       code: CLIENT_CONTRACT_MISMATCH,
     });
   });
+
+  // §6: clients must treat proposed_actions as optional. The schema's
+  // `.default([])` lets a pre-Phase-2 backend (field absent) still parse.
+  it('defaults proposed_actions to [] when the field is absent', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(okResponse(apiResponse(samplePlan))),
+    );
+
+    const result = await generateApplicationPlan({});
+
+    expect(result.proposed_actions).toEqual([]);
+  });
+
+  it('parses proposed_actions when the backend includes them', async () => {
+    const planWithActions = {
+      ...samplePlan,
+      proposed_actions: [
+        {
+          action_type: 'set_status',
+          job_id: 12,
+          application_status: 'applied',
+          target_group_id: null,
+          memo: null,
+          reason: '지원을 완료했다면 상태를 업데이트하세요.',
+        },
+      ],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(okResponse(apiResponse(planWithActions))),
+    );
+
+    const result = await generateApplicationPlan({});
+
+    expect(result.proposed_actions).toHaveLength(1);
+    expect(result.proposed_actions?.[0]).toMatchObject({
+      action_type: 'set_status',
+      job_id: 12,
+      application_status: 'applied',
+    });
+  });
 });

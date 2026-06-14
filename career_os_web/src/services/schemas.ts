@@ -75,6 +75,8 @@ export const jobPostingDetailSchema = jobPostingListItemSchema.extend({
   application_form: z.string().nullable(),
   contact_person: z.string().nullable(),
   homepage: z.string().nullable(),
+  // Phase 2: memo is detail-only — the list projection omits it.
+  memo: z.string().nullable(),
 });
 
 export const jobPostingPageSchema = z.object({
@@ -170,12 +172,26 @@ const planItemSchema = z.object({
   rationale: z.string(),
 });
 
-// Phase 1 plan shape. `proposed_actions` is deliberately omitted — Zod strips
-// unknown keys, so a Phase 2 backend deploy that adds it cannot break this
-// client (§5.1); Phase 2 will add the field with `.default([])`.
+// Phase 2 propose-then-execute action. `target_group_id` is a UUID per §3, but
+// kept as a plain nullable string here: model output is untrusted and the PATCH
+// re-validates it server-side, so a stray format must not throw away an
+// otherwise-good plan at the contract boundary.
+const proposedActionSchema = z.object({
+  action_type: z.enum(['set_status', 'assign_group', 'save_memo']),
+  job_id: z.number(),
+  application_status: applicationStatusSchema.nullable(),
+  target_group_id: z.string().nullable(),
+  memo: z.string().nullable(),
+  reason: z.string(),
+});
+
+// `proposed_actions` defaults to [] so a backend that has not yet shipped Phase 2
+// (field absent) still parses, and consumers can read the array unconditionally
+// (§6).
 const applicationPlanSchema = z.object({
   summary: z.string(),
   items: z.array(planItemSchema),
+  proposed_actions: z.array(proposedActionSchema).default([]),
 });
 
 export const applicationPlanApiResponseSchema = apiResponseSchema(

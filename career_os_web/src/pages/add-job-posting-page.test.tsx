@@ -50,6 +50,7 @@ const savedDetailResponse = {
     application_form: null,
     contact_person: null,
     homepage: null,
+    memo: null,
   },
 };
 

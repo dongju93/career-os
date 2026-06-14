@@ -1,11 +1,14 @@
 import {
   AlertCircle,
   ArrowRight,
+  Check,
   Clock,
   Lightbulb,
+  ListChecks,
   Loader2,
   RefreshCw,
   Sparkles,
+  X,
 } from 'lucide-react';
 import {
   type ReactNode,
@@ -27,14 +30,21 @@ import {
   toUserFacingError,
   type UserFacingError,
 } from '../services/api-error';
+import { updateJobPosting } from '../services/job-postings';
 import { fetchJobSearchGroups } from '../services/job-search-groups';
 import { generateApplicationPlan } from '../services/strategist';
 import { fetchUserProfile } from '../services/user-profile';
-import type { ApplicationPlan, PlanItem } from '../types/application-plan';
+import type {
+  ApplicationPlan,
+  PlanItem,
+  ProposedAction,
+} from '../types/application-plan';
+import type { JobPostingUpdate } from '../types/job-posting';
 import type { JobSearchGroupItem } from '../types/job-search-group';
 import {
   DEADLINE_URGENCY_LABELS,
   deadlineUrgencyVariant,
+  describeProposedAction,
 } from '../utils/strategist-formatters';
 
 const FOCUS_MAX = 300;
@@ -278,6 +288,152 @@ function PlanResult({ plan }: { plan: ApplicationPlan }) {
   );
 }
 
+// Maps a proposed action to the single PATCH field that confirming it sends (§6).
+// Returns null when the model omitted the field the action needs, so the card can
+// disable "적용" rather than issue a malformed request.
+function buildProposedActionPatch(
+  action: ProposedAction,
+): JobPostingUpdate | null {
+  switch (action.action_type) {
+    case 'set_status':
+      return action.application_status
+        ? { application_status: action.application_status }
+        : null;
+    case 'assign_group':
+      return action.target_group_id
+        ? { group_id: action.target_group_id }
+        : null;
+    case 'save_memo':
+      // A save_memo proposal needs memo content; clearing a memo is a
+      // detail-page concern, not something the strategist suggests.
+      return action.memo ? { memo: action.memo } : null;
+  }
+}
+
+// One confirm/dismiss card. Confirming issues the PATCH (server is the source of
+// truth, no optimistic write); dismissing is purely local — no API call (§6).
+function ProposedActionCard({
+  action,
+  description,
+}: {
+  action: ProposedAction;
+  description: string;
+}) {
+  const [phase, setPhase] = useState<'idle' | 'applying' | 'applied'>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [isDismissed, setIsDismissed] = useState(false);
+
+  const patch = buildProposedActionPatch(action);
+
+  if (isDismissed) return null;
+
+  async function handleApply() {
+    if (!patch) return;
+    setPhase('applying');
+    setError(null);
+    try {
+      await updateJobPosting(action.job_id, patch);
+      setPhase('applied');
+    } catch (err) {
+      setError(toUserFacingError(err, '제안을 적용하지 못했습니다.').message);
+      setPhase('idle');
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-4">
+        <div>
+          <p className="text-sm font-semibold text-foreground">{description}</p>
+          {action.reason && (
+            <p className="mt-1 text-sm text-gray-600">{action.reason}</p>
+          )}
+        </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {phase === 'applied' ? (
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-primary">
+            <Check className="h-4 w-4" />
+            적용됨
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              disabled={phase === 'applying' || patch === null}
+              size="sm"
+              onClick={handleApply}
+            >
+              {phase === 'applying' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              적용
+            </Button>
+            <Button
+              disabled={phase === 'applying'}
+              size="sm"
+              variant="ghost"
+              onClick={() => setIsDismissed(true)}
+            >
+              <X className="h-4 w-4" />
+              무시
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProposedActionList({
+  plan,
+  groups,
+}: {
+  plan: ApplicationPlan;
+  groups: JobSearchGroupItem[];
+}) {
+  const actions = plan.proposed_actions ?? [];
+  if (actions.length === 0) return null;
+
+  // Resolve display names from data already on hand: job titles from the plan's
+  // own items, group names from the selector's groups. Both fall back to the raw
+  // id when an action references something outside those sets (§6).
+  const jobTitleById = new Map(plan.items.map((i) => [i.job_id, i.job_title]));
+  const groupNameById = new Map(groups.map((g) => [g.id, g.name]));
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-primary uppercase">
+        <ListChecks className="h-3.5 w-3.5" />
+        제안된 액션
+      </div>
+      {actions.map((action) => {
+        const jobTitle =
+          jobTitleById.get(action.job_id) ?? `공고 #${action.job_id}`;
+        const groupName =
+          (action.target_group_id &&
+            groupNameById.get(action.target_group_id)) ||
+          action.target_group_id ||
+          '';
+        return (
+          <ProposedActionCard
+            key={`${action.action_type}:${action.job_id}:${action.application_status ?? ''}:${action.target_group_id ?? ''}:${action.memo ?? ''}`}
+            action={action}
+            description={describeProposedAction(action, jobTitle, groupName)}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function StrategistPage() {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [bootstrapError, setBootstrapError] = useState<UserFacingError | null>(
@@ -457,7 +613,12 @@ export function StrategistPage() {
           </Alert>
         )}
 
-        {plan && <PlanResult plan={plan} />}
+        {plan && (
+          <>
+            <PlanResult plan={plan} />
+            <ProposedActionList plan={plan} groups={groups} />
+          </>
+        )}
       </div>
     );
   }

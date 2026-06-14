@@ -87,6 +87,7 @@ const minimalDetail = {
   application_form: null,
   contact_person: null,
   homepage: null,
+  memo: null,
 };
 
 describe('extractJobPosting', () => {
@@ -233,6 +234,25 @@ describe('updateJobPosting', () => {
     );
     // Single-attempt: a status PATCH must not be retried.
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends a memo PATCH and accepts null to clear it', async () => {
+    const updated = { ...minimalDetail, memo: null };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(okResponse(apiResponse(updated)));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await updateJobPosting(1, { memo: null });
+
+    expect(result.memo).toBeNull();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`,
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ memo: null }),
+      }),
+    );
   });
 
   it('throws ApiError with CLIENT_CONTRACT_MISMATCH on schema mismatch', async () => {

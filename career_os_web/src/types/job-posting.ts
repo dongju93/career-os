@@ -60,10 +60,13 @@ export interface JobPostingListItem {
   updated_at: string;
 }
 
-// Partial PATCH body for /v1/job-postings/{id}. Phase 0 exposes only
-// `application_status`; `group_id`/`memo` arrive in Phase 2.
+// Partial PATCH body for /v1/job-postings/{id}. At least one field is required.
+// `group_id` moves a posting to another owned group; `memo: null` clears the memo
+// (§3). Each propose-then-execute confirmation sends exactly one of these.
 export interface JobPostingUpdate {
   application_status?: ApplicationStatus;
+  group_id?: string;
+  memo?: string | null;
 }
 
 export interface JobPostingDetail extends JobPostingListItem {
@@ -78,6 +81,8 @@ export interface JobPostingDetail extends JobPostingListItem {
   application_form: string | null;
   contact_person: string | null;
   homepage: string | null;
+  // Phase 2: free-form note, detail-only (omitted from list projections).
+  memo: string | null;
 }
 
 export interface JobPostingPage {

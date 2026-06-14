@@ -5,6 +5,7 @@ import {
   Building2,
   Calendar,
   CheckCircle,
+  CheckCircle2,
   ClipboardList,
   Clock,
   Code2,
@@ -17,7 +18,9 @@ import {
   List,
   MapPin,
   RefreshCw,
+  Save,
   Star,
+  StickyNote,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { useCallback, useEffect, useState } from 'react';
@@ -27,6 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { fetchJobPosting, updateJobPosting } from '../services/job-postings';
 import type { ApplicationStatus, JobPostingDetail } from '../types/job-posting';
@@ -40,6 +44,9 @@ import {
 const APPLICATION_STATUS_OPTIONS = Object.keys(
   APPLICATION_STATUS_LABELS,
 ) as ApplicationStatus[];
+
+// §3 memo cap, enforced client-side so the server 422 stays a fallback.
+const MEMO_MAX = 2000;
 
 import { toSafeExternalUrl } from '../utils/url';
 
@@ -116,6 +123,10 @@ export function JobPostingDetailPage() {
   const [error, setError] = useState<UserFacingError | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusError, setStatusError] = useState<UserFacingError | null>(null);
+  const [memoDraft, setMemoDraft] = useState('');
+  const [isSavingMemo, setIsSavingMemo] = useState(false);
+  const [memoError, setMemoError] = useState<UserFacingError | null>(null);
+  const [memoSuccess, setMemoSuccess] = useState(false);
 
   const loadDetail = useCallback(
     (signal?: AbortSignal) => {
@@ -125,7 +136,12 @@ export function JobPostingDetailPage() {
       setError(null);
 
       fetchJobPosting(Number(id), signal)
-        .then(setDetail)
+        .then((loaded) => {
+          setDetail(loaded);
+          // Seed the editable draft from the server value; further edits are
+          // local until the user saves.
+          setMemoDraft(loaded.memo ?? '');
+        })
         .catch((err: unknown) => {
           if (err instanceof Error && err.name === 'AbortError') return;
           setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
@@ -159,6 +175,31 @@ export function JobPostingDetailPage() {
       setStatusError(toUserFacingError(err, '상태를 변경하지 못했습니다.'));
     } finally {
       setIsUpdatingStatus(false);
+    }
+  }
+
+  async function handleSaveMemo() {
+    if (!detail) return;
+
+    setIsSavingMemo(true);
+    setMemoError(null);
+    setMemoSuccess(false);
+
+    try {
+      // An empty draft is an explicit clear (memo: null per §3); otherwise save
+      // the trimmed text, matching the profile page's free-text handling.
+      const trimmed = memoDraft.trim();
+      const updated = await updateJobPosting(detail.id, {
+        memo: trimmed === '' ? null : trimmed,
+      });
+      // Server response is the source of truth (no optimistic write).
+      setDetail(updated);
+      setMemoDraft(updated.memo ?? '');
+      setMemoSuccess(true);
+    } catch (err) {
+      setMemoError(toUserFacingError(err, '메모를 저장하지 못했습니다.'));
+    } finally {
+      setIsSavingMemo(false);
     }
   }
 
@@ -300,6 +341,51 @@ export function JobPostingDetailPage() {
               <AlertDescription>{statusError.message}</AlertDescription>
             </Alert>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Memo */}
+      <Card>
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between gap-3">
+            <SectionHeading icon={StickyNote} title="메모" />
+            <span className="text-xs text-gray-500">
+              {memoDraft.length} / {MEMO_MAX}
+            </span>
+          </div>
+          <Textarea
+            aria-label="메모"
+            className="mt-3"
+            disabled={isSavingMemo}
+            maxLength={MEMO_MAX}
+            placeholder="이 공고에 대한 메모를 남겨보세요."
+            value={memoDraft}
+            onChange={(e) => {
+              setMemoDraft(e.target.value);
+              setMemoSuccess(false);
+            }}
+          />
+          {memoError && (
+            <Alert className="mt-3" variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{memoError.message}</AlertDescription>
+            </Alert>
+          )}
+          {memoSuccess && (
+            <Alert className="mt-3" variant="success">
+              <CheckCircle2 className="h-4 w-4" />
+              <AlertDescription>메모를 저장했습니다.</AlertDescription>
+            </Alert>
+          )}
+          <div className="mt-3 flex justify-end">
+            <Button
+              disabled={isSavingMemo || memoDraft === (detail.memo ?? '')}
+              onClick={handleSaveMemo}
+            >
+              <Save className="h-4 w-4" />
+              {isSavingMemo ? '저장 중…' : '메모 저장'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
