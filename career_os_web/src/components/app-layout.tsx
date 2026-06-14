@@ -5,6 +5,7 @@ import {
   LogOut,
   Menu,
   PlusCircle,
+  Sparkles,
   UserCircle,
   X,
 } from 'lucide-react';
@@ -41,6 +42,12 @@ const navigationItems = [
     icon: UserCircle,
     label: '프로필',
     description: '내 경력 정보 관리',
+  },
+  {
+    href: '/strategist',
+    icon: Sparkles,
+    label: '지원 전략',
+    description: 'AI 지원 전략 플랜',
   },
 ];
 

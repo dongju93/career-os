@@ -155,3 +155,29 @@ const userProfileSchema = z.object({
 
 export const userProfileApiResponseSchema =
   apiResponseSchema(userProfileSchema);
+
+const deadlineUrgencySchema = z.enum(['overdue', 'soon', 'later', 'unknown']);
+
+const planItemSchema = z.object({
+  job_id: z.number(),
+  company_name: z.string(),
+  job_title: z.string(),
+  fit_score: z.number(),
+  matched_skills: z.array(z.string()),
+  missing_skills: z.array(z.string()),
+  deadline_urgency: deadlineUrgencySchema,
+  recommended_action: z.string(),
+  rationale: z.string(),
+});
+
+// Phase 1 plan shape. `proposed_actions` is deliberately omitted — Zod strips
+// unknown keys, so a Phase 2 backend deploy that adds it cannot break this
+// client (§5.1); Phase 2 will add the field with `.default([])`.
+const applicationPlanSchema = z.object({
+  summary: z.string(),
+  items: z.array(planItemSchema),
+});
+
+export const applicationPlanApiResponseSchema = apiResponseSchema(
+  applicationPlanSchema,
+);

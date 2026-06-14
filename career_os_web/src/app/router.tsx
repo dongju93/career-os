@@ -32,6 +32,11 @@ const ProfilePage = lazy(() =>
     default: m.ProfilePage,
   })),
 );
+const StrategistPage = lazy(() =>
+  import('../pages/strategist-page').then((m) => ({
+    default: m.StrategistPage,
+  })),
+);
 
 export const appRoutes = [
   {
@@ -74,6 +79,10 @@ export const appRoutes = [
           {
             path: 'profile',
             element: <ProfilePage />,
+          },
+          {
+            path: 'strategist',
+            element: <StrategistPage />,
           },
           {
             path: '*',
