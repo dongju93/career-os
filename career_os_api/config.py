@@ -109,6 +109,13 @@ class Settings(BaseSettings):
     # How many of the most recent thread items are fed to the model as history.
     chatkit_history_item_limit: int = 20
 
+    # Application Strategist agent — feature flag; /v1/agent/* returns 404 when False.
+    strategist_agent_enabled: bool = False
+    # Model override for plan/artifact runs; falls back to openai_model when unset.
+    strategist_model: str | None = None
+    # Max saved postings fed into a single plan run (context + latency bound).
+    strategist_plan_posting_limit: int = 20
+
     @model_validator(mode="after")
     def _apply_dev_overrides(self) -> Settings:
         if self.dev:

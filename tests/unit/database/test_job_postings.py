@@ -398,3 +398,85 @@ async def test_get_chat_context_detail_scopes_by_user() -> None:
     sql, params = cursor.execute_calls[0]
     assert "WHERE id = %(job_id)s AND user_id = %(user_id)s" in sql
     assert params == {"job_id": 19, "user_id": user_id}
+
+
+@pytest.mark.asyncio
+async def test_list_for_strategist_scopes_by_user_and_binds_trim_length() -> None:
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+    rows = [{"id": 1, "company_name": "Career OS"}]
+    cursor = FakeCursor(rows=rows)
+    conn = FakeConnection(cursor=cursor)
+
+    result = await job_postings_module.list_job_postings_for_strategist(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        group_id=group_id,
+        status="applied",
+        limit=15,
+    )
+
+    assert result == rows
+    assert conn.cursor_row_factories == [dict_row]
+    sql, params = cursor.execute_calls[0]
+    assert "user_id = %(user_id)s" in sql
+    assert params == {
+        "user_id": user_id,
+        "group_id": group_id,
+        "status": "applied",
+        "limit": 15,
+        "field_chars": job_postings_module._MAX_STRATEGIST_FIELD_CHARS,
+    }
+
+
+@pytest.mark.asyncio
+async def test_count_for_strategist_scopes_by_user_and_group() -> None:
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+    cursor = FakeCursor(fetchone_results=[{"total": 4}])
+    conn = FakeConnection(cursor=cursor)
+
+    total = await job_postings_module.count_job_postings_for_strategist(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        group_id=group_id,
+    )
+
+    assert total == 4
+    sql, params = cursor.execute_calls[0]
+    assert "user_id = %(user_id)s AND group_id = %(group_id)s" in sql
+    assert params == {"user_id": user_id, "group_id": group_id}
+
+
+@pytest.mark.asyncio
+async def test_filter_owned_ids_returns_matching_subset() -> None:
+    user_id = uuid.uuid7()
+    cursor = FakeCursor(rows=[{"id": 101}, {"id": 102}])
+    conn = FakeConnection(cursor=cursor)
+
+    owned = await job_postings_module.filter_owned_job_posting_ids(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        job_ids=[101, 102, 999],
+    )
+
+    assert owned == {101, 102}
+    sql, params = cursor.execute_calls[0]
+    assert "id = ANY(%(ids)s)" in sql
+    assert params == {"user_id": user_id, "ids": [101, 102, 999]}
+
+
+@pytest.mark.asyncio
+async def test_filter_owned_ids_short_circuits_on_empty_input() -> None:
+    cursor = FakeCursor(rows=[{"id": 1}])
+    conn = FakeConnection(cursor=cursor)
+
+    owned = await job_postings_module.filter_owned_job_posting_ids(
+        cast(AsyncConnection, conn),
+        user_id=uuid.uuid7(),
+        job_ids=[],
+    )
+
+    # No ids → no query at all.
+    assert owned == set()
+    assert cursor.execute_calls == []

@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
@@ -348,3 +348,54 @@ class UserProfile(UserProfileUpsertRequest):
 
     created_at: datetime
     updated_at: datetime
+
+
+# ── Application Strategist ───────────────────────────────────────────────────────
+
+
+# Deadline interpretation, computed by the model from the supplied "today" date and
+# the posting's free-text deadline: overdue (past), soon (≤7 days), later (a future
+# parseable date), unknown (no parseable date, e.g. 상시채용).
+DeadlineUrgency = Literal["overdue", "soon", "later", "unknown"]
+
+
+class PlanItem(BaseModel):
+    """One prioritized posting in the generated Application Plan.
+
+    This is part of the agent's structured output (`ApplicationPlan` is the SDK
+    output_type), so every field is required — the model must fill them all. The
+    job_id is model-emitted and therefore untrusted: the route re-verifies it
+    against the caller's own postings before this reaches the client.
+    """
+
+    job_id: int
+    company_name: str
+    job_title: str
+    fit_score: Annotated[int, Field(ge=0, le=100)]
+    matched_skills: list[str]
+    missing_skills: list[str]
+    deadline_urgency: DeadlineUrgency
+    recommended_action: str
+    rationale: str
+
+
+class ApplicationPlan(BaseModel):
+    """POST /v1/agent/plan response payload AND the Agents-SDK output_type.
+
+    Kept free of any server-only fields because it doubles as the model's required
+    output contract. Phase 2 will add `proposed_actions` here.
+    """
+
+    summary: str
+    items: Annotated[list[PlanItem], Field(max_length=10)]
+
+
+class ApplicationPlanRequest(BaseModel):
+    """POST /v1/agent/plan body. Both fields optional.
+
+    group_id omitted/null → the caller's current active group. focus is free-text
+    user steering passed verbatim into the run input.
+    """
+
+    group_id: UUID | None = None
+    focus: Annotated[str, Field(max_length=300)] | None = None

@@ -380,3 +380,128 @@ async def get_job_posting_for_chat_context(
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_CHAT_DETAIL_SQL, {"job_id": job_id, "user_id": user_id})
         return cast("JobPostingChatDetailRow | None", await cur.fetchone())
+
+
+# Per-field character cap for the heavy text columns fed to the Strategist agent.
+# Fit/gap analysis needs qualifications/preferred_points/responsibilities, but the
+# full TEXT would balloon the model context (and the DB→app transfer), so LEFT()
+# trims each in the query: ~20 postings × ~1.2 KB worst case.
+_MAX_STRATEGIST_FIELD_CHARS = 400
+
+
+class JobPostingStrategistRow(TypedDict):
+    id: int
+    group_id: UUID
+    platform: str
+    company_name: str
+    job_title: str
+    experience_req: str | None
+    deadline: str | None
+    location: str | None
+    employment_type: str | None
+    salary: str | None
+    tech_stack: list[str] | None
+    job_category: str | None
+    industry: str | None
+    application_status: str
+    status_updated_at: datetime | None
+    scraped_at: datetime
+    # Trimmed to _MAX_STRATEGIST_FIELD_CHARS by LEFT() in the query.
+    qualifications: str | None
+    preferred_points: str | None
+    responsibilities: str | None
+
+
+# contact_person is intentionally never selected — personal data must not enter
+# model context automatically (same posture as the chat-context queries). The
+# untrusted, model-chosen group_id/status filters and the trim length are bound as
+# params (keeping this a LiteralString) and the user_id scope is mandatory.
+_STRATEGIST_LIST_SQL = """
+SELECT
+    id, group_id, platform, company_name, job_title, experience_req, deadline,
+    location, employment_type, salary, tech_stack, job_category, industry,
+    application_status, status_updated_at, scraped_at,
+    LEFT(qualifications, %(field_chars)s)   AS qualifications,
+    LEFT(preferred_points, %(field_chars)s) AS preferred_points,
+    LEFT(responsibilities, %(field_chars)s) AS responsibilities
+FROM job_postings
+WHERE user_id = %(user_id)s
+  AND (%(group_id)s::uuid IS NULL OR group_id = %(group_id)s)
+  AND (%(status)s::text IS NULL OR application_status = %(status)s)
+ORDER BY scraped_at DESC, id DESC
+LIMIT %(limit)s
+"""
+
+_STRATEGIST_COUNT_SQL = """
+SELECT COUNT(*) AS total
+FROM job_postings
+WHERE user_id = %(user_id)s AND group_id = %(group_id)s
+"""
+
+# Re-verifies model-emitted plan ids against the caller's own postings. ANY(array)
+# lets us validate the whole batch in one round trip; the user_id scope means a
+# hallucinated or cross-tenant id simply does not come back.
+_STRATEGIST_OWNED_IDS_SQL = """
+SELECT id
+FROM job_postings
+WHERE user_id = %(user_id)s AND id = ANY(%(ids)s)
+"""
+
+
+async def list_job_postings_for_strategist(
+    conn: AsyncConnection,
+    *,
+    user_id: UUID,
+    group_id: UUID | None,
+    status: str | None,
+    limit: int,
+) -> list[JobPostingStrategistRow]:
+    async with conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            _STRATEGIST_LIST_SQL,
+            {
+                "user_id": user_id,
+                "group_id": group_id,
+                "status": status,
+                "limit": limit,
+                "field_chars": _MAX_STRATEGIST_FIELD_CHARS,
+            },
+        )
+        rows = await cur.fetchall()
+    return cast(list[JobPostingStrategistRow], rows)
+
+
+async def count_job_postings_for_strategist(
+    conn: AsyncConnection,
+    *,
+    user_id: UUID,
+    group_id: UUID,
+) -> int:
+    async with conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            _STRATEGIST_COUNT_SQL, {"user_id": user_id, "group_id": group_id}
+        )
+        row = await cur.fetchone()
+    assert row is not None  # COUNT(*) always returns exactly one row
+    return row["total"]
+
+
+async def filter_owned_job_posting_ids(
+    conn: AsyncConnection,
+    *,
+    user_id: UUID,
+    job_ids: list[int],
+) -> set[int]:
+    """Return the subset of job_ids that actually belong to user_id.
+
+    Used to drop hallucinated / cross-tenant ids from model output before it
+    reaches the client. An empty input short-circuits without a query.
+    """
+    if not job_ids:
+        return set()
+    async with conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            _STRATEGIST_OWNED_IDS_SQL, {"user_id": user_id, "ids": job_ids}
+        )
+        rows = await cur.fetchall()
+    return {row["id"] for row in rows}

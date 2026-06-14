@@ -61,6 +61,7 @@ from career_os_api.schemas import (
 )
 from career_os_api.service.job_posting.extractor import extract_job_posting
 from career_os_api.service.job_posting.fetch import fetch_url_content
+from career_os_api.strategist.strategist_routes import router as strategist_router
 
 v1_router = APIRouter(prefix=f"/{API_V1}")
 
@@ -81,6 +82,12 @@ _CurrentUser = Annotated[dict, Depends(get_current_user)]
 # The runtime dependency on the router also guards against runtime flag changes.
 if settings.chatkit_enabled:
     v1_router.include_router(chatkit_router)
+
+# Strategist routes are always mounted; the router's _require_strategist_enabled
+# dependency returns 404 at request time while the flag is off. Mounting
+# unconditionally (unlike chatkit) lets tests toggle the flag at runtime, since the
+# default is off and a conditional include would otherwise never register the route.
+v1_router.include_router(strategist_router)
 
 
 def _resolve_callback_url(
