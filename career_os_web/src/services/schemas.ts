@@ -197,3 +197,23 @@ const applicationPlanSchema = z.object({
 export const applicationPlanApiResponseSchema = apiResponseSchema(
   applicationPlanSchema,
 );
+
+// Phase 3 (§7): per-posting artifact generation. `content_markdown` is kept as a
+// plain string (capped server-side at 12000 chars) — the client renders it as
+// pre-wrapped text, so no markdown shape needs validating here.
+const artifactTypeSchema = z.enum([
+  'resume_bullets',
+  'cover_letter',
+  'interview_prep',
+]);
+
+const applicationArtifactSchema = z.object({
+  artifact_type: artifactTypeSchema,
+  job_id: z.number(),
+  title: z.string(),
+  content_markdown: z.string(),
+});
+
+export const applicationArtifactApiResponseSchema = apiResponseSchema(
+  applicationArtifactSchema,
+);

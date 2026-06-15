@@ -4,11 +4,13 @@ import {
   Briefcase,
   Building2,
   Calendar,
+  Check,
   CheckCircle,
   CheckCircle2,
   ClipboardList,
   Clock,
   Code2,
+  Copy,
   DollarSign,
   ExternalLink,
   FileText,
@@ -16,23 +18,36 @@ import {
   Globe,
   Info,
   List,
+  Loader2,
   MapPin,
   RefreshCw,
   Save,
+  Sparkles,
   Star,
   StickyNote,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { toUserFacingError, type UserFacingError } from '../services/api-error';
+import {
+  ApiError,
+  toUserFacingError,
+  type UserFacingError,
+} from '../services/api-error';
 import { fetchJobPosting, updateJobPosting } from '../services/job-postings';
+import { generateArtifact } from '../services/strategist';
+import type {
+  ApplicationArtifact,
+  ArtifactType,
+} from '../types/application-artifact';
 import type { ApplicationStatus, JobPostingDetail } from '../types/job-posting';
 import {
   APPLICATION_STATUS_LABELS,
@@ -40,6 +55,7 @@ import {
   formatRelativeDate,
   platformVariant,
 } from '../utils/job-posting-formatters';
+import { ARTIFACT_TYPE_LABELS } from '../utils/strategist-formatters';
 
 const APPLICATION_STATUS_OPTIONS = Object.keys(
   APPLICATION_STATUS_LABELS,
@@ -113,6 +129,212 @@ function DetailErrorState({
         다시 시도
       </Button>
     </div>
+  );
+}
+
+const ARTIFACT_TYPE_OPTIONS = Object.keys(
+  ARTIFACT_TYPE_LABELS,
+) as ArtifactType[];
+
+// §7 focus cap, enforced client-side so the server 422 stays a fallback.
+const ARTIFACT_FOCUS_MAX = 300;
+
+// Per-posting "AI 지원 자료" generator. Mirrors the strategist page's long-latency
+// treatment and the §8 no-retry/abort contract: the POST is single-attempt, the
+// in-flight ~10–60 s run is aborted on unmount, and errors never auto-retry.
+function JobPostingArtifactCard({ jobId }: { jobId: number }) {
+  const [artifactType, setArtifactType] =
+    useState<ArtifactType>('resume_bullets');
+  const [focusText, setFocusText] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [artifact, setArtifact] = useState<ApplicationArtifact | null>(null);
+  const [artifactError, setArtifactError] = useState<{
+    message: string;
+    canRetry: boolean;
+  } | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
+
+  const artifactControllerRef = useRef<AbortController | null>(null);
+  const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Abort the in-flight run and drop the pending copy-reset timer on unmount.
+  useEffect(() => {
+    return () => {
+      artifactControllerRef.current?.abort();
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+    };
+  }, []);
+
+  async function handleGenerate() {
+    artifactControllerRef.current?.abort();
+    const controller = new AbortController();
+    artifactControllerRef.current = controller;
+
+    setIsGenerating(true);
+    setArtifactError(null);
+    setArtifact(null);
+    setIsCopied(false);
+
+    try {
+      const result = await generateArtifact(
+        {
+          job_id: jobId,
+          artifact_type: artifactType,
+          focus: focusText.trim() === '' ? null : focusText.trim(),
+        },
+        controller.signal,
+      );
+      setArtifact(result);
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      // The posting is already loaded and owned, so a 404 here is the feature
+      // flag being off (§3 shares it with the plan endpoint), not a missing
+      // posting; 409 means no profile yet. Neither is retryable, and a 429
+      // carries a useful message but retrying would just re-hit the limit.
+      // Everything else (incl. 502 run failures) gets a manual retry.
+      if (err instanceof ApiError && err.status === 404) {
+        setArtifactError({
+          message: '아직 준비 중인 기능이에요.',
+          canRetry: false,
+        });
+        return;
+      }
+      if (err instanceof ApiError && err.status === 409) {
+        setArtifactError({
+          message: 'AI 지원 자료를 생성하려면 먼저 프로필을 작성해주세요.',
+          canRetry: false,
+        });
+        return;
+      }
+      const canRetry = !(err instanceof ApiError && err.status === 429);
+      setArtifactError({
+        message: toUserFacingError(err, 'AI 지원 자료를 생성하지 못했습니다.')
+          .message,
+        canRetry,
+      });
+    } finally {
+      if (!controller.signal.aborted) setIsGenerating(false);
+      if (artifactControllerRef.current === controller) {
+        artifactControllerRef.current = null;
+      }
+    }
+  }
+
+  async function handleCopy() {
+    if (!artifact) return;
+    try {
+      await navigator.clipboard.writeText(artifact.content_markdown);
+      setIsCopied(true);
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+      copyResetRef.current = setTimeout(() => setIsCopied(false), 2000);
+    } catch {
+      // Clipboard can be unavailable (insecure context / denied permission).
+      // The text stays on screen for manual selection; skip the copied feedback.
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <SectionHeading icon={Sparkles} title="AI 지원 자료" />
+        <p className="mt-3 text-sm text-gray-600">
+          저장한 공고와 프로필을 바탕으로 지원 자료 초안을 만들어드려요.
+        </p>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="artifact-type">자료 종류</Label>
+            <select
+              className="input-clean h-10 w-full rounded-xl px-3 text-sm focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+              disabled={isGenerating}
+              id="artifact-type"
+              value={artifactType}
+              onChange={(e) => setArtifactType(e.target.value as ArtifactType)}
+            >
+              {ARTIFACT_TYPE_OPTIONS.map((type) => (
+                <option key={type} value={type}>
+                  {ARTIFACT_TYPE_LABELS[type]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="artifact-focus">집중할 방향 (선택)</Label>
+            <Input
+              disabled={isGenerating}
+              id="artifact-focus"
+              maxLength={ARTIFACT_FOCUS_MAX}
+              placeholder="예: 리더십 경험 강조"
+              value={focusText}
+              onChange={(e) => setFocusText(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button disabled={isGenerating} onClick={handleGenerate}>
+            {isGenerating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            {isGenerating ? '생성 중…' : '자료 생성'}
+          </Button>
+          {isGenerating && (
+            <span className="text-sm text-gray-600">
+              자료를 생성하고 있어요. 최대 1분 정도 걸릴 수 있어요.
+            </span>
+          )}
+        </div>
+
+        {artifactError && (
+          <Alert className="mt-4" variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex flex-wrap items-center gap-3">
+              {artifactError.message}
+              {artifactError.canRetry && (
+                <Button
+                  disabled={isGenerating}
+                  size="sm"
+                  variant="outline"
+                  onClick={handleGenerate}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  다시 시도
+                </Button>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {artifact && (
+          <div className="mt-4 rounded-xl border border-primary/15 bg-primary/8 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-sm font-bold tracking-tight">
+                {artifact.title}
+              </h3>
+              <Button
+                className="shrink-0"
+                size="sm"
+                variant="outline"
+                onClick={handleCopy}
+              >
+                {isCopied ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+                {isCopied ? '복사됨' : '복사하기'}
+              </Button>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed whitespace-pre-wrap">
+              {artifact.content_markdown}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -388,6 +610,9 @@ export function JobPostingDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* AI artifacts (Phase 3) */}
+      <JobPostingArtifactCard jobId={detail.id} />
 
       {/* Metadata */}
       {hasMetadata && (

@@ -1,8 +1,17 @@
+import type { ArtifactType } from '../types/application-artifact';
 import type {
   DeadlineUrgency,
   ProposedAction,
 } from '../types/application-plan';
 import { APPLICATION_STATUS_LABELS } from './job-posting-formatters';
+
+// Canonical Korean labels for the per-posting artifact types (§7). Single source
+// of truth wherever an artifact type is shown, mirroring DEADLINE_URGENCY_LABELS.
+export const ARTIFACT_TYPE_LABELS: Record<ArtifactType, string> = {
+  resume_bullets: '이력서 불릿',
+  cover_letter: '자기소개서 포인트',
+  interview_prep: '면접 준비',
+};
 
 // Canonical Korean labels for deadline urgency (§5.3). Keep these the single
 // source of truth wherever urgency is shown, mirroring APPLICATION_STATUS_LABELS.

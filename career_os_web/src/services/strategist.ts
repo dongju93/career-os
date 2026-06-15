@@ -1,7 +1,14 @@
+import type {
+  ApplicationArtifact,
+  ArtifactType,
+} from '../types/application-artifact';
 import type { ApplicationPlan } from '../types/application-plan';
 import { fetchWithApiRetry } from './api-client';
 import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
-import { applicationPlanApiResponseSchema } from './schemas';
+import {
+  applicationArtifactApiResponseSchema,
+  applicationPlanApiResponseSchema,
+} from './schemas';
 
 const CONTRACT_ERROR_MESSAGE = '서버 응답 형식이 올바르지 않습니다.';
 
@@ -41,4 +48,34 @@ export async function generateApplicationPlan(
   const raw = await response.json();
   return assertContractMatch(applicationPlanApiResponseSchema.safeParse(raw))
     .data;
+}
+
+// Generates a single per-posting artifact (resume bullets / cover-letter points /
+// interview prep) via POST /v1/agent/artifact (§7).
+//
+// Same cost profile as the plan run: a model call against a 5/min + 20/day quota,
+// so it is deliberately single-attempt — never pass `retryable`. The caller owns
+// the AbortController and forwards its signal so unmount cancels the request.
+export async function generateArtifact(
+  body: {
+    job_id: number;
+    artifact_type: ArtifactType;
+    focus?: string | null;
+  },
+  signal?: AbortSignal,
+): Promise<ApplicationArtifact> {
+  const response = await fetchWithApiRetry(
+    `${import.meta.env.VITE_API_BASE_URL}/v1/agent/artifact`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    },
+    'AI 지원 자료를 생성하지 못했습니다.',
+  );
+  const raw = await response.json();
+  return assertContractMatch(
+    applicationArtifactApiResponseSchema.safeParse(raw),
+  ).data;
 }
