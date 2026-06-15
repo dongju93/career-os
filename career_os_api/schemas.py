@@ -436,3 +436,37 @@ class ApplicationPlanRequest(BaseModel):
 
     group_id: UUID | None = None
     focus: Annotated[str, Field(max_length=300)] | None = None
+
+
+# The three tailored-artifact kinds the strategist can generate for a single posting.
+ArtifactType = Literal["resume_bullets", "cover_letter", "interview_prep"]
+
+
+class ArtifactRequest(BaseModel):
+    """POST /v1/agent/artifact body.
+
+    Targets exactly one saved posting. job_id is required (the artifact agent is
+    tool-less — the route fetches the posting + profile server-side and bakes them
+    into the run input), and it is re-verified against the caller's own postings
+    before any model call. focus is optional free-text steering.
+    """
+
+    job_id: int
+    artifact_type: ArtifactType
+    focus: Annotated[str, Field(max_length=300)] | None = None
+
+
+class ApplicationArtifact(BaseModel):
+    """POST /v1/agent/artifact response payload AND the Agents-SDK output_type.
+
+    Kept free of server-only fields because it doubles as the model's required
+    output contract. content_markdown is hard-capped so a runaway generation fails
+    Pydantic validation instead of reaching the client. job_id and artifact_type are
+    model-echoed and therefore untrusted — the route pins both back to the verified
+    request values before returning.
+    """
+
+    artifact_type: ArtifactType
+    job_id: int
+    title: str
+    content_markdown: Annotated[str, Field(max_length=12000)]

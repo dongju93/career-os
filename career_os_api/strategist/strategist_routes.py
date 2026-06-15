@@ -21,6 +21,7 @@ from career_os_api.config import settings
 from career_os_api.database.job_postings import (
     count_job_postings_for_strategist,
     filter_owned_job_posting_ids,
+    get_job_posting,
 )
 from career_os_api.database.job_search_groups import (
     filter_owned_group_ids,
@@ -33,11 +34,17 @@ from career_os_api.middleware import get_request_id
 from career_os_api.rate_limit import quota, rate_limit
 from career_os_api.responses import ApiResponse
 from career_os_api.schemas import (
+    ApplicationArtifact,
     ApplicationPlan,
     ApplicationPlanRequest,
+    ArtifactRequest,
     ProposedAction,
 )
-from career_os_api.strategist.strategist_agent import build_strategist_agent
+from career_os_api.strategist.strategist_agent import (
+    build_artifact_agent,
+    build_strategist_agent,
+    compose_artifact_input,
+)
 from career_os_api.strategist.strategist_context import StrategistRunContext
 
 _logger = logging.getLogger(__name__)
@@ -63,6 +70,20 @@ async def run_strategist_plan(
     """Thin SDK seam so API tests can monkeypatch the model run wholesale."""
     result = await Runner.run(agent, input_text, context=context, max_turns=8)
     return result.final_output_as(ApplicationPlan)
+
+
+async def run_strategist_artifact(
+    agent: Agent[StrategistRunContext],
+    input_text: str,
+    context: StrategistRunContext,
+) -> ApplicationArtifact:
+    """Thin SDK seam for the artifact run (monkeypatched in API tests).
+
+    The agent is tool-less, so a single structured-output turn suffices; max_turns=2
+    leaves headroom without inviting open-ended loops.
+    """
+    result = await Runner.run(agent, input_text, context=context, max_turns=2)
+    return result.final_output_as(ApplicationArtifact)
 
 
 @router.post(
@@ -240,3 +261,87 @@ async def _filter_owned_plan_output(
             update={"items": kept_items, "proposed_actions": kept_actions}
         )
     return plan
+
+
+@router.post(
+    "/agent/artifact",
+    tags=["agent"],
+    dependencies=[rate_limit(5, per="minute"), quota(20, per="day")],
+    responses={
+        401: {"description": "인증 실패"},
+        404: {"description": "채용 공고를 찾을 수 없음"},
+        409: {"description": "프로필이 없음"},
+        502: {"description": "자료 생성(에이전트 실행) 실패"},
+    },
+)
+async def create_application_artifact(
+    data: ArtifactRequest,
+    request: Request,
+    current_user: _CurrentUser,
+) -> ApiResponse[ApplicationArtifact]:
+    user_id = current_user["id"]
+    pool = request.app.state.pool
+
+    # Resolve ownership + precondition before any model call. Both are reads, so they
+    # share one retryable operation; the posting fetch enforces ownership (foreign /
+    # missing id → no row → 404), so no separate id re-check is needed afterwards.
+    # HTTPExceptions raised here pass through run_database_operation untouched.
+    async def resolve(conn: Any) -> tuple[Any, Any]:
+        posting = await get_job_posting(conn, data.job_id, user_id=user_id)
+        if posting is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job posting {data.job_id} not found",
+            )
+        profile = await get_user_profile(conn, user_id=user_id)
+        if profile is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="지원 자료를 생성하려면 먼저 프로필을 작성해주세요.",
+            )
+        return posting, profile
+
+    posting, profile = await run_database_operation(
+        pool, resolve, label="strategist.artifact.resolve"
+    )
+
+    # Compose the run input deterministically (tool-less agent) — contact_person is
+    # excluded and heavy posting fields trimmed inside compose_artifact_input.
+    input_text = compose_artifact_input(
+        profile=profile,
+        posting=posting,
+        artifact_type=data.artifact_type,
+        focus=data.focus,
+    )
+
+    context = StrategistRunContext(
+        user_id=user_id, pool=pool, request_id=get_request_id()
+    )
+    agent = build_artifact_agent(settings.strategist_model or settings.openai_model)
+
+    try:
+        artifact = await run_strategist_artifact(agent, input_text, context)
+    except AgentsException as exc:
+        _logger.warning(
+            "strategist.artifact.run_failed user_id=%s request_id=%s error=%s",
+            user_id,
+            get_request_id(),
+            type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="지원 자료 생성에 실패했습니다. 잠시 후 다시 시도해주세요.",
+        ) from exc
+
+    # Model output is untrusted: pin the model-echoed job_id / artifact_type back to
+    # the verified request values so a hallucinated echo can never reach the client.
+    # Ownership of data.job_id was already confirmed by the posting fetch above.
+    artifact = artifact.model_copy(
+        update={"job_id": data.job_id, "artifact_type": data.artifact_type}
+    )
+
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="지원 자료가 생성되었습니다.",
+        data=artifact,
+    )
