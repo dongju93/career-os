@@ -1,11 +1,10 @@
 # CareerOS API
 
-![FastAPI](https://img.shields.io/badge/FastAPI-0.136.3-009688?logo=fastapi&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.137.1-009688?logo=fastapi&logoColor=white)
 ![FastAPI Cloud](https://img.shields.io/badge/FastAPI%20Cloud-Deployed-009688?logo=fastapi&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)
 ![OpenAI](https://img.shields.io/badge/OpenAI_SDK-2.41.0-412991?logo=openai&logoColor=white)
-![openai-chatkit](https://img.shields.io/badge/openai--chatkit-1.6.5-412991?logo=openai&logoColor=white)
 ![Pyrefly](https://img.shields.io/badge/Pyrefly-1.0.0-0668E1?logo=meta&logoColor=white)
 ![Google OAuth](https://img.shields.io/badge/Google_OAuth-Authlib-4285F4?logo=google&logoColor=white)
 [![codecov](https://codecov.io/github/dongju93/career-os/graph/badge.svg?flag=backend&token=48VXFY8C3M)](https://codecov.io/github/dongju93/career-os)
@@ -117,6 +116,39 @@ API 문서: `http://localhost:8000/v1/docs`
 
 ---
 
+## AI 기능
+
+### AI 구직 어시스턴트 (ChatKit)
+
+저장된 공고 데이터를 문맥으로 활용하는 한국어 구직 활동 도우미입니다.
+
+- **실시간 스트리밍** — HTTP SSE(`text/event-stream`)로 응답을 토큰 단위로 전송; 지연 없이 대화 흐름 유지
+- **대화 이력 영속화** — 스레드·메시지를 PostgreSQL JSONB로 저장; 세션을 넘어 맥락 유지
+- **저장 공고 검색 도구** — `search_saved_job_postings` / `get_saved_job_posting_detail` 두 함수 도구를 에이전트에 연결해 사용자가 저장한 공고에 대해 직접 질의 가능
+- **테넌트 격리** — 도구가 받는 `user_id`는 인증된 세션에서만 유입; 모델이 다른 사용자 데이터에 접근할 수 없는 구조
+- **사용량 제한** — 분당 30회·일별 500회; Redis 슬라이딩 윈도우(Lua 원자 스크립트)
+
+### AI 지원 전략가 (Application Strategist)
+
+저장된 공고 전체와 커리어 프로필을 입력으로 받아 두 단계 분석을 수행하는 목표 지향 에이전트입니다.
+
+**Phase 1 — 전략 플랜** (`POST /agent/plan`)
+
+- `get_career_profile` / `list_postings_with_status` 두 읽기 전용 도구로 사용자 데이터를 조회한 뒤 `output_type=ApplicationPlan`으로 우선순위가 매겨진 지원 전략을 구조화 출력
+- 모델 출력은 Pydantic 검증 + 소유권 재검증(`job_id`·`target_group_id`)을 거친 뒤에만 응답에 포함
+- 최대 8 turns; 분당 5회·일별 30회 제한
+
+**Phase 2 — 공고별 맞춤 지원 자료** (`POST /agent/artifact`)
+
+- 단일 공고 + 커리어 프로필을 서버가 직접 조합해 입력 구성 (모델이 데이터를 요청·수집하지 않음)
+- `artifact_type` ∈ `resume_bullets` / `cover_letter` / `interview_prep` 세 유형 선택
+- 응답의 `job_id`·`artifact_type`은 요청값으로 고정(모델 에코 신뢰 안 함); `content_markdown` ≤ 12 000자 하드캡
+- 최대 2 turns; 분당 5회·일별 20회 제한
+
+> 두 엔드포인트 모두 `STRATEGIST_AGENT_ENABLED=true` 설정 시 활성화됩니다(기본값 `false`).
+
+---
+
 ## 기능
 
 - **Google OAuth 로그인** — 브라우저용 세션 쿠키 인증, 서버 발급 Bearer 토큰 fallback 지원
@@ -126,8 +158,6 @@ API 문서: `http://localhost:8000/v1/docs`
 - **공고 저장·관리** — 공고를 `group_id`에 연결해 저장, 그룹별 목록 필터링, 동일 공고의 다른 그룹별 별도 저장 지원
 - **공고 상태·메모 관리** — 지원 상태(`saved`/`applied`/`interviewing`/`offer`/`rejected`/`withdrawn`) 변경, 다른 그룹으로 이동, 메모 작성을 부분 수정으로 지원
 - **커리어 프로필** — 직무·경력·기술·희망 근무지 등 7개 필드를 전체 교체(upsert) 방식으로 관리
-- **AI 구직 어시스턴트 (ChatKit)** — 한국어 기반 구직 활동 도우미; 스트리밍 SSE 응답, PostgreSQL 대화 이력 저장, 분당 30회·일별 500회 사용량 제한; `CHATKIT_ENABLED=false` 시 비활성화
-- **AI 지원 전략가 (Application Strategist)** — 저장된 공고와 커리어 프로필을 분석해 우선순위가 매겨진 지원 전략 플랜과 공고별 맞춤 지원 자료(자기소개서 문구, 자소서, 면접 준비)를 생성; `STRATEGIST_AGENT_ENABLED=false`(기본값) 시 `/v1/agent/*` 비활성화
 - **사용량 제한** — Redis 슬라이딩 윈도우(분당)와 고정 윈도우(일·월별) 조합; Redis 미설정 시 fail-open
 - **지원 플랫폼** — `saramin.co.kr`, `wanted.co.kr`
 
