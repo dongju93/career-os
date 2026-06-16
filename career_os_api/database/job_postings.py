@@ -283,10 +283,11 @@ async def update_job_posting_fields(
     escaping as a 500. A move that would duplicate a posting in the target group
     (the uq_job_postings_group_id unique index) surfaces as psycopg's
     UniqueViolation, which the route maps to 409.
-    """
-    if not fields:
-        return await get_job_posting(conn, job_id, user_id=user_id)
 
+    `fields` is always non-empty: the only caller (the PATCH /job-postings/{id}
+    route) builds it from a JobPostingUpdateRequest whose validator rejects an
+    empty body with 422 before the handler runs.
+    """
     if "group_id" in fields:
         async with conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(_GROUP_OWNED_BY_USER_SQL, (fields["group_id"], user_id))
