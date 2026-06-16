@@ -371,7 +371,9 @@ def test_plan_scopes_id_verification_to_target_group(
     assert response.status_code == 200
     assert [item["job_id"] for item in response.json()["data"]["items"]] == [101]
     # The resolved target group is threaded into the ownership check.
-    assert owned_filter.await_args.kwargs["group_id"] == target_group
+    await_args = owned_filter.await_args
+    assert await_args is not None
+    assert await_args.kwargs["group_id"] == target_group
 
 
 # ── Phase 2: proposed-action post-validation ──────────────────────────────────
