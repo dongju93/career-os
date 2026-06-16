@@ -9,8 +9,8 @@ maintainers = [{ name = "dongju93" }]
 dependencies = [
     "authlib==1.7.2",
     "beautifulsoup4==4.15.0",
-    "fastapi[standard]==0.136.3",
-    "httpx2>=2.3.0",
+    "fastapi[standard]==0.137.1",
+    "httpx2>=2.4.0",
     "itsdangerous==2.2.0",
     "openai-chatkit==1.6.5",
     "psycopg-pool==3.3.1",
@@ -23,7 +23,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "fakeredis[lua]==2.36.1",
-    "pytest==9.0.3",
+    "pytest==9.1.0",
     "pytest-asyncio==1.4.0",
     "pytest-cov==7.1.0",
     "types-authlib==1.6.11.20260518",
