@@ -217,3 +217,29 @@ def test_put_profile_rejects_over_limit_fields(
 
     assert response.status_code == 422
     assert upsert.await_count == 0
+
+
+@pytest.mark.parametrize("field", ["target_roles", "skills", "locations"])
+def test_put_profile_rejects_scalar_for_array_fields(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+) -> None:
+    """A JSON scalar for a list[str] field must 422, not be exploded into chars.
+
+    Regression: the mode="before" validator iterated the raw value directly, so
+    "Python" was cleaned into ['P', 'y', 't', 'h', 'o', 'n'] and stored as a
+    bogus TEXT[] instead of failing type validation.
+    """
+    upsert = AsyncMock()
+    monkeypatch.setattr(app_module, "upsert_user_profile", upsert)
+
+    response = client.put(
+        PROFILE_URL,
+        json={field: "Python"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 422
+    assert upsert.await_count == 0

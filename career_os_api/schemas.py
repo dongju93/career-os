@@ -341,10 +341,15 @@ class UserProfileUpsertRequest(BaseModel):
 
     @field_validator("target_roles", "skills", "locations", mode="before")
     @classmethod
-    def drop_empty_profile_entries(cls, v: list[str] | None) -> list[str] | None:
+    def drop_empty_profile_entries(cls, v: object) -> object:
         if v is None:
             return None
-        cleaned = [item for item in v if isinstance(item, str) and item.strip()]
+        if not isinstance(v, list):
+            # Leave non-list input untouched so Pydantic raises a list[str] type
+            # error instead of silently exploding a scalar (e.g. "Python") into
+            # its characters under mode="before".
+            return v
+        cleaned = [item.strip() for item in v if isinstance(item, str) and item.strip()]
         return cleaned or None
 
 
