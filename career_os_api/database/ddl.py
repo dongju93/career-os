@@ -23,20 +23,20 @@ CREATE_JOB_POSTINGS_TABLE = """
 CREATE TABLE IF NOT EXISTS job_postings (
     -- PK & identity
     id                    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    user_id               UUID          NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    platform              VARCHAR(20)   NOT NULL CHECK (platform IN ('saramin', 'wanted')),
-    posting_id            VARCHAR(50)   NOT NULL,
-    posting_url           TEXT          NOT NULL,
+    user_id               UUID   NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    platform              TEXT   NOT NULL CHECK (platform IN ('saramin', 'wanted')),
+    posting_id            TEXT   NOT NULL,
+    posting_url           TEXT   NOT NULL,
 
     -- Strict common (required)
-    company_name          VARCHAR(200)  NOT NULL,
-    job_title             VARCHAR(500)  NOT NULL,
-    experience_req        VARCHAR(100),
-    deadline              VARCHAR(100),
-    location              VARCHAR(300),
+    company_name          TEXT   NOT NULL,
+    job_title             TEXT   NOT NULL,
+    experience_req        TEXT,
+    deadline              TEXT,
+    location              TEXT,
 
     -- General (recommended)
-    employment_type       VARCHAR(50),
+    employment_type       TEXT,
     job_description       TEXT,
     responsibilities      TEXT,
     qualifications        TEXT,
@@ -45,22 +45,22 @@ CREATE TABLE IF NOT EXISTS job_postings (
     hiring_process        TEXT,
 
     -- Platform-specific (optional)
-    education_req         VARCHAR(100),
-    salary                VARCHAR(200),
+    education_req         TEXT,
+    salary                TEXT,
     tech_stack            TEXT[],
     tags                  TEXT[],
-    application_method    VARCHAR(200),
-    application_form      VARCHAR(200),
-    contact_person        VARCHAR(100),
-    homepage              VARCHAR(500),
-    job_category          VARCHAR(200),
-    industry              VARCHAR(200),
+    application_method    TEXT,
+    application_form      TEXT,
+    contact_person        TEXT,
+    homepage              TEXT,
+    job_category          TEXT,
+    industry              TEXT,
 
     -- Group
-    group_id              UUID          NOT NULL REFERENCES job_search_groups (id) ON DELETE CASCADE,
+    group_id              UUID   NOT NULL REFERENCES job_search_groups (id) ON DELETE CASCADE,
 
     -- Application lifecycle
-    application_status    VARCHAR(20)   NOT NULL DEFAULT 'saved'
+    application_status    TEXT   NOT NULL DEFAULT 'saved'
         CHECK (application_status IN
             ('saved', 'applied', 'interviewing', 'offer', 'rejected', 'withdrawn')),
     status_updated_at     TIMESTAMPTZ,
@@ -77,10 +77,10 @@ CREATE TABLE IF NOT EXISTS job_postings (
 
 CREATE_JOB_SEARCH_GROUPS_TABLE = """
 CREATE TABLE IF NOT EXISTS job_search_groups (
-    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID         NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    name        VARCHAR(100) NOT NULL,
-    started_at  DATE         NOT NULL,
+    id          UUID  PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID  NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    name        TEXT  NOT NULL,
+    started_at  DATE  NOT NULL,
     ended_at    DATE,
     memo        TEXT,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -96,15 +96,15 @@ CREATE INDEX IF NOT EXISTS idx_job_search_groups_user_id
 
 CREATE_USERS_TABLE = """
 CREATE TABLE IF NOT EXISTS users (
-    id          UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-    google_id   VARCHAR(255)  NOT NULL,
-    email       VARCHAR(255)  NOT NULL,
-    name        VARCHAR(100),
-    picture     VARCHAR(512),
-    is_active   BOOLEAN       NOT NULL DEFAULT TRUE,
+    id          UUID     PRIMARY KEY DEFAULT gen_random_uuid(),
+    google_id   TEXT     NOT NULL,
+    email       TEXT     NOT NULL,
+    name        TEXT,
+    picture     TEXT,
+    is_active   BOOLEAN  NOT NULL DEFAULT TRUE,
     auth_session_revoked_at TIMESTAMPTZ,
-    created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
     CONSTRAINT uq_users_google_id UNIQUE (google_id),
     CONSTRAINT uq_users_email     UNIQUE (email)
@@ -113,13 +113,13 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE_USER_PROFILES_TABLE = """
 CREATE TABLE IF NOT EXISTS user_profiles (
-    user_id            UUID         PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
-    headline           VARCHAR(200),
-    years_experience   SMALLINT,
+    user_id            UUID     PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+    headline           TEXT,
+    years_experience   SMALLINT CHECK (years_experience BETWEEN 0 AND 60),
     target_roles       TEXT[],
     skills             TEXT[],
     locations          TEXT[],
-    salary_expectation VARCHAR(200),
+    salary_expectation TEXT,
     summary            TEXT,
     created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW()
@@ -128,14 +128,14 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 
 CREATE_RISC_EVENTS_TABLE = """
 CREATE TABLE IF NOT EXISTS risc_events (
-    id          BIGINT        GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    jti         VARCHAR(255)  NOT NULL,
-    event_type  VARCHAR(255)  NOT NULL,
-    google_id   VARCHAR(255),
-    reason      VARCHAR(255),
-    issued_at   TIMESTAMPTZ   NOT NULL,
-    payload     JSONB         NOT NULL,
-    received_at TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    id          BIGINT  GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    jti         TEXT    NOT NULL,
+    event_type  TEXT    NOT NULL,
+    google_id   TEXT,
+    reason      TEXT,
+    issued_at   TIMESTAMPTZ  NOT NULL,
+    payload     JSONB        NOT NULL,
+    received_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
     CONSTRAINT uq_risc_events_jti UNIQUE (jti)
 );
@@ -185,6 +185,37 @@ CREATE INDEX IF NOT EXISTS idx_job_postings_group_id_scraped_at
 
 CREATE INDEX IF NOT EXISTS idx_job_postings_user_id_scraped_at
     ON job_postings (user_id, scraped_at DESC);
+
+-- Partial index for active-status queries (list endpoint + strategist agent).
+CREATE INDEX IF NOT EXISTS idx_job_postings_status_active
+    ON job_postings (user_id, scraped_at DESC)
+    WHERE application_status IN ('saved', 'applied', 'interviewing');
+
+-- GIN indexes for array containment queries on job_postings and user_profiles.
+CREATE INDEX IF NOT EXISTS idx_job_postings_tech_stack
+    ON job_postings USING GIN (tech_stack)
+    WHERE tech_stack IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_job_postings_tags
+    ON job_postings USING GIN (tags)
+    WHERE tags IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_user_profiles_skills
+    ON user_profiles USING GIN (skills)
+    WHERE skills IS NOT NULL;
+
+-- risc_events: lookup by google_id and time-range audit queries.
+CREATE INDEX IF NOT EXISTS idx_risc_events_google_id
+    ON risc_events (google_id)
+    WHERE google_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_risc_events_received_at
+    ON risc_events (received_at DESC);
+
+-- chatkit_items: FK to users(id) ON DELETE CASCADE requires an index on
+-- user_id so cascade-deletes do not scan the full table.
+CREATE INDEX IF NOT EXISTS idx_chatkit_items_user_id
+    ON chatkit_items (user_id);
 """
 
 CREATE_COMMENTS = """
