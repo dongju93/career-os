@@ -1,3 +1,4 @@
+import { Briefcase, FolderOpen, Sparkles } from 'lucide-react';
 import { useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -120,7 +121,7 @@ export function LoginPage() {
         <CardContent className="px-8 pb-8 pt-8">
           <div className="mb-8 flex flex-col items-center gap-4">
             <span className="rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold tracking-[0.2em] text-primary uppercase border border-primary/20">
-              Frosted Workspace
+              구직 활동 관리
             </span>
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-teal-400 text-lg font-black text-slate-900 shadow-lg shadow-primary/30">
               CO
@@ -150,7 +151,27 @@ export function LoginPage() {
             Google로 계속하기
           </Button>
 
-          <p className="text-gray-500 mx-auto mt-6 max-w-[16rem] text-center text-xs leading-5 text-balance">
+          <div className="mt-5 space-y-2.5 rounded-xl bg-muted/60 px-4 py-3.5">
+            {(
+              [
+                { icon: Briefcase, text: '채용공고 URL로 자동 스크랩 & 정리' },
+                { icon: FolderOpen, text: '구직 활동 그룹으로 체계적 관리' },
+                { icon: Sparkles, text: 'AI 기반 지원 전략 & 자료 생성' },
+              ] as const
+            ).map(({ icon: Icon, text }) => (
+              <div
+                key={text}
+                className="flex items-center gap-2.5 text-xs text-gray-600"
+              >
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
+                  <Icon className="h-2.5 w-2.5" />
+                </div>
+                {text}
+              </div>
+            ))}
+          </div>
+
+          <p className="text-gray-500 mx-auto mt-5 max-w-[16rem] text-center text-xs leading-5 text-balance">
             계속하면 서비스 이용약관에 동의하게 됩니다.
           </p>
         </CardContent>

@@ -575,7 +575,7 @@ export function StrategistPage() {
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3">
               <Button disabled={isGenerating} onClick={handleGenerate}>
                 {isGenerating ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -584,14 +584,31 @@ export function StrategistPage() {
                 )}
                 {isGenerating ? '생성 중…' : '플랜 생성'}
               </Button>
-              {isGenerating && (
-                <span className="text-sm text-gray-600">
-                  플랜을 생성하고 있어요. 최대 1분 정도 걸릴 수 있어요.
-                </span>
-              )}
             </div>
           </CardContent>
         </Card>
+
+        {isGenerating && (
+          <div className="animate-fade-in rounded-xl border border-primary/20 bg-primary/5 p-5">
+            <div className="relative mb-4 h-1 overflow-hidden rounded-full bg-primary/15">
+              <div className="absolute inset-y-0 left-0 w-2/5 rounded-full bg-linear-to-r from-primary to-teal-400 animate-indeterminate" />
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Sparkles className="h-5 w-5 animate-pulse" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  AI가 채용공고를 분석 중이에요
+                </p>
+                <p className="mt-0.5 text-xs text-gray-600">
+                  저장된 공고와 프로필을 비교해 지원 전략 플랜을 만들고 있어요.
+                  최대 1분 정도 걸릴 수 있어요.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {generateError && (
           <Alert variant="destructive">

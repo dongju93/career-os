@@ -25,6 +25,7 @@ import type { JobPostingListItem } from '../types/job-posting';
 import type { JobSearchGroupItem } from '../types/job-search-group';
 import {
   APPLICATION_STATUS_LABELS,
+  applicationStatusAccentClass,
   applicationStatusVariant,
   formatRelativeDate,
   platformVariant,
@@ -52,7 +53,14 @@ function JobPostingCard({ item }: { item: JobPostingListItem }) {
 
   return (
     <Card className="group glass-hover relative overflow-hidden has-focus-visible:ring-2 has-focus-visible:ring-primary has-focus-visible:ring-offset-2">
-      <CardContent className="p-5">
+      <div
+        aria-hidden="true"
+        className={cn(
+          'absolute inset-y-0 left-0 w-1',
+          applicationStatusAccentClass(item.application_status),
+        )}
+      />
+      <CardContent className="p-5 pl-6">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={platformVariant(item.platform)}>
@@ -226,7 +234,7 @@ function GroupFilterBar({
           key={group.id}
           type="button"
           className={cn(
-            'shrink-0 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors border',
+            'flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors border',
             selected === group.id
               ? 'bg-primary/15 text-primary border-primary/20'
               : 'text-gray-600 border-transparent hover:bg-muted',
@@ -234,6 +242,18 @@ function GroupFilterBar({
           onClick={() => onSelect(group.id)}
         >
           {index === 0 ? `${group.name} (현재)` : group.name}
+          {group.posting_count > 0 && (
+            <span
+              className={cn(
+                'inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold',
+                selected === group.id
+                  ? 'bg-primary/20 text-primary'
+                  : 'bg-muted text-gray-500',
+              )}
+            >
+              {group.posting_count}
+            </span>
+          )}
         </button>
       ))}
     </div>

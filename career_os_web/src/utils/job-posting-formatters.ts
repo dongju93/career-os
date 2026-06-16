@@ -57,3 +57,24 @@ export function applicationStatusVariant(
       return 'outline';
   }
 }
+
+// Maps each status to a left-accent bar Tailwind bg class for card-level
+// scanning — allows instant status identification without reading badge text.
+export function applicationStatusAccentClass(
+  status: ApplicationStatus,
+): string {
+  switch (status) {
+    case 'saved':
+      return 'bg-gray-300/50';
+    case 'applied':
+      return 'bg-primary';
+    case 'interviewing':
+      return 'bg-amber-400';
+    case 'offer':
+      return 'bg-emerald-400';
+    case 'rejected':
+      return 'bg-red-400/60';
+    case 'withdrawn':
+      return 'bg-gray-300/30';
+  }
+}
