@@ -19,12 +19,13 @@
 | 프로덕트 매니저     | [SoEun99](https://github.com/SoEun99)   |
 | 소프트웨어 엔지니어 | [dongju93](https://github.com/dongju93) |
 
-### 프로젝트 관리
+### 프로젝트 리소스
 
-| 항목        | 링크                                                                                      |
-| ----------- | ----------------------------------------------------------------------------------------- |
-| 이슈 트래킹 | [Linear - CAR](https://linear.app/careeros999/team/CAR)                                   |
-| 문서        | [Confluence - CareerOS](https://eoth999-1775281441291.atlassian.net/wiki/spaces/CareerOS) |
+| 항목        | 링크                                                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 이슈 트래킹 | [Linear - CAR](https://linear.app/careeros999/team/CAR)                                                                                                       |
+| 문서        | [Confluence - CareerOS](https://eoth999-1775281441291.atlassian.net/wiki/spaces/CareerOS)                                                                     |
+| 디자인      | [Penpot - CareerOS](https://design.penpot.app/#/dashboard/files?team-id=8c927302-d076-8020-8007-fff42a037e36&project-id=8c927302-d076-8020-8007-fff434f249aa) |
 
 ### 배포 및 인프라
 
