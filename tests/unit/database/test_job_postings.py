@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import pytest
 from psycopg import AsyncConnection
+from psycopg.errors import ForeignKeyViolation
 from psycopg.rows import dict_row
 
 from career_os_api.database import ddl as ddl_module
@@ -426,6 +427,41 @@ async def test_update_job_posting_fields_raises_for_foreign_target_group() -> No
     # The UPDATE must never run when ownership fails.
     assert len(cursor.execute_calls) == 1
     assert cursor.execute_calls[0][0] == job_postings_module._GROUP_OWNED_BY_USER_SQL
+
+
+@pytest.mark.asyncio
+async def test_update_job_posting_fields_maps_fk_violation_to_target_group_not_found() -> (
+    None
+):
+    # TOCTOU: the target group passes the ownership precheck, then is deleted (a
+    # concurrent DELETE /job-search-groups/{id}) before the UPDATE runs. The FK on
+    # group_id fails with ForeignKeyViolation, which must surface as the same
+    # TargetGroupNotFoundError (the route's 404 path) instead of escaping as a 500.
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+
+    class FkRaisingCursor(FakeCursor):
+        async def execute(self, query: str, params: Any = None) -> None:
+            await super().execute(query, params)
+            if "UPDATE job_postings" in query:
+                raise ForeignKeyViolation("target group deleted mid-move")
+
+    # Precheck fetchone is truthy so ownership passes; the UPDATE then raises.
+    cursor = FkRaisingCursor(fetchone_results=[{"exists": 1}])
+    conn = FakeConnection(cursor=cursor)
+
+    with pytest.raises(job_postings_module.TargetGroupNotFoundError):
+        await job_postings_module.update_job_posting_fields(
+            cast(AsyncConnection, conn),
+            user_id=user_id,
+            job_id=7,
+            fields={"group_id": group_id},
+        )
+
+    # Both statements were attempted: the precheck SELECT, then the failing UPDATE.
+    assert len(cursor.execute_calls) == 2
+    assert cursor.execute_calls[0][0] == job_postings_module._GROUP_OWNED_BY_USER_SQL
+    assert "UPDATE job_postings" in cursor.execute_calls[1][0]
 
 
 def test_upsert_do_update_set_preserves_status_but_returns_it() -> None:

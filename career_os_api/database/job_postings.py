@@ -3,6 +3,7 @@ from typing import TypedDict, cast
 from uuid import UUID
 
 from psycopg import AsyncConnection
+from psycopg.errors import ForeignKeyViolation
 from psycopg.rows import dict_row
 
 from career_os_api.schemas import JobPostingExtracted
@@ -274,9 +275,14 @@ async def update_job_posting_fields(
 
     A group move (group_id in fields) first verifies — on this same connection, so
     within one transaction — that the target group belongs to the caller; a foreign
-    or unknown group raises TargetGroupNotFoundError. A move that would duplicate a
-    posting in the target group (the uq_job_postings_group_id unique index) surfaces
-    as psycopg's UniqueViolation, which the route maps to 409.
+    or unknown group raises TargetGroupNotFoundError. Should the target group pass
+    that precheck but be deleted before the UPDATE runs (a TOCTOU race with a
+    concurrent DELETE /job-search-groups/{id}), the NOT NULL FK on group_id fails
+    with ForeignKeyViolation — group_id is the only FK an UPDATE here can violate —
+    so it is caught and re-raised as the same TargetGroupNotFoundError rather than
+    escaping as a 500. A move that would duplicate a posting in the target group
+    (the uq_job_postings_group_id unique index) surfaces as psycopg's
+    UniqueViolation, which the route maps to 409.
     """
     if not fields:
         return await get_job_posting(conn, job_id, user_id=user_id)
@@ -299,7 +305,15 @@ WHERE id = %s AND user_id = %s
 RETURNING {_DETAIL_COLUMNS}
 """
     async with conn.cursor(row_factory=dict_row) as cur:
-        await cur.execute(sql, (*values, job_id, user_id))  # type: ignore[arg-type]
+        try:
+            await cur.execute(sql, (*values, job_id, user_id))  # type: ignore[arg-type]
+        except ForeignKeyViolation as exc:
+            # The target group passed the ownership precheck above but was deleted
+            # before this UPDATE ran. group_id is the only FK an UPDATE here touches,
+            # so this is the same "target group is gone" case — map it to the 404
+            # path. Caught narrowly (not IntegrityError) so a UniqueViolation still
+            # propagates to the route's 409 handler.
+            raise TargetGroupNotFoundError from exc
         return cast("JobPostingDetailRow | None", await cur.fetchone())
 
 
