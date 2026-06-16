@@ -8,8 +8,13 @@
 -- existing rows. Safe on a small table; run during low-traffic window if
 -- the table is large.
 --
--- IF NOT EXISTS guard (PG15+ syntax) makes this safe to re-run.
-
-ALTER TABLE user_profiles
-    ADD CONSTRAINT IF NOT EXISTS chk_user_profiles_years_experience
-    CHECK (years_experience BETWEEN 0 AND 60);
+-- DO/EXCEPTION block makes this safe to re-run (duplicate_object = no-op).
+DO $$
+BEGIN
+    ALTER TABLE user_profiles
+        ADD CONSTRAINT chk_user_profiles_years_experience
+        CHECK (years_experience BETWEEN 0 AND 60);
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END
+$$;
