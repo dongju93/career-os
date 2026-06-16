@@ -13,6 +13,7 @@ class UpsertResult(TypedDict):
     group_id: UUID
     application_status: str
     status_updated_at: datetime | None
+    memo: str | None
     scraped_at: datetime
     created_at: datetime
     updated_at: datetime
@@ -99,7 +100,7 @@ ON CONFLICT (group_id, platform, posting_id) DO UPDATE SET
     scraped_at         = NOW(),
     updated_at         = NOW()
 RETURNING
-    id, group_id, application_status, status_updated_at,
+    id, group_id, application_status, status_updated_at, memo,
     scraped_at, created_at, updated_at, (xmax = 0) AS inserted
 """
 

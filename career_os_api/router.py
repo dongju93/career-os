@@ -487,6 +487,9 @@ async def create_job_posting(
         group_id=row["group_id"],
         application_status=row["application_status"],
         status_updated_at=row["status_updated_at"],
+        # memo is preserved across re-saves (omitted from DO UPDATE SET), so it must
+        # come from the returned row — data is the write-path payload and has no memo.
+        memo=row["memo"],
         scraped_at=row["scraped_at"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],

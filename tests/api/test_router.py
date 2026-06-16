@@ -384,6 +384,7 @@ def test_create_job_posting_endpoint_returns_created_record(
             "group_id": group_id,
             "application_status": "saved",
             "status_updated_at": None,
+            "memo": None,
             "scraped_at": stored["scraped_at"],
             "created_at": stored["created_at"],
             "updated_at": stored["updated_at"],
@@ -436,6 +437,9 @@ def test_create_job_posting_endpoint_returns_200_for_updates(
     monkeypatch.setattr(
         app_module, "get_current_group_id", AsyncMock(return_value=group_id)
     )
+    # An existing posting keeps a memo the user entered earlier: the upsert preserves
+    # it (absent from DO UPDATE SET) and now returns it in RETURNING. The response must
+    # surface that preserved note, not the null default it produced before the fix.
     monkeypatch.setattr(
         app_module,
         "upsert_job_posting",
@@ -445,6 +449,7 @@ def test_create_job_posting_endpoint_returns_200_for_updates(
                 "group_id": group_id,
                 "application_status": "saved",
                 "status_updated_at": None,
+                "memo": "지원 전 포트폴리오 정리하기",
                 "scraped_at": stored["scraped_at"],
                 "created_at": stored["created_at"],
                 "updated_at": stored["updated_at"],
@@ -461,6 +466,7 @@ def test_create_job_posting_endpoint_returns_200_for_updates(
 
     assert response.status_code == 200
     assert response.json()["data"]["id"] == 11
+    assert response.json()["data"]["memo"] == "지원 전 포트폴리오 정리하기"
 
 
 def test_create_job_posting_endpoint_rejects_blank_posting_id(

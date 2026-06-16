@@ -369,13 +369,15 @@ def test_detail_sql_projects_memo_but_list_sql_does_not() -> None:
         assert "memo" not in sql
 
 
-def test_upsert_do_update_set_preserves_memo() -> None:
+def test_upsert_do_update_set_preserves_memo_but_returns_it() -> None:
     # Re-saving / re-extracting a posting must not wipe a user-entered memo, so memo
-    # must be absent from DO UPDATE SET (same preservation rule as the status cols).
-    set_clause = job_postings_module._UPSERT_SQL.split("DO UPDATE SET", 1)[1].split(
-        "RETURNING", 1
-    )[0]
+    # must be absent from DO UPDATE SET (same preservation rule as the status cols) —
+    # yet still projected in RETURNING so the response reflects the preserved note
+    # instead of a stale null.
+    after_conflict = job_postings_module._UPSERT_SQL.split("DO UPDATE SET", 1)[1]
+    set_clause, returning_clause = after_conflict.split("RETURNING", 1)
     assert "memo" not in set_clause
+    assert "memo" in returning_clause
 
 
 @pytest.mark.asyncio
