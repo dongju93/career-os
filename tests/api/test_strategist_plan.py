@@ -333,6 +333,47 @@ def test_plan_drops_hallucinated_job_ids(
     assert [item["job_id"] for item in response.json()["data"]["items"]] == [101]
 
 
+def test_plan_scopes_id_verification_to_target_group(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    current_user: dict,
+    enabled: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # An explicit, owned group is requested, so the route must verify model job_ids
+    # against *that* group — not just the user — closing the cross-group leak.
+    target_group = uuid.uuid7()
+    monkeypatch.setattr(
+        routes_module,
+        "get_job_search_group",
+        AsyncMock(return_value={"id": target_group, "user_id": current_user["id"]}),
+    )
+    monkeypatch.setattr(
+        routes_module, "get_user_profile", AsyncMock(return_value=make_profile())
+    )
+    monkeypatch.setattr(
+        routes_module, "count_job_postings_for_strategist", AsyncMock(return_value=2)
+    )
+    # The model echoes an in-group id (101) and a real-but-other-group id (202).
+    monkeypatch.setattr(
+        routes_module,
+        "run_strategist_plan",
+        AsyncMock(return_value=make_plan([101, 202])),
+    )
+    # The group-scoped filter only returns the in-group id.
+    owned_filter = AsyncMock(return_value={101})
+    monkeypatch.setattr(routes_module, "filter_owned_job_posting_ids", owned_filter)
+
+    response = client.post(
+        PLAN_URL, json={"group_id": str(target_group)}, headers=auth_headers
+    )
+
+    assert response.status_code == 200
+    assert [item["job_id"] for item in response.json()["data"]["items"]] == [101]
+    # The resolved target group is threaded into the ownership check.
+    assert owned_filter.await_args.kwargs["group_id"] == target_group
+
+
 # ── Phase 2: proposed-action post-validation ──────────────────────────────────
 
 

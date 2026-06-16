@@ -80,10 +80,15 @@ class FakePool:
 
 
 def _make_context(
-    user_id: uuid.UUID, cursors: Sequence[FakeCursor]
+    user_id: uuid.UUID,
+    cursors: Sequence[FakeCursor],
+    *,
+    target_group_id: uuid.UUID | None = None,
 ) -> StrategistRunContext:
     pool = FakePool(FakeConnection(cursors))
-    return StrategistRunContext(user_id=user_id, pool=cast(Any, pool))
+    return StrategistRunContext(
+        user_id=user_id, pool=cast(Any, pool), target_group_id=target_group_id
+    )
 
 
 def _profile_row(**overrides: Any) -> dict[str, Any]:
@@ -169,9 +174,7 @@ async def test_list_impl_scopes_by_user_and_projects_rows() -> None:
     cursor = FakeCursor(fetchall=[[_strategist_row(1), _strategist_row(2)]])
     context = _make_context(user_id, [cursor])
 
-    out = await _list_postings_with_status_impl(
-        context, group_id=None, status=None, limit=20
-    )
+    out = await _list_postings_with_status_impl(context, status=None, limit=20)
 
     payload = json.loads(out)
     assert payload["count"] == 2
@@ -185,16 +188,18 @@ async def test_list_impl_scopes_by_user_and_projects_rows() -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_impl_invalid_group_id_returns_error_without_query() -> None:
-    cursor = FakeCursor()
-    context = _make_context(uuid.uuid7(), [cursor])
+async def test_list_impl_scopes_to_context_target_group() -> None:
+    # The group scope comes only from the server-set context — the model has no
+    # group argument to widen or change it.
+    target_group_id = uuid.uuid7()
+    cursor = FakeCursor(fetchall=[[]])
+    context = _make_context(uuid.uuid7(), [cursor], target_group_id=target_group_id)
 
-    out = await _list_postings_with_status_impl(
-        context, group_id="not-a-uuid", status=None, limit=20
-    )
+    out = await _list_postings_with_status_impl(context, status=None, limit=20)
 
-    assert json.loads(out) == {"error": "invalid_group_id"}
-    assert cursor.executed == []
+    _, params = cursor.executed[0]
+    assert params["group_id"] == target_group_id
+    assert json.loads(out)["group_id"] == str(target_group_id)
 
 
 @pytest.mark.asyncio
@@ -202,26 +207,22 @@ async def test_list_impl_invalid_status_returns_error_without_query() -> None:
     cursor = FakeCursor()
     context = _make_context(uuid.uuid7(), [cursor])
 
-    out = await _list_postings_with_status_impl(
-        context, group_id=None, status="bogus", limit=20
-    )
+    out = await _list_postings_with_status_impl(context, status="bogus", limit=20)
 
     assert json.loads(out) == {"error": "invalid_status"}
     assert cursor.executed == []
 
 
 @pytest.mark.asyncio
-async def test_list_impl_valid_status_and_group_pass_through() -> None:
-    group_id = uuid.uuid7()
+async def test_list_impl_valid_status_passes_through() -> None:
+    target_group_id = uuid.uuid7()
     cursor = FakeCursor(fetchall=[[]])
-    context = _make_context(uuid.uuid7(), [cursor])
+    context = _make_context(uuid.uuid7(), [cursor], target_group_id=target_group_id)
 
-    await _list_postings_with_status_impl(
-        context, group_id=str(group_id), status="applied", limit=10
-    )
+    await _list_postings_with_status_impl(context, status="applied", limit=10)
 
     _, params = cursor.executed[0]
-    assert params["group_id"] == group_id
+    assert params["group_id"] == target_group_id
     assert params["status"] == "applied"
 
 
@@ -230,9 +231,7 @@ async def test_list_impl_clamps_limit_to_configured_maximum() -> None:
     cursor = FakeCursor(fetchall=[[]])
     context = _make_context(uuid.uuid7(), [cursor])
 
-    await _list_postings_with_status_impl(
-        context, group_id=None, status=None, limit=999
-    )
+    await _list_postings_with_status_impl(context, status=None, limit=999)
 
     _, params = cursor.executed[0]
     assert params["limit"] == app_settings.strategist_plan_posting_limit
@@ -243,7 +242,7 @@ async def test_list_impl_clamps_limit_to_minimum() -> None:
     cursor = FakeCursor(fetchall=[[]])
     context = _make_context(uuid.uuid7(), [cursor])
 
-    await _list_postings_with_status_impl(context, group_id=None, status=None, limit=0)
+    await _list_postings_with_status_impl(context, status=None, limit=0)
 
     _, params = cursor.executed[0]
     assert params["limit"] == 1
@@ -267,7 +266,7 @@ async def test_list_impl_binds_trim_length_param() -> None:
     cursor = FakeCursor(fetchall=[[]])
     context = _make_context(uuid.uuid7(), [cursor])
 
-    await _list_postings_with_status_impl(context, group_id=None, status=None, limit=5)
+    await _list_postings_with_status_impl(context, status=None, limit=5)
 
     _, params = cursor.executed[0]
     assert params["field_chars"] == _MAX_STRATEGIST_FIELD_CHARS

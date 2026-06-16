@@ -534,7 +534,29 @@ async def test_filter_owned_ids_returns_matching_subset() -> None:
     assert owned == {101, 102}
     sql, params = cursor.execute_calls[0]
     assert "id = ANY(%(ids)s)" in sql
-    assert params == {"user_id": user_id, "ids": [101, 102, 999]}
+    # No group given → group_id is None so the SQL clause is a no-op (all groups).
+    assert params == {"user_id": user_id, "ids": [101, 102, 999], "group_id": None}
+
+
+@pytest.mark.asyncio
+async def test_filter_owned_ids_scopes_to_target_group_when_given() -> None:
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+    cursor = FakeCursor(rows=[{"id": 101}])
+    conn = FakeConnection(cursor=cursor)
+
+    owned = await job_postings_module.filter_owned_job_posting_ids(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        job_ids=[101, 102],
+        group_id=group_id,
+    )
+
+    assert owned == {101}
+    sql, params = cursor.execute_calls[0]
+    # Group scoping is bound as a param so an out-of-group id cannot survive.
+    assert "group_id = %(group_id)s" in sql
+    assert params == {"user_id": user_id, "ids": [101, 102], "group_id": group_id}
 
 
 @pytest.mark.asyncio

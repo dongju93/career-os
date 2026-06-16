@@ -470,11 +470,15 @@ WHERE user_id = %(user_id)s AND group_id = %(group_id)s
 
 # Re-verifies model-emitted plan ids against the caller's own postings. ANY(array)
 # lets us validate the whole batch in one round trip; the user_id scope means a
-# hallucinated or cross-tenant id simply does not come back.
+# hallucinated or cross-tenant id simply does not come back. The optional group_id
+# clause additionally drops any id outside the plan's target group, so a model that
+# references a real-but-other-group posting cannot pollute a group-scoped plan.
 _STRATEGIST_OWNED_IDS_SQL = """
 SELECT id
 FROM job_postings
-WHERE user_id = %(user_id)s AND id = ANY(%(ids)s)
+WHERE user_id = %(user_id)s
+  AND (%(group_id)s::uuid IS NULL OR group_id = %(group_id)s)
+  AND id = ANY(%(ids)s)
 """
 
 
@@ -521,17 +525,22 @@ async def filter_owned_job_posting_ids(
     *,
     user_id: UUID,
     job_ids: list[int],
+    group_id: UUID | None = None,
 ) -> set[int]:
     """Return the subset of job_ids that actually belong to user_id.
 
     Used to drop hallucinated / cross-tenant ids from model output before it
-    reaches the client. An empty input short-circuits without a query.
+    reaches the client. When group_id is given, the result is further restricted
+    to postings in that group, so a group-scoped plan cannot keep an id that names
+    a real posting in one of the user's other groups. An empty input short-circuits
+    without a query.
     """
     if not job_ids:
         return set()
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(
-            _STRATEGIST_OWNED_IDS_SQL, {"user_id": user_id, "ids": job_ids}
+            _STRATEGIST_OWNED_IDS_SQL,
+            {"user_id": user_id, "ids": job_ids, "group_id": group_id},
         )
         rows = await cur.fetchall()
     return {row["id"] for row in rows}

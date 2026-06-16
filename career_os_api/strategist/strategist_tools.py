@@ -1,13 +1,14 @@
 """지원 전략 에이전트의 read-only Agents SDK function tool.
 
 모든 조회는 ctx.context.user_id로 scope된다. 모델은 user 신원을 인자로 줄 수 없다.
-group_id / status / limit은 untrusted input으로 취급해 파싱·검증·clamp한다. 두 도구 모두
-별도로 테스트 가능한 `_impl` 함수에 위임한다(chatkit/job_posting_tools.py 패턴).
+그룹 스코프도 마찬가지로 서버가 정한다: list 도구는 ctx.context.target_group_id만
+사용하고, 모델이 그룹을 고를 수 없게 해 분석 대상 그룹이 다른 그룹으로 새는 것을 막는다.
+status / limit은 untrusted input으로 취급해 파싱·검증·clamp한다. 두 도구 모두 별도로
+테스트 가능한 `_impl` 함수에 위임한다(chatkit/job_posting_tools.py 패턴).
 """
 
 import json
 from typing import Annotated, Any
-from uuid import UUID
 
 from agents import RunContextWrapper, function_tool
 
@@ -53,18 +54,15 @@ async def _get_career_profile_impl(context: StrategistRunContext) -> str:
 async def _list_postings_with_status_impl(
     context: StrategistRunContext,
     *,
-    group_id: str | None,
     status: str | None,
     limit: int,
 ) -> str:
-    clamped_limit = max(1, min(limit, settings.strategist_plan_posting_limit))
+    # Group scope is server-pinned: the plan route resolves the target group and
+    # stores it on the context, so the model cannot widen the analysis to another
+    # group by omitting (or changing) a group argument.
+    target_group_id = context.target_group_id
 
-    parsed_group_id: UUID | None = None
-    if group_id:
-        try:
-            parsed_group_id = UUID(group_id)
-        except ValueError:
-            return json.dumps({"error": "invalid_group_id"}, ensure_ascii=False)
+    clamped_limit = max(1, min(limit, settings.strategist_plan_posting_limit))
 
     normalized_status: str | None = None
     if status:
@@ -77,7 +75,7 @@ async def _list_postings_with_status_impl(
         return await list_job_postings_for_strategist(
             conn,
             user_id=context.user_id,
-            group_id=parsed_group_id,
+            group_id=target_group_id,
             status=normalized_status,
             limit=clamped_limit,
         )
@@ -89,7 +87,7 @@ async def _list_postings_with_status_impl(
     payload = {
         "items": items,
         "count": len(items),
-        "group_id": str(parsed_group_id) if parsed_group_id else None,
+        "group_id": str(target_group_id) if target_group_id else None,
         "status": normalized_status,
     }
     return json.dumps(payload, ensure_ascii=False, default=str)
@@ -112,13 +110,13 @@ async def get_career_profile(ctx: StrategistToolContext) -> str:
     name_override="list_postings_with_status",
     description_override=(
         "List the authenticated user's saved job postings with their application "
-        "status. Use this to choose which postings to analyze. Pass the target group "
-        "UUID in group_id; optionally filter by application status."
+        "status. The list is always scoped to the target job-search group for this "
+        "plan run (you cannot choose the group). Use this to pick which postings to "
+        "analyze; optionally filter by application status."
     ),
 )
 async def list_postings_with_status(
     ctx: StrategistToolContext,
-    group_id: Annotated[str | None, "Job search group UUID to scope the list"] = None,
     status: Annotated[
         str | None,
         "Optional application status filter: saved/applied/interviewing/offer/rejected/withdrawn",
@@ -126,5 +124,5 @@ async def list_postings_with_status(
     limit: Annotated[int, "Maximum number of postings to return"] = _DEFAULT_LIST_LIMIT,
 ) -> str:
     return await _list_postings_with_status_impl(
-        ctx.context, group_id=group_id, status=status, limit=limit
+        ctx.context, status=status, limit=limit
     )

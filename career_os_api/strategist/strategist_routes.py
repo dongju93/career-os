@@ -159,7 +159,10 @@ async def create_application_plan(
     input_text = "\n".join(input_lines)
 
     context = StrategistRunContext(
-        user_id=user_id, pool=pool, request_id=get_request_id()
+        user_id=user_id,
+        pool=pool,
+        request_id=get_request_id(),
+        target_group_id=group_id,
     )
     agent = build_strategist_agent(settings.strategist_model or settings.openai_model)
 
@@ -179,8 +182,9 @@ async def create_application_plan(
         ) from exc
 
     # Step 6: model output is untrusted — drop any item or proposed action whose
-    # job_id (or assign_group target group) is not the caller's own.
-    plan = await _filter_owned_plan_output(pool, user_id, plan)
+    # job_id is not the caller's own *and* in the analyzed group, or (for
+    # assign_group) whose target group is not the caller's own.
+    plan = await _filter_owned_plan_output(pool, user_id, group_id, plan)
 
     # Step 7.
     return ApiResponse(
@@ -208,12 +212,16 @@ def _is_proposed_action_owned(
 
 
 async def _filter_owned_plan_output(
-    pool: Any, user_id: Any, plan: ApplicationPlan
+    pool: Any, user_id: Any, group_id: UUID, plan: ApplicationPlan
 ) -> ApplicationPlan:
-    """Last line of defense against hallucinated / cross-tenant references reaching
-    the client. Drops any plan item or proposed action whose job_id is not one of the
-    caller's postings, plus any assign_group action whose target_group_id is not one
-    of the caller's groups."""
+    """Last line of defense against hallucinated / cross-tenant / cross-group
+    references reaching the client. Drops any plan item or proposed action whose
+    job_id is not one of the caller's postings *in the analyzed group*, plus any
+    assign_group action whose target_group_id is not one of the caller's groups.
+
+    Scoping the job_id check to `group_id` (not just user_id) matches the list tool,
+    which only ever surfaces the target group's postings — so an item naming a
+    real-but-other-group posting is treated as out-of-scope, not kept."""
     # One id space for items and actions so a single query verifies every job_id.
     job_ids = {item.job_id for item in plan.items}
     job_ids.update(action.job_id for action in plan.proposed_actions)
@@ -230,7 +238,7 @@ async def _filter_owned_plan_output(
 
     async def operation(conn: Any) -> tuple[set[int], set[UUID]]:
         owned_ids = await filter_owned_job_posting_ids(
-            conn, user_id=user_id, job_ids=list(job_ids)
+            conn, user_id=user_id, job_ids=list(job_ids), group_id=group_id
         )
         owned_groups = await filter_owned_group_ids(
             conn, user_id=user_id, group_ids=list(target_group_ids)
