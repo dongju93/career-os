@@ -5,6 +5,7 @@
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
 [![codecov](https://codecov.io/github/dongju93/career-os/graph/badge.svg?flag=frontend&token=48VXFY8C3M)](https://codecov.io/github/dongju93/career-os)
+![Sentry](https://img.shields.io/badge/Sentry-Monitored-362D59?logo=sentry&logoColor=white)
 
 구직 활동을 관리하는 Career OS의 React 기반 프론트엔드 애플리케이션입니다. Google OAuth 인증, 구직 활동 그룹 관리, 채용공고 저장·조회, AI 채팅 어시스턴트 기능을 제공합니다.
 
@@ -29,9 +30,10 @@
 
 ### 배포 및 인프라
 
-| 항목                 | 링크                                                                  |
-| -------------------- | --------------------------------------------------------------------- |
-| 프론트엔드 배포 관리 | [Vercel - career-os](https://vercel.com/dongju93s-projects/career-os) |
+| 항목                 | 링크                                                                                                            |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 프론트엔드 배포 관리 | [Vercel - career-os](https://vercel.com/dongju93s-projects/career-os)                                           |
+| 에러 모니터링        | [Sentry - career-os-frontend](https://self-xxz.sentry.io/projects/career-os-frontend/?project=4511576351440896) |
 
 ---
 

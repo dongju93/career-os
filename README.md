@@ -8,6 +8,7 @@
 ![Pyrefly](https://img.shields.io/badge/Pyrefly-1.0.0-0668E1?logo=meta&logoColor=white)
 ![Google OAuth](https://img.shields.io/badge/Google_OAuth-Authlib-4285F4?logo=google&logoColor=white)
 [![codecov](https://codecov.io/github/dongju93/career-os/graph/badge.svg?flag=backend&token=48VXFY8C3M)](https://codecov.io/github/dongju93/career-os)
+![Sentry](https://img.shields.io/badge/Sentry-Monitored-362D59?logo=sentry&logoColor=white)
 
 한국 채용 플랫폼(사람인, 원티드)의 채용 공고를 수집·추출하고, 구직 활동 그룹별로 저장·관리하는 FastAPI 백엔드 서비스입니다.
 
@@ -38,6 +39,7 @@
 | ----------------- | ------------------------------------------------------------------------------------------------------------- |
 | 데이터베이스 관리 | [Neon - career-os](https://console.neon.tech/app/projects/twilight-firefly-07947306)                          |
 | 백엔드 배포 관리  | [FastAPI Cloud - career-os](https://dashboard.fastapicloud.com/spdlqj011-77893206/apps/career-os/deployments) |
+| 에러 모니터링     | [Sentry - career-os-backend](https://self-xxz.sentry.io/projects/career-os-backend/?project=4511576348229632) |
 
 ---
 

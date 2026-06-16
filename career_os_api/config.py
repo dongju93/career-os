@@ -119,6 +119,11 @@ class Settings(BaseSettings):
     # How many of the most recent thread items are fed to the model as history.
     chatkit_history_item_limit: int = 20
 
+    # Sentry — optional; monitoring is disabled when unset.
+    sentry_dsn: str | None = None
+    # Sample rate for performance tracing (0.0–1.0). 0.1 = 10 % of transactions.
+    sentry_traces_sample_rate: float = 0.1
+
     # Application Strategist agent — feature flag; /v1/agent/* returns 404 when False.
     strategist_agent_enabled: bool = False
     # Model override for plan/artifact runs; falls back to openai_model when unset.

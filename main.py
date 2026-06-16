@@ -2,12 +2,15 @@ import logging
 from contextlib import asynccontextmanager
 
 import httpx2
+import sentry_sdk
 from agents import set_default_openai_client, set_tracing_disabled
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from openai import AsyncOpenAI
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -27,6 +30,21 @@ from career_os_api.middleware import (
 from career_os_api.rate_limit.client import create_redis_client
 from career_os_api.responses import api_error_response, api_validation_error_response
 from career_os_api.router import v1_router
+
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.environment,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        integrations=[
+            FastApiIntegration(),
+            LoggingIntegration(
+                level=logging.WARNING,
+                event_level=logging.ERROR,
+            ),
+        ],
+        send_default_pii=False,
+    )
 
 _log_handler = logging.StreamHandler()
 _log_handler.setFormatter(
@@ -177,6 +195,7 @@ async def unhandled_exception_handler(
     request: Request,
     exc: Exception,
 ) -> JSONResponse:
+    sentry_sdk.capture_exception(exc)
     logger.error(
         "Unhandled API exception",
         exc_info=(type(exc), exc, exc.__traceback__),

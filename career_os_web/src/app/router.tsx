@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react';
 import { lazy } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router';
 import { AppLayout } from '../components/app-layout';
@@ -94,4 +95,6 @@ export const appRoutes = [
   },
 ];
 
-export const router = createBrowserRouter(appRoutes);
+const sentryCreateBrowserRouter =
+  Sentry.wrapCreateBrowserRouterV7(createBrowserRouter);
+export const router = sentryCreateBrowserRouter(appRoutes);
