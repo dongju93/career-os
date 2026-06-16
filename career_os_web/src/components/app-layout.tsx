@@ -5,6 +5,8 @@ import {
   LogOut,
   Menu,
   PlusCircle,
+  Sparkles,
+  UserCircle,
   X,
 } from 'lucide-react';
 import { Suspense, useState } from 'react';
@@ -34,6 +36,18 @@ const navigationItems = [
     icon: PlusCircle,
     label: '채용공고 등록',
     description: '새 URL 스크랩 및 저장',
+  },
+  {
+    href: '/profile',
+    icon: UserCircle,
+    label: '프로필',
+    description: '내 경력 정보 관리',
+  },
+  {
+    href: '/strategist',
+    icon: Sparkles,
+    label: '지원 전략',
+    description: 'AI 지원 전략 플랜',
   },
 ];
 

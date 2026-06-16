@@ -72,6 +72,15 @@ WHERE user_id = %s
 FOR UPDATE
 """
 
+# Re-verifies model-emitted assign_group target ids against the caller's own groups.
+# ANY(array) validates the whole batch in one round trip; the user_id scope means a
+# hallucinated or cross-tenant group id simply does not come back.
+_OWNED_GROUP_IDS_SQL = """
+SELECT id
+FROM job_search_groups
+WHERE user_id = %s AND id = ANY(%s)
+"""
+
 
 _LIST_ACTIVE_SQL = """
 SELECT
@@ -231,6 +240,25 @@ async def delete_job_search_group(
     async with conn.cursor() as cur:
         await cur.execute(_DELETE_SQL, (group_id, user_id))
         return cur.rowcount > 0
+
+
+async def filter_owned_group_ids(
+    conn: AsyncConnection,
+    *,
+    user_id: uuid.UUID,
+    group_ids: list[uuid.UUID],
+) -> set[uuid.UUID]:
+    """Return the subset of group_ids that actually belong to user_id.
+
+    Used to drop hallucinated / cross-tenant target groups from proposed actions
+    before they reach the client. An empty input short-circuits without a query.
+    """
+    if not group_ids:
+        return set()
+    async with conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(_OWNED_GROUP_IDS_SQL, (user_id, group_ids))
+        rows = await cur.fetchall()
+    return {row["id"] for row in rows}
 
 
 async def get_user_group_ids_for_update(

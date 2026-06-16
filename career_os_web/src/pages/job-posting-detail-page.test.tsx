@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../store/auth-store';
@@ -49,6 +49,8 @@ function buildJobPostingDetail(
     job_category: 'Engineering',
     industry: 'Software',
     group_id: TEST_GROUP_ID,
+    application_status: 'saved',
+    status_updated_at: null,
     scraped_at: '2026-04-20T12:00:00Z',
     created_at: '2026-04-20T12:00:00Z',
     updated_at: '2026-04-20T12:00:00Z',
@@ -63,6 +65,7 @@ function buildJobPostingDetail(
     application_form: 'Resume',
     contact_person: 'Hiring Team',
     homepage: 'https://career-os.example.com',
+    memo: null,
     ...overrides,
   };
 }
@@ -87,6 +90,8 @@ function buildJobPostingPage(detail = buildJobPostingDetail()): JobPostingPage {
         job_category: detail.job_category,
         industry: detail.industry,
         group_id: detail.group_id,
+        application_status: detail.application_status,
+        status_updated_at: detail.status_updated_at,
         scraped_at: detail.scraped_at,
         created_at: detail.created_at,
         updated_at: detail.updated_at,
@@ -96,6 +101,44 @@ function buildJobPostingPage(detail = buildJobPostingDetail()): JobPostingPage {
     offset: 0,
     limit: 50,
   };
+}
+
+// Routes /v1/auth/me and the loaded detail to fixtures, delegating the Phase 3
+// /v1/agent/artifact POST to the caller-supplied handler so each artifact test
+// controls only the run outcome.
+function buildDetailFetchMock(
+  detail: JobPostingDetail,
+  artifactHandler: (init?: RequestInit) => ReturnType<typeof jsonResponse>,
+) {
+  return vi.fn(async (input: string, init?: RequestInit) => {
+    if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+      return jsonResponse(
+        apiResponse({
+          user_id: 'user-1',
+          email: 'user@example.com',
+          name: 'Career OS User',
+          picture: null,
+        }),
+      );
+    }
+
+    if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/agent/artifact`) {
+      return artifactHandler(init);
+    }
+
+    if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+      return jsonResponse(apiResponse(detail));
+    }
+
+    throw new Error(`Unexpected fetch request: ${input}`);
+  });
+}
+
+function stubClipboard(writeText: ReturnType<typeof vi.fn>) {
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText },
+    configurable: true,
+  });
 }
 
 describe('JobPostingDetailPage', () => {
@@ -262,6 +305,112 @@ describe('JobPostingDetailPage', () => {
     expect(router.state.location.pathname).toBe('/job-postings/1');
   });
 
+  it('changes application status via the selector and reflects the server response', async () => {
+    const user = userEvent.setup();
+    const detail = buildJobPostingDetail();
+    let patchBody: Record<string, unknown> | null = null;
+
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+        if (init?.method === 'PATCH') {
+          patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          return jsonResponse(
+            apiResponse({
+              ...detail,
+              application_status: 'interviewing',
+              status_updated_at: '2026-04-25T09:00:00Z',
+            }),
+          );
+        }
+        return jsonResponse(apiResponse(detail));
+      }
+
+      throw new Error(`Unexpected fetch request: ${input}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings/1');
+
+    await screen.findByRole('heading', { name: 'Frontend Engineer' });
+
+    const statusSelect =
+      screen.getByLabelText<HTMLSelectElement>('지원 상태 변경');
+    expect(statusSelect.value).toBe('saved');
+
+    await user.selectOptions(statusSelect, 'interviewing');
+
+    await waitFor(() => {
+      expect(patchBody).toEqual({ application_status: 'interviewing' });
+    });
+    await waitFor(() => {
+      expect(statusSelect.value).toBe('interviewing');
+    });
+  });
+
+  it('surfaces a failure when the status update is rejected', async () => {
+    const user = userEvent.setup();
+    const detail = buildJobPostingDetail();
+
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+        if (init?.method === 'PATCH') {
+          return jsonResponse(
+            {
+              type: 'about:blank',
+              title: 'Unprocessable Entity',
+              status: 422,
+              detail: '상태 값이 올바르지 않습니다.',
+              instance: '/v1/job-postings/1',
+            },
+            422,
+          );
+        }
+        return jsonResponse(apiResponse(detail));
+      }
+
+      throw new Error(`Unexpected fetch request: ${input}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings/1');
+
+    await screen.findByRole('heading', { name: 'Frontend Engineer' });
+
+    const statusSelect =
+      screen.getByLabelText<HTMLSelectElement>('지원 상태 변경');
+    await user.selectOptions(statusSelect, 'applied');
+
+    expect(
+      await screen.findByText('상태 값이 올바르지 않습니다.'),
+    ).toBeInTheDocument();
+    // No optimistic write: the controlled selector reverts to the server value.
+    expect(statusSelect.value).toBe('saved');
+  });
+
   it('shows a structured API error and retries the same detail request', async () => {
     const user = userEvent.setup();
     const detail = buildJobPostingDetail();
@@ -320,5 +469,242 @@ describe('JobPostingDetailPage', () => {
       await screen.findByRole('heading', { name: 'Frontend Engineer' }),
     ).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('saves a memo and reflects the server response', async () => {
+    const user = userEvent.setup();
+    const detail = buildJobPostingDetail();
+    let patchBody: Record<string, unknown> | null = null;
+
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+        if (init?.method === 'PATCH') {
+          patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          return jsonResponse(
+            apiResponse({ ...detail, memo: '관심 있는 공고' }),
+          );
+        }
+        return jsonResponse(apiResponse(detail));
+      }
+
+      throw new Error(`Unexpected fetch request: ${input}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings/1');
+
+    await screen.findByRole('heading', { name: 'Frontend Engineer' });
+
+    const memoBox = screen.getByLabelText<HTMLTextAreaElement>('메모');
+    await user.type(memoBox, '관심 있는 공고');
+    await user.click(screen.getByRole('button', { name: '메모 저장' }));
+
+    await waitFor(() => {
+      expect(patchBody).toEqual({ memo: '관심 있는 공고' });
+    });
+    expect(await screen.findByText('메모를 저장했습니다.')).toBeInTheDocument();
+    expect(memoBox.value).toBe('관심 있는 공고');
+  });
+
+  it('clears a memo by saving an empty draft (memo: null)', async () => {
+    const user = userEvent.setup();
+    const detail = buildJobPostingDetail({ memo: '기존 메모' });
+    let patchBody: Record<string, unknown> | null = null;
+
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+        if (init?.method === 'PATCH') {
+          patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          return jsonResponse(apiResponse({ ...detail, memo: null }));
+        }
+        return jsonResponse(apiResponse(detail));
+      }
+
+      throw new Error(`Unexpected fetch request: ${input}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings/1');
+
+    await screen.findByRole('heading', { name: 'Frontend Engineer' });
+
+    const memoBox = screen.getByLabelText<HTMLTextAreaElement>('메모');
+    expect(memoBox.value).toBe('기존 메모');
+
+    await user.clear(memoBox);
+    await user.click(screen.getByRole('button', { name: '메모 저장' }));
+
+    // An emptied draft is an explicit clear: the PATCH carries memo: null.
+    await waitFor(() => {
+      expect(patchBody).toEqual({ memo: null });
+    });
+  });
+
+  it('generates an artifact for the selected type and copies it to the clipboard', async () => {
+    const user = userEvent.setup();
+    const detail = buildJobPostingDetail();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    stubClipboard(writeText);
+    let artifactBody: Record<string, unknown> | null = null;
+
+    const fetchMock = buildDetailFetchMock(detail, (init) => {
+      artifactBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return jsonResponse(
+        apiResponse({
+          artifact_type: 'cover_letter',
+          job_id: detail.id,
+          title: '자기소개서 포인트',
+          content_markdown: '핵심 경험을 강조하세요.',
+        }),
+      );
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings/1');
+
+    await screen.findByRole('heading', { name: 'Frontend Engineer' });
+
+    await user.selectOptions(
+      screen.getByLabelText<HTMLSelectElement>('자료 종류'),
+      'cover_letter',
+    );
+    await user.click(screen.getByRole('button', { name: '자료 생성' }));
+
+    // The generated body is rendered as pre-wrapped plain text.
+    expect(
+      await screen.findByText('핵심 경험을 강조하세요.'),
+    ).toBeInTheDocument();
+    // The selected type drives the request; empty focus is sent as null.
+    await waitFor(() => {
+      expect(artifactBody).toEqual({
+        job_id: 1,
+        artifact_type: 'cover_letter',
+        focus: null,
+      });
+    });
+
+    await user.click(screen.getByRole('button', { name: /복사하기/ }));
+
+    expect(writeText).toHaveBeenCalledWith('핵심 경험을 강조하세요.');
+    expect(
+      await screen.findByRole('button', { name: /복사됨/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the "준비 중" message when artifact generation returns 404', async () => {
+    const user = userEvent.setup();
+    const detail = buildJobPostingDetail();
+    const fetchMock = buildDetailFetchMock(detail, () =>
+      jsonResponse(
+        {
+          type: 'about:blank',
+          title: 'Not Found',
+          status: 404,
+          detail: '찾을 수 없습니다.',
+          instance: '/v1/agent/artifact',
+        },
+        404,
+      ),
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings/1');
+
+    await screen.findByRole('heading', { name: 'Frontend Engineer' });
+    await user.click(screen.getByRole('button', { name: '자료 생성' }));
+
+    expect(
+      await screen.findByText('아직 준비 중인 기능이에요.'),
+    ).toBeInTheDocument();
+  });
+
+  it('prompts to create a profile when artifact generation returns 409', async () => {
+    const user = userEvent.setup();
+    const detail = buildJobPostingDetail();
+    const fetchMock = buildDetailFetchMock(detail, () =>
+      jsonResponse(
+        {
+          type: 'about:blank',
+          title: 'Conflict',
+          status: 409,
+          detail: '프로필이 없습니다.',
+          instance: '/v1/agent/artifact',
+        },
+        409,
+      ),
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings/1');
+
+    await screen.findByRole('heading', { name: 'Frontend Engineer' });
+    await user.click(screen.getByRole('button', { name: '자료 생성' }));
+
+    expect(
+      await screen.findByText(
+        'AI 지원 자료를 생성하려면 먼저 프로필을 작성해주세요.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('surfaces the rate-limit message without a retry button on 429', async () => {
+    const user = userEvent.setup();
+    const detail = buildJobPostingDetail();
+    const fetchMock = buildDetailFetchMock(detail, () =>
+      jsonResponse(
+        {
+          type: 'about:blank',
+          title: 'Too Many Requests',
+          status: 429,
+          detail: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.',
+          instance: '/v1/agent/artifact',
+        },
+        429,
+      ),
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings/1');
+
+    await screen.findByRole('heading', { name: 'Frontend Engineer' });
+    await user.click(screen.getByRole('button', { name: '자료 생성' }));
+
+    expect(
+      await screen.findByText(
+        '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.',
+      ),
+    ).toBeInTheDocument();
+    // A 429 is not retryable — the manual retry affordance must be absent.
+    expect(
+      screen.queryByRole('button', { name: /다시 시도/ }),
+    ).not.toBeInTheDocument();
   });
 });

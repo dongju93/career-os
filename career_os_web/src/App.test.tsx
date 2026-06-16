@@ -29,6 +29,8 @@ const jobPostingPage = {
       job_category: 'Engineering',
       industry: 'Software',
       group_id: '00000000-0000-7000-8000-000000000001',
+      application_status: 'saved' as const,
+      status_updated_at: null,
       scraped_at: '2026-04-20T12:00:00Z',
       created_at: '2026-04-20T12:00:00Z',
       updated_at: '2026-04-20T12:00:00Z',

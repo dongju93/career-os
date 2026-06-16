@@ -1,12 +1,16 @@
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
 from psycopg import AsyncConnection
+from psycopg.errors import ForeignKeyViolation
 from psycopg.rows import dict_row
 
+from career_os_api.database import ddl as ddl_module
 from career_os_api.database import job_postings as job_postings_module
+from career_os_api.schemas import ApplicationStatus
 
 
 class FakeExecuteResult:
@@ -305,6 +309,185 @@ async def test_search_chat_context_group_filter_keeps_user_scope() -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_job_posting_fields_stamps_status_updated_at() -> None:
+    user_id = uuid.uuid7()
+    row = {"id": 7, "application_status": "applied"}
+    cursor = FakeCursor(fetchone_results=[row])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await job_postings_module.update_job_posting_fields(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        job_id=7,
+        fields={"application_status": "applied"},
+    )
+
+    assert result == row
+    assert conn.cursor_row_factories == [dict_row]
+    sql, params = cursor.execute_calls[0]
+    assert "application_status = %s" in sql
+    # A status change must also bump status_updated_at in the same statement.
+    assert "status_updated_at = NOW()" in sql
+    assert "WHERE id = %s AND user_id = %s" in sql
+    assert params == ("applied", 7, user_id)
+
+
+@pytest.mark.asyncio
+async def test_update_job_posting_fields_returns_none_when_no_row_matches() -> None:
+    # Foreign / unknown id matches no row under the user_id-scoped WHERE.
+    cursor = FakeCursor(fetchone_results=[None])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await job_postings_module.update_job_posting_fields(
+        cast(AsyncConnection, conn),
+        user_id=uuid.uuid7(),
+        job_id=999,
+        fields={"application_status": "applied"},
+    )
+
+    assert result is None
+
+
+def test_list_and_detail_sql_project_application_lifecycle_columns() -> None:
+    for sql in (
+        job_postings_module._DETAIL_SQL,
+        job_postings_module._LIST_BY_USER_SQL,
+        job_postings_module._LIST_BY_GROUP_SQL,
+    ):
+        assert "application_status" in sql
+        assert "status_updated_at" in sql
+
+
+def test_detail_sql_projects_memo_but_list_sql_does_not() -> None:
+    # memo is a detail-only field — present in the detail/update projection, absent
+    # from the lightweight list projections.
+    assert "memo" in job_postings_module._DETAIL_COLUMNS
+    assert "memo" in job_postings_module._DETAIL_SQL
+    for sql in (
+        job_postings_module._LIST_BY_USER_SQL,
+        job_postings_module._LIST_BY_GROUP_SQL,
+    ):
+        assert "memo" not in sql
+
+
+def test_upsert_do_update_set_preserves_memo_but_returns_it() -> None:
+    # Re-saving / re-extracting a posting must not wipe a user-entered memo, so memo
+    # must be absent from DO UPDATE SET (same preservation rule as the status cols) —
+    # yet still projected in RETURNING so the response reflects the preserved note
+    # instead of a stale null.
+    after_conflict = job_postings_module._UPSERT_SQL.split("DO UPDATE SET", 1)[1]
+    set_clause, returning_clause = after_conflict.split("RETURNING", 1)
+    assert "memo" not in set_clause
+    assert "memo" in returning_clause
+
+
+@pytest.mark.asyncio
+async def test_update_job_posting_fields_verifies_target_group_then_updates() -> None:
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+    updated_row = {"id": 7, "group_id": group_id}
+    # First fetchone answers the ownership check (truthy), second the UPDATE RETURNING.
+    cursor = FakeCursor(fetchone_results=[{"exists": 1}, updated_row])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await job_postings_module.update_job_posting_fields(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        job_id=7,
+        fields={"group_id": group_id},
+    )
+
+    assert result == updated_row
+    # Ownership check runs first, scoped by both group id and user id.
+    check_sql, check_params = cursor.execute_calls[0]
+    assert check_sql == job_postings_module._GROUP_OWNED_BY_USER_SQL
+    assert check_params == (group_id, user_id)
+    # Then the UPDATE writes group_id under the user-scoped WHERE.
+    update_sql, update_params = cursor.execute_calls[1]
+    assert "group_id = %s" in update_sql
+    assert update_params == (group_id, 7, user_id)
+
+
+@pytest.mark.asyncio
+async def test_update_job_posting_fields_raises_for_foreign_target_group() -> None:
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+    # Ownership check returns no row → the target group is foreign / unknown.
+    cursor = FakeCursor(fetchone_results=[None])
+    conn = FakeConnection(cursor=cursor)
+
+    with pytest.raises(job_postings_module.TargetGroupNotFoundError):
+        await job_postings_module.update_job_posting_fields(
+            cast(AsyncConnection, conn),
+            user_id=user_id,
+            job_id=7,
+            fields={"group_id": group_id},
+        )
+
+    # The UPDATE must never run when ownership fails.
+    assert len(cursor.execute_calls) == 1
+    assert cursor.execute_calls[0][0] == job_postings_module._GROUP_OWNED_BY_USER_SQL
+
+
+@pytest.mark.asyncio
+async def test_update_job_posting_fields_maps_fk_violation_to_target_group_not_found() -> (
+    None
+):
+    # TOCTOU: the target group passes the ownership precheck, then is deleted (a
+    # concurrent DELETE /job-search-groups/{id}) before the UPDATE runs. The FK on
+    # group_id fails with ForeignKeyViolation, which must surface as the same
+    # TargetGroupNotFoundError (the route's 404 path) instead of escaping as a 500.
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+
+    class FkRaisingCursor(FakeCursor):
+        async def execute(self, query: str, params: Any = None) -> None:
+            await super().execute(query, params)
+            if "UPDATE job_postings" in query:
+                raise ForeignKeyViolation("target group deleted mid-move")
+
+    # Precheck fetchone is truthy so ownership passes; the UPDATE then raises.
+    cursor = FkRaisingCursor(fetchone_results=[{"exists": 1}])
+    conn = FakeConnection(cursor=cursor)
+
+    with pytest.raises(job_postings_module.TargetGroupNotFoundError):
+        await job_postings_module.update_job_posting_fields(
+            cast(AsyncConnection, conn),
+            user_id=user_id,
+            job_id=7,
+            fields={"group_id": group_id},
+        )
+
+    # Both statements were attempted: the precheck SELECT, then the failing UPDATE.
+    assert len(cursor.execute_calls) == 2
+    assert cursor.execute_calls[0][0] == job_postings_module._GROUP_OWNED_BY_USER_SQL
+    assert "UPDATE job_postings" in cursor.execute_calls[1][0]
+
+
+def test_upsert_do_update_set_preserves_status_but_returns_it() -> None:
+    # Re-saving a posting must not reset its lifecycle columns, so they must be
+    # absent from DO UPDATE SET — yet still projected in RETURNING.
+    after_conflict = job_postings_module._UPSERT_SQL.split("DO UPDATE SET", 1)[1]
+    set_clause, returning_clause = after_conflict.split("RETURNING", 1)
+    assert "application_status" not in set_clause
+    assert "status_updated_at" not in set_clause
+    assert "application_status" in returning_clause
+    assert "status_updated_at" in returning_clause
+
+
+def test_application_status_enum_matches_ddl_check_constraints() -> None:
+    # Guards against silent drift between the StrEnum and the literal CHECK lists
+    # in both the CREATE TABLE and the migration for existing databases.
+    migration_sql = (
+        Path(__file__).parents[3] / "migrations/2026-06-10-1.sql"
+    ).read_text()
+    for member in ApplicationStatus:
+        token = f"'{member.value}'"
+        assert token in ddl_module.CREATE_JOB_POSTINGS_TABLE
+        assert token in migration_sql
+
+
+@pytest.mark.asyncio
 async def test_get_chat_context_detail_scopes_by_user() -> None:
     user_id = uuid.uuid7()
     row = {"id": 19, "company_name": "Career OS"}
@@ -322,3 +505,107 @@ async def test_get_chat_context_detail_scopes_by_user() -> None:
     sql, params = cursor.execute_calls[0]
     assert "WHERE id = %(job_id)s AND user_id = %(user_id)s" in sql
     assert params == {"job_id": 19, "user_id": user_id}
+
+
+@pytest.mark.asyncio
+async def test_list_for_strategist_scopes_by_user_and_binds_trim_length() -> None:
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+    rows = [{"id": 1, "company_name": "Career OS"}]
+    cursor = FakeCursor(rows=rows)
+    conn = FakeConnection(cursor=cursor)
+
+    result = await job_postings_module.list_job_postings_for_strategist(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        group_id=group_id,
+        status="applied",
+        limit=15,
+    )
+
+    assert result == rows
+    assert conn.cursor_row_factories == [dict_row]
+    sql, params = cursor.execute_calls[0]
+    assert "user_id = %(user_id)s" in sql
+    assert params == {
+        "user_id": user_id,
+        "group_id": group_id,
+        "status": "applied",
+        "limit": 15,
+        "field_chars": job_postings_module._MAX_STRATEGIST_FIELD_CHARS,
+    }
+
+
+@pytest.mark.asyncio
+async def test_count_for_strategist_scopes_by_user_and_group() -> None:
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+    cursor = FakeCursor(fetchone_results=[{"total": 4}])
+    conn = FakeConnection(cursor=cursor)
+
+    total = await job_postings_module.count_job_postings_for_strategist(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        group_id=group_id,
+    )
+
+    assert total == 4
+    sql, params = cursor.execute_calls[0]
+    assert "user_id = %(user_id)s AND group_id = %(group_id)s" in sql
+    assert params == {"user_id": user_id, "group_id": group_id}
+
+
+@pytest.mark.asyncio
+async def test_filter_owned_ids_returns_matching_subset() -> None:
+    user_id = uuid.uuid7()
+    cursor = FakeCursor(rows=[{"id": 101}, {"id": 102}])
+    conn = FakeConnection(cursor=cursor)
+
+    owned = await job_postings_module.filter_owned_job_posting_ids(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        job_ids=[101, 102, 999],
+    )
+
+    assert owned == {101, 102}
+    sql, params = cursor.execute_calls[0]
+    assert "id = ANY(%(ids)s)" in sql
+    # No group given → group_id is None so the SQL clause is a no-op (all groups).
+    assert params == {"user_id": user_id, "ids": [101, 102, 999], "group_id": None}
+
+
+@pytest.mark.asyncio
+async def test_filter_owned_ids_scopes_to_target_group_when_given() -> None:
+    user_id = uuid.uuid7()
+    group_id = uuid.uuid7()
+    cursor = FakeCursor(rows=[{"id": 101}])
+    conn = FakeConnection(cursor=cursor)
+
+    owned = await job_postings_module.filter_owned_job_posting_ids(
+        cast(AsyncConnection, conn),
+        user_id=user_id,
+        job_ids=[101, 102],
+        group_id=group_id,
+    )
+
+    assert owned == {101}
+    sql, params = cursor.execute_calls[0]
+    # Group scoping is bound as a param so an out-of-group id cannot survive.
+    assert "group_id = %(group_id)s" in sql
+    assert params == {"user_id": user_id, "ids": [101, 102], "group_id": group_id}
+
+
+@pytest.mark.asyncio
+async def test_filter_owned_ids_short_circuits_on_empty_input() -> None:
+    cursor = FakeCursor(rows=[{"id": 1}])
+    conn = FakeConnection(cursor=cursor)
+
+    owned = await job_postings_module.filter_owned_job_posting_ids(
+        cast(AsyncConnection, conn),
+        user_id=uuid.uuid7(),
+        job_ids=[],
+    )
+
+    # No ids → no query at all.
+    assert owned == set()
+    assert cursor.execute_calls == []

@@ -1,5 +1,13 @@
 """
 DDL definitions for the career-os PostgreSQL schema.
+
+Rule: ALTER statements are **prohibited** in this file.
+  - This file manages only CREATE TABLE / CREATE INDEX / COMMENT DDL,
+    all of which are idempotent via IF NOT EXISTS and safe to run at
+    every startup.
+  - Any change to an existing table (ADD COLUMN, DROP COLUMN, ADD
+    CONSTRAINT, etc.) must be written as a one-off SQL script in
+    migrations/YYYY-MM-DD-<n>.sql and run manually against production.
 """
 
 from psycopg import AsyncConnection
@@ -51,6 +59,15 @@ CREATE TABLE IF NOT EXISTS job_postings (
     -- Group
     group_id              UUID          NOT NULL REFERENCES job_search_groups (id) ON DELETE CASCADE,
 
+    -- Application lifecycle
+    application_status    VARCHAR(20)   NOT NULL DEFAULT 'saved'
+        CHECK (application_status IN
+            ('saved', 'applied', 'interviewing', 'offer', 'rejected', 'withdrawn')),
+    status_updated_at     TIMESTAMPTZ,
+
+    -- User annotation
+    memo                  TEXT,
+
     -- Metadata
     scraped_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     created_at            TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -91,6 +108,21 @@ CREATE TABLE IF NOT EXISTS users (
 
     CONSTRAINT uq_users_google_id UNIQUE (google_id),
     CONSTRAINT uq_users_email     UNIQUE (email)
+);
+"""
+
+CREATE_USER_PROFILES_TABLE = """
+CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id            UUID         PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+    headline           VARCHAR(200),
+    years_experience   SMALLINT,
+    target_roles       TEXT[],
+    skills             TEXT[],
+    locations          TEXT[],
+    salary_expectation VARCHAR(200),
+    summary            TEXT,
+    created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 """
 
@@ -162,7 +194,19 @@ COMMENT ON COLUMN job_postings.platform    IS '출처 플랫폼 (saramin | wante
 COMMENT ON COLUMN job_postings.posting_id  IS '플랫폼 내 공고 고유 ID (saramin: rec_idx, wanted: wd ID)';
 COMMENT ON COLUMN job_postings.tech_stack  IS '기술스택 배열 (원티드: 별도 섹션, 사람인: 키워드 파싱)';
 COMMENT ON COLUMN job_postings.tags        IS '원티드 회사 태그 배열';
+COMMENT ON COLUMN job_postings.application_status IS '지원 진행 상태 (saved → applied → interviewing → offer/rejected/withdrawn)';
+COMMENT ON COLUMN job_postings.status_updated_at  IS 'application_status가 마지막으로 변경된 시각';
+COMMENT ON COLUMN job_postings.memo        IS '사용자가 공고에 남긴 자유 메모 (NULL = 메모 없음)';
 COMMENT ON COLUMN job_postings.scraped_at  IS '데이터 수집 시각';
+
+COMMENT ON TABLE  user_profiles                    IS '지원 전략 에이전트가 참조하는 사용자 커리어 프로필 (사용자당 1행)';
+COMMENT ON COLUMN user_profiles.headline           IS '한 줄 자기소개/직함';
+COMMENT ON COLUMN user_profiles.years_experience   IS '총 경력 연수 (0~60)';
+COMMENT ON COLUMN user_profiles.target_roles       IS '희망 직무 배열';
+COMMENT ON COLUMN user_profiles.skills             IS '보유 스킬 배열';
+COMMENT ON COLUMN user_profiles.locations          IS '선호 근무 지역 배열';
+COMMENT ON COLUMN user_profiles.salary_expectation IS '희망 연봉/처우';
+COMMENT ON COLUMN user_profiles.summary            IS '자유 형식 커리어 요약 서술';
 
 COMMENT ON TABLE  users          IS 'Google OAuth로 가입한 사용자 계정';
 COMMENT ON COLUMN users.google_id IS 'Google sub claim (고유 사용자 식별자)';
@@ -188,6 +232,7 @@ COMMENT ON COLUMN job_search_groups.memo     IS '구직 활동 관련 자유 메
 
 async def _apply_schema(conn: AsyncConnection) -> None:
     await conn.execute(CREATE_USERS_TABLE)
+    await conn.execute(CREATE_USER_PROFILES_TABLE)
     await conn.execute(CREATE_JOB_SEARCH_GROUPS_TABLE)
     await conn.execute(CREATE_JOB_POSTINGS_TABLE)
     await conn.execute(CREATE_RISC_EVENTS_TABLE)

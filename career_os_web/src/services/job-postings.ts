@@ -2,6 +2,7 @@ import type {
   JobPostingDetail,
   JobPostingExtracted,
   JobPostingPage,
+  JobPostingUpdate,
 } from '../types/job-posting';
 import { fetchWithApiRetry } from './api-client';
 import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
@@ -71,6 +72,27 @@ export async function fetchJobPosting(
     `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/${id}`,
     { signal },
     '채용공고를 불러오지 못했습니다.',
+  );
+  const raw = await response.json();
+  return assertContractMatch(jobPostingDetailApiResponseSchema.safeParse(raw))
+    .data;
+}
+
+// Partial update of a saved posting (application_status / group_id / memo).
+// Deliberately single-attempt — never pass `retryable`: the PATCH is not
+// idempotent and must not be silently re-sent.
+export async function updateJobPosting(
+  id: number,
+  patch: JobPostingUpdate,
+): Promise<JobPostingDetail> {
+  const response = await fetchWithApiRetry(
+    `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/${id}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    },
+    '채용공고를 수정하지 못했습니다.',
   );
   const raw = await response.json();
   return assertContractMatch(jobPostingDetailApiResponseSchema.safeParse(raw))

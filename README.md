@@ -81,6 +81,11 @@ CHATKIT_ENABLED=true           # false 시 /v1/chatkit 404 반환
 CHATKIT_MODEL=                 # 미설정 시 OPENAI_MODEL 사용
 CHATKIT_MAX_THREADS_PER_USER=50
 CHATKIT_HISTORY_ITEM_LIMIT=20
+
+# 선택 — Application Strategist 에이전트 (기본값 비활성화)
+STRATEGIST_AGENT_ENABLED=false # true 시 /v1/agent/plan, /v1/agent/artifact 활성화
+STRATEGIST_MODEL=              # 미설정 시 OPENAI_MODEL 사용
+STRATEGIST_PLAN_POSTING_LIMIT=20
 ```
 
 ### 실행
@@ -119,7 +124,10 @@ API 문서: `http://localhost:8000/v1/docs`
 - **구직 활동 그룹 관리** — 구직 라운드 생성·조회·수정·종료·삭제, 진행/종료 상태 필터링, 최초 로그인 시 기본 그룹 자동 생성
 - **채용 공고 추출** — 사람인·원티드 URL을 입력하면 OpenAI로 구조화된 데이터 반환
 - **공고 저장·관리** — 공고를 `group_id`에 연결해 저장, 그룹별 목록 필터링, 동일 공고의 다른 그룹별 별도 저장 지원
+- **공고 상태·메모 관리** — 지원 상태(`saved`/`applied`/`interviewing`/`offer`/`rejected`/`withdrawn`) 변경, 다른 그룹으로 이동, 메모 작성을 부분 수정으로 지원
+- **커리어 프로필** — 직무·경력·기술·희망 근무지 등 7개 필드를 전체 교체(upsert) 방식으로 관리
 - **AI 구직 어시스턴트 (ChatKit)** — 한국어 기반 구직 활동 도우미; 스트리밍 SSE 응답, PostgreSQL 대화 이력 저장, 분당 30회·일별 500회 사용량 제한; `CHATKIT_ENABLED=false` 시 비활성화
+- **AI 지원 전략가 (Application Strategist)** — 저장된 공고와 커리어 프로필을 분석해 우선순위가 매겨진 지원 전략 플랜과 공고별 맞춤 지원 자료(자기소개서 문구, 자소서, 면접 준비)를 생성; `STRATEGIST_AGENT_ENABLED=false`(기본값) 시 `/v1/agent/*` 비활성화
 - **사용량 제한** — Redis 슬라이딩 윈도우(분당)와 고정 윈도우(일·월별) 조합; Redis 미설정 시 fail-open
 - **지원 플랫폼** — `saramin.co.kr`, `wanted.co.kr`
 
@@ -140,26 +148,31 @@ OAuth 로그인으로 저장되는 사용자 계정 정보와 Google Cross-Accou
 
 모든 엔드포인트는 `/v1` 접두사를 사용합니다. 보호된 엔드포인트는 브라우저 세션 쿠키와 `X-Career-OS-Client: web` 헤더 또는 `Authorization: Bearer <token>` 헤더가 필요합니다.
 
-| 메서드   | 경로                            | 인증 | 설명                                                                                                  |
-| -------- | ------------------------------- | :--: | ----------------------------------------------------------------------------------------------------- |
-| `GET`    | `/`                             |      | 헬스체크                                                                                              |
-| `GET`    | `/health/db`                    |      | DB 연결 확인                                                                                          |
-| `GET`    | `/auth/google`                  |      | Google 로그인 시작 (`?callback_url=` 지원)                                                            |
-| `GET`    | `/auth/google/callback`         |      | OAuth 콜백, 세션 발급                                                                                 |
-| `POST`   | `/auth/google/risc`             |      | Google RISC 보안 이벤트 수신                                                                          |
-| `GET`    | `/auth/me`                      |  ✓   | 현재 사용자 조회                                                                                      |
-| `PATCH`  | `/auth/me`                      |  ✓   | 사용자 이름 수정                                                                                      |
-| `POST`   | `/auth/logout`                  |  ✓   | 로그아웃                                                                                              |
-| `POST`   | `/chatkit`                      |  ✓   | AI 어시스턴트 채팅; 스트리밍 SSE 또는 JSON; 분당 30회·일별 500회 제한; `CHATKIT_ENABLED=false` 시 404 |
-| `GET`    | `/job-postings`                 |  ✓   | 저장된 공고 목록 (`offset`, `limit`, 선택 `group_id`)                                                 |
-| `GET`    | `/job-postings/extraction?url=` |  ✓   | URL에서 공고 추출 (저장 안 함)                                                                        |
-| `POST`   | `/job-postings`                 |  ✓   | 추출된 공고를 그룹에 저장 (선택 `group_id`, 201 신규 / 200 갱신)                                      |
-| `GET`    | `/job-postings/{id}`            |  ✓   | 저장된 공고 상세 조회                                                                                 |
-| `GET`    | `/job-search-groups`            |  ✓   | 구직 활동 그룹 목록 (`status`, `offset`, `limit`)                                                     |
-| `POST`   | `/job-search-groups`            |  ✓   | 구직 활동 그룹 생성                                                                                   |
-| `GET`    | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 상세 조회                                                                              |
-| `PATCH`  | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 이름·기간·메모 수정                                                                    |
-| `DELETE` | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 삭제 (마지막 그룹 삭제 불가)                                                           |
+| 메서드   | 경로                            | 인증 | 설명                                                                                                                                            |
+| -------- | ------------------------------- | :--: | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/`                             |      | 헬스체크                                                                                                                                        |
+| `GET`    | `/health/db`                    |      | DB 연결 확인                                                                                                                                    |
+| `GET`    | `/auth/google`                  |      | Google 로그인 시작 (`?callback_url=` 지원)                                                                                                      |
+| `GET`    | `/auth/google/callback`         |      | OAuth 콜백, 세션 발급                                                                                                                           |
+| `POST`   | `/auth/google/risc`             |      | Google RISC 보안 이벤트 수신                                                                                                                    |
+| `GET`    | `/auth/me`                      |  ✓   | 현재 사용자 조회                                                                                                                                |
+| `PATCH`  | `/auth/me`                      |  ✓   | 사용자 이름 수정                                                                                                                                |
+| `POST`   | `/auth/logout`                  |  ✓   | 로그아웃                                                                                                                                        |
+| `POST`   | `/chatkit`                      |  ✓   | AI 어시스턴트 채팅; 스트리밍 SSE 또는 JSON; 분당 30회·일별 500회 제한; `CHATKIT_ENABLED=false` 시 404                                           |
+| `GET`    | `/job-postings`                 |  ✓   | 저장된 공고 목록 (`offset`, `limit`, 선택 `group_id`)                                                                                           |
+| `GET`    | `/job-postings/extraction?url=` |  ✓   | URL에서 공고 추출 (저장 안 함)                                                                                                                  |
+| `POST`   | `/job-postings`                 |  ✓   | 추출된 공고를 그룹에 저장 (선택 `group_id`, 201 신규 / 200 갱신)                                                                                |
+| `GET`    | `/job-postings/{id}`            |  ✓   | 저장된 공고 상세 조회                                                                                                                           |
+| `PATCH`  | `/job-postings/{id}`            |  ✓   | 공고 부분 수정 (지원 상태·그룹 이동·메모); 빈 본문 422, 대상 그룹 없음 404, 대상 그룹에 중복 시 409                                             |
+| `GET`    | `/job-search-groups`            |  ✓   | 구직 활동 그룹 목록 (`status`, `offset`, `limit`)                                                                                               |
+| `POST`   | `/job-search-groups`            |  ✓   | 구직 활동 그룹 생성                                                                                                                             |
+| `GET`    | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 상세 조회                                                                                                                        |
+| `PATCH`  | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 이름·기간·메모 수정                                                                                                              |
+| `DELETE` | `/job-search-groups/{id}`       |  ✓   | 구직 활동 그룹 삭제 (마지막 그룹 삭제 불가)                                                                                                     |
+| `GET`    | `/profile`                      |  ✓   | 커리어 프로필 조회; 없으면 404                                                                                                                  |
+| `PUT`    | `/profile`                      |  ✓   | 커리어 프로필 전체 교체 (upsert); 최초 생성 시 201, 교체 시 200                                                                                 |
+| `POST`   | `/agent/plan`                   |  ✓   | 지원 전략 플랜 생성; 분당 5회·일별 30회 제한; `STRATEGIST_AGENT_ENABLED=false` 시 404                                                           |
+| `POST`   | `/agent/artifact`               |  ✓   | 공고별 맞춤 지원 자료 생성 (`resume_bullets`/`cover_letter`/`interview_prep`); 분당 5회·일별 20회 제한; `STRATEGIST_AGENT_ENABLED=false` 시 404 |
 
 ---
 

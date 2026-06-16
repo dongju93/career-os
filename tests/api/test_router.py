@@ -34,6 +34,9 @@ def make_stored_row(sample_job_posting, *, job_id: int = 1, group_id=None) -> di
         "id": job_id,
         "group_id": group_id or uuid.uuid7(),
         **sample_job_posting.model_dump(),
+        "application_status": "saved",
+        "status_updated_at": None,
+        "memo": None,
         "scraped_at": timestamp,
         "created_at": timestamp,
         "updated_at": timestamp,
@@ -59,6 +62,8 @@ def make_list_row(sample_job_posting, *, job_id: int = 1, group_id=None) -> dict
         "tags": stored["tags"],
         "job_category": stored["job_category"],
         "industry": stored["industry"],
+        "application_status": stored["application_status"],
+        "status_updated_at": stored["status_updated_at"],
         "scraped_at": stored["scraped_at"],
         "created_at": stored["created_at"],
         "updated_at": stored["updated_at"],
@@ -270,6 +275,8 @@ def test_list_job_postings_endpoint_returns_paginated_results(
                     "tags": sample_job_posting.tags,
                     "job_category": sample_job_posting.job_category,
                     "industry": sample_job_posting.industry,
+                    "application_status": "saved",
+                    "status_updated_at": None,
                     "scraped_at": to_api_datetime(rows[0]["scraped_at"]),
                     "created_at": to_api_datetime(rows[0]["created_at"]),
                     "updated_at": to_api_datetime(rows[0]["updated_at"]),
@@ -375,6 +382,9 @@ def test_create_job_posting_endpoint_returns_created_record(
         return_value={
             "id": stored["id"],
             "group_id": group_id,
+            "application_status": "saved",
+            "status_updated_at": None,
+            "memo": None,
             "scraped_at": stored["scraped_at"],
             "created_at": stored["created_at"],
             "updated_at": stored["updated_at"],
@@ -397,6 +407,9 @@ def test_create_job_posting_endpoint_returns_created_record(
             "id": 11,
             "group_id": str(group_id),
             **sample_job_posting.model_dump(mode="json"),
+            "application_status": "saved",
+            "status_updated_at": None,
+            "memo": None,
             "scraped_at": to_api_datetime(stored["scraped_at"]),
             "created_at": to_api_datetime(stored["created_at"]),
             "updated_at": to_api_datetime(stored["updated_at"]),
@@ -424,6 +437,9 @@ def test_create_job_posting_endpoint_returns_200_for_updates(
     monkeypatch.setattr(
         app_module, "get_current_group_id", AsyncMock(return_value=group_id)
     )
+    # An existing posting keeps a memo the user entered earlier: the upsert preserves
+    # it (absent from DO UPDATE SET) and now returns it in RETURNING. The response must
+    # surface that preserved note, not the null default it produced before the fix.
     monkeypatch.setattr(
         app_module,
         "upsert_job_posting",
@@ -431,6 +447,9 @@ def test_create_job_posting_endpoint_returns_200_for_updates(
             return_value={
                 "id": stored["id"],
                 "group_id": group_id,
+                "application_status": "saved",
+                "status_updated_at": None,
+                "memo": "지원 전 포트폴리오 정리하기",
                 "scraped_at": stored["scraped_at"],
                 "created_at": stored["created_at"],
                 "updated_at": stored["updated_at"],
@@ -447,6 +466,7 @@ def test_create_job_posting_endpoint_returns_200_for_updates(
 
     assert response.status_code == 200
     assert response.json()["data"]["id"] == 11
+    assert response.json()["data"]["memo"] == "지원 전 포트폴리오 정리하기"
 
 
 def test_create_job_posting_endpoint_rejects_blank_posting_id(
@@ -496,6 +516,9 @@ def test_get_job_posting_detail_endpoint_returns_stored_record(
             "id": 19,
             "group_id": str(group_id),
             **sample_job_posting.model_dump(mode="json"),
+            "application_status": "saved",
+            "status_updated_at": None,
+            "memo": None,
             "scraped_at": to_api_datetime(stored["scraped_at"]),
             "created_at": to_api_datetime(stored["created_at"]),
             "updated_at": to_api_datetime(stored["updated_at"]),

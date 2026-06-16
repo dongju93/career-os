@@ -1,5 +1,6 @@
 from datetime import date, datetime
-from typing import Annotated
+from enum import StrEnum
+from typing import Annotated, Literal
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID
 
@@ -44,6 +45,19 @@ class UpdateCurrentUserRequest(BaseModel):
 
 
 # ── Job Postings ──────────────────────────────────────────────────────────────
+
+
+class ApplicationStatus(StrEnum):
+    """Lifecycle of a saved posting. Mirrors the job_postings.application_status
+    CHECK constraint — the DDL string stays literal (the Platform CHECK is the
+    precedent); a drift test guards the two against silent divergence."""
+
+    saved = "saved"
+    applied = "applied"
+    interviewing = "interviewing"
+    offer = "offer"
+    rejected = "rejected"
+    withdrawn = "withdrawn"
 
 
 class _JobPostingBase(BaseModel):
@@ -167,9 +181,36 @@ class JobPostingStored(_JobPostingBase):
 
     id: int
     group_id: UUID
+    application_status: ApplicationStatus
+    status_updated_at: datetime | None = None
+    memo: Annotated[str, Field(max_length=2000)] | None = None
     scraped_at: datetime
     created_at: datetime
     updated_at: datetime
+
+
+class JobPostingUpdateRequest(BaseModel):
+    """PATCH /v1/job-postings/{job_id} body — partial update of a saved posting.
+
+    At least one field must be provided. NOT NULL columns (application_status,
+    group_id) may not be set to an explicit null (mirrors the null-rejection guard
+    in the groups PATCH handler). memo is a nullable column, so an explicit null
+    is a valid "clear the memo" instruction and is allowed.
+    """
+
+    application_status: ApplicationStatus | None = None
+    group_id: UUID | None = None
+    memo: Annotated[str, Field(max_length=2000)] | None = None
+
+    @model_validator(mode="after")
+    def reject_empty_or_null_not_null_columns(self) -> JobPostingUpdateRequest:
+        if not self.model_fields_set:
+            raise ValueError("At least one field must be provided")
+        # memo is intentionally absent: an explicit null clears the memo.
+        for field in ("application_status", "group_id"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} cannot be null")
+        return self
 
 
 class JobPostingListItem(BaseModel):
@@ -191,6 +232,8 @@ class JobPostingListItem(BaseModel):
     tags: list[str] | None = None
     job_category: str | None = None
     industry: str | None = None
+    application_status: ApplicationStatus
+    status_updated_at: datetime | None = None
     scraped_at: datetime
     created_at: datetime
     updated_at: datetime
@@ -263,3 +306,172 @@ class JobSearchGroupPage(BaseModel):
     total: int
     offset: int
     limit: int
+
+
+# ── Career Profile ──────────────────────────────────────────────────────────────
+
+
+# Each array entry is capped so a single oversized item fails at the API boundary,
+# not at the TEXT[] insert. List-level Field(max_length=...) bounds the item count.
+_ProfileTag = Annotated[str, Field(max_length=100)]
+
+
+class UserProfileUpsertRequest(BaseModel):
+    """PUT /v1/profile body — full-replace upsert.
+
+    Every field is optional and nullable; fields omitted on a replace are stored
+    as NULL. String lengths mirror the user_profiles VARCHAR/TEXT limits so
+    validation fails before the DB insert.
+    """
+
+    headline: Annotated[str, Field(max_length=200)] | None = None
+    years_experience: Annotated[int, Field(ge=0, le=60)] | None = None
+    target_roles: Annotated[list[_ProfileTag], Field(max_length=20)] | None = None
+    skills: Annotated[list[_ProfileTag], Field(max_length=50)] | None = None
+    locations: Annotated[list[_ProfileTag], Field(max_length=20)] | None = None
+    salary_expectation: Annotated[str, Field(max_length=200)] | None = None
+    summary: Annotated[str, Field(max_length=8000)] | None = None
+
+    @field_validator("headline")
+    @classmethod
+    def normalize_headline(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return v.strip() or None
+
+    @field_validator("target_roles", "skills", "locations", mode="before")
+    @classmethod
+    def drop_empty_profile_entries(cls, v: object) -> object:
+        if v is None:
+            return None
+        if not isinstance(v, list):
+            # Leave non-list input untouched so Pydantic raises a list[str] type
+            # error instead of silently exploding a scalar (e.g. "Python") into
+            # its characters under mode="before".
+            return v
+        cleaned = [item.strip() for item in v if isinstance(item, str) and item.strip()]
+        return cleaned or None
+
+
+class UserProfile(UserProfileUpsertRequest):
+    """GET/PUT /v1/profile response — the seven content fields plus timestamps."""
+
+    created_at: datetime
+    updated_at: datetime
+
+
+# ── Application Strategist ───────────────────────────────────────────────────────
+
+
+# Deadline interpretation, computed by the model from the supplied "today" date and
+# the posting's free-text deadline: overdue (past), soon (≤7 days), later (a future
+# parseable date), unknown (no parseable date, e.g. 상시채용).
+DeadlineUrgency = Literal["overdue", "soon", "later", "unknown"]
+
+
+class PlanItem(BaseModel):
+    """One prioritized posting in the generated Application Plan.
+
+    This is part of the agent's structured output (`ApplicationPlan` is the SDK
+    output_type), so every field is required — the model must fill them all. The
+    job_id is model-emitted and therefore untrusted: the route re-verifies it
+    against the caller's own postings before this reaches the client.
+    """
+
+    job_id: int
+    company_name: str
+    job_title: str
+    fit_score: Annotated[int, Field(ge=0, le=100)]
+    matched_skills: list[str]
+    missing_skills: list[str]
+    deadline_urgency: DeadlineUrgency
+    recommended_action: str
+    rationale: str
+
+
+ProposedActionType = Literal["set_status", "assign_group", "save_memo"]
+
+
+class ProposedAction(BaseModel):
+    """A propose-then-confirm app action the model suggests but never executes.
+
+    The agent has no write tools: it only proposes. The client applies a proposal
+    by calling PATCH /v1/job-postings/{job_id} with the matching field; rejection is
+    a client-side dismissal with no API call. job_id and target_group_id are
+    model-emitted and therefore untrusted — the route re-verifies both against the
+    caller's own postings/groups before this reaches the client.
+
+    Which field carries the payload depends on action_type:
+      - set_status   → application_status
+      - assign_group → target_group_id
+      - save_memo    → memo
+    """
+
+    action_type: ProposedActionType
+    job_id: int
+    application_status: ApplicationStatus | None = Field(
+        default=None, description="set_status 액션의 목표 상태"
+    )
+    target_group_id: str | None = Field(
+        default=None, description="assign_group 액션의 목표 그룹 UUID"
+    )
+    memo: str | None = Field(default=None, description="save_memo 액션의 메모 내용")
+    reason: str
+
+
+class ApplicationPlan(BaseModel):
+    """POST /v1/agent/plan response payload AND the Agents-SDK output_type.
+
+    Kept free of any server-only fields because it doubles as the model's required
+    output contract. proposed_actions defaults to [] so the model may omit it and
+    clients can always treat it as optional.
+    """
+
+    summary: str
+    items: Annotated[list[PlanItem], Field(max_length=10)]
+    proposed_actions: list[ProposedAction] = []
+
+
+class ApplicationPlanRequest(BaseModel):
+    """POST /v1/agent/plan body. Both fields optional.
+
+    group_id omitted/null → the caller's current active group. focus is free-text
+    user steering passed verbatim into the run input.
+    """
+
+    group_id: UUID | None = None
+    focus: Annotated[str, Field(max_length=300)] | None = None
+
+
+# The three tailored-artifact kinds the strategist can generate for a single posting.
+ArtifactType = Literal["resume_bullets", "cover_letter", "interview_prep"]
+
+
+class ArtifactRequest(BaseModel):
+    """POST /v1/agent/artifact body.
+
+    Targets exactly one saved posting. job_id is required (the artifact agent is
+    tool-less — the route fetches the posting + profile server-side and bakes them
+    into the run input), and it is re-verified against the caller's own postings
+    before any model call. focus is optional free-text steering.
+    """
+
+    job_id: int
+    artifact_type: ArtifactType
+    focus: Annotated[str, Field(max_length=300)] | None = None
+
+
+class ApplicationArtifact(BaseModel):
+    """POST /v1/agent/artifact response payload AND the Agents-SDK output_type.
+
+    Kept free of server-only fields because it doubles as the model's required
+    output contract. content_markdown is hard-capped so a runaway generation fails
+    Pydantic validation instead of reaching the client. job_id and artifact_type are
+    model-echoed and therefore untrusted — the route pins both back to the verified
+    request values before returning.
+    """
+
+    artifact_type: ArtifactType
+    job_id: int
+    title: str
+    content_markdown: Annotated[str, Field(max_length=12000)]

@@ -24,6 +24,8 @@ import { fetchJobSearchGroups } from '../services/job-search-groups';
 import type { JobPostingListItem } from '../types/job-posting';
 import type { JobSearchGroupItem } from '../types/job-search-group';
 import {
+  APPLICATION_STATUS_LABELS,
+  applicationStatusVariant,
   formatRelativeDate,
   platformVariant,
 } from '../utils/job-posting-formatters';
@@ -52,9 +54,14 @@ function JobPostingCard({ item }: { item: JobPostingListItem }) {
     <Card className="group glass-hover relative overflow-hidden has-focus-visible:ring-2 has-focus-visible:ring-primary has-focus-visible:ring-offset-2">
       <CardContent className="p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <Badge variant={platformVariant(item.platform)}>
-            {item.platform}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={platformVariant(item.platform)}>
+              {item.platform}
+            </Badge>
+            <Badge variant={applicationStatusVariant(item.application_status)}>
+              {APPLICATION_STATUS_LABELS[item.application_status]}
+            </Badge>
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-gray-600">
               {formatRelativeDate(item.created_at)}

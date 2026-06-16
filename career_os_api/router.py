@@ -8,6 +8,7 @@ from uuid import UUID
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from psycopg.errors import UniqueViolation
 
 from career_os_api.auth.dependencies import get_current_user
 from career_os_api.auth.risc import (
@@ -21,8 +22,10 @@ from career_os_api.chatkit.routes import router as chatkit_router
 from career_os_api.config import settings
 from career_os_api.constants import API_V1
 from career_os_api.database.job_postings import (
+    TargetGroupNotFoundError,
     get_job_posting,
     get_job_postings,
+    update_job_posting_fields,
     upsert_job_posting,
 )
 from career_os_api.database.job_search_groups import (
@@ -37,6 +40,7 @@ from career_os_api.database.job_search_groups import (
     update_job_search_group,
 )
 from career_os_api.database.retry import run_database_operation
+from career_os_api.database.user_profiles import get_user_profile, upsert_user_profile
 from career_os_api.database.users import update_user_name, upsert_user
 from career_os_api.rate_limit import quota, rate_limit
 from career_os_api.responses import ApiResponse
@@ -47,15 +51,19 @@ from career_os_api.schemas import (
     JobPostingListItem,
     JobPostingPage,
     JobPostingStored,
+    JobPostingUpdateRequest,
     JobSearchGroup,
     JobSearchGroupCreate,
     JobSearchGroupItem,
     JobSearchGroupPage,
     JobSearchGroupUpdate,
     UpdateCurrentUserRequest,
+    UserProfile,
+    UserProfileUpsertRequest,
 )
 from career_os_api.service.job_posting.extractor import extract_job_posting
 from career_os_api.service.job_posting.fetch import fetch_url_content
+from career_os_api.strategist.strategist_routes import router as strategist_router
 
 v1_router = APIRouter(prefix=f"/{API_V1}")
 
@@ -76,6 +84,12 @@ _CurrentUser = Annotated[dict, Depends(get_current_user)]
 # The runtime dependency on the router also guards against runtime flag changes.
 if settings.chatkit_enabled:
     v1_router.include_router(chatkit_router)
+
+# Strategist routes are always mounted; the router's _require_strategist_enabled
+# dependency returns 404 at request time while the flag is off. Mounting
+# unconditionally (unlike chatkit) lets tests toggle the flag at runtime, since the
+# default is off and a conditional include would otherwise never register the route.
+v1_router.include_router(strategist_router)
 
 
 def _resolve_callback_url(
@@ -471,6 +485,11 @@ async def create_job_posting(
     stored = JobPostingStored(
         id=row["id"],
         group_id=row["group_id"],
+        application_status=row["application_status"],
+        status_updated_at=row["status_updated_at"],
+        # memo is preserved across re-saves (omitted from DO UPDATE SET), so it must
+        # come from the returned row — data is the write-path payload and has no memo.
+        memo=row["memo"],
         scraped_at=row["scraped_at"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -509,6 +528,75 @@ async def get_job_posting_detail(
     return ApiResponse(
         status=status.HTTP_200_OK,
         message="채용공고 정보를 조회했습니다.",
+        data=JobPostingStored(**row),
+    )
+
+
+@v1_router.patch(
+    "/job-postings/{job_id}",
+    tags=["job-postings"],
+    dependencies=[rate_limit(30, per="minute")],
+    responses={
+        404: {"description": "Job posting or target group not found"},
+        409: {"description": "Target group already contains this posting"},
+    },
+)
+async def update_job_posting(
+    job_id: int,
+    data: JobPostingUpdateRequest,
+    request: Request,
+    current_user: _CurrentUser,
+) -> ApiResponse[JobPostingStored]:
+    # Only the fields the client actually sent are written. The schema validator
+    # already rejected an empty body and explicit nulls on NOT NULL columns.
+    # memo is the one nullable column, so an explicit null must still be written
+    # (it clears the memo) — hence the model_fields_set check rather than `is not None`.
+    update_fields: dict[str, object] = {}
+    if data.application_status is not None:
+        update_fields["application_status"] = data.application_status.value
+    if data.group_id is not None:
+        update_fields["group_id"] = data.group_id
+    if "memo" in data.model_fields_set:
+        update_fields["memo"] = data.memo
+
+    async def operation(conn):
+        return await update_job_posting_fields(
+            conn,
+            user_id=current_user["id"],
+            job_id=job_id,
+            fields=update_fields,
+        )
+
+    try:
+        # Non-idempotent write: the UPDATE stamps updated_at/status_updated_at = NOW()
+        # and may move group_id, so a retry after the DB applied the change would
+        # re-stamp timestamps or re-attempt the move. Only retry pool-acquisition
+        # failures (operation provably never ran); fail fast as 503 otherwise.
+        row = await run_database_operation(
+            request.app.state.pool,
+            operation,
+            idempotent=False,
+            label="update_job_posting",
+        )
+    except TargetGroupNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="대상 구직 활동 그룹을 찾을 수 없습니다.",
+        ) from exc
+    except UniqueViolation as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 대상 그룹에 같은 공고가 저장되어 있습니다.",
+        ) from exc
+
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job posting {job_id} not found",
+        )
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="채용공고가 수정되었습니다.",
         data=JobPostingStored(**row),
     )
 
@@ -720,3 +808,63 @@ async def delete_job_search_group_handler(
         label="delete_job_search_group",
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── Career Profile ────────────────────────────────────────────────────────────
+
+
+@v1_router.get(
+    "/profile",
+    tags=["profile"],
+    dependencies=[rate_limit(60, per="minute")],
+    responses={404: {"description": "Profile not found"}},
+)
+async def read_current_user_profile(
+    request: Request,
+    current_user: _CurrentUser,
+) -> ApiResponse[UserProfile]:
+    async def operation(conn):
+        return await get_user_profile(conn, user_id=current_user["id"])
+
+    row = await run_database_operation(request.app.state.pool, operation)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="프로필이 아직 없습니다.",
+        )
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="프로필을 조회했습니다.",
+        data=UserProfile(**row),
+    )
+
+
+@v1_router.put(
+    "/profile",
+    tags=["profile"],
+    dependencies=[rate_limit(20, per="minute")],
+    responses={
+        # "model" forces FastAPI to emit a body schema for the non-default 201,
+        # so generated clients treat the create response as non-empty.
+        201: {
+            "model": ApiResponse[UserProfile],
+            "description": "Profile created",
+        },
+    },
+)
+async def replace_current_user_profile(
+    data: UserProfileUpsertRequest,
+    request: Request,
+    response: Response,
+    current_user: _CurrentUser,
+) -> ApiResponse[UserProfile]:
+    async def operation(conn):
+        return await upsert_user_profile(conn, user_id=current_user["id"], data=data)
+
+    row = await run_database_operation(request.app.state.pool, operation)
+    http_status = status.HTTP_201_CREATED if row["inserted"] else status.HTTP_200_OK
+    response.status_code = http_status
+    message = (
+        "프로필이 생성되었습니다." if row["inserted"] else "프로필이 수정되었습니다."
+    )
+    return ApiResponse(status=http_status, message=message, data=UserProfile(**row))
