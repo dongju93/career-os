@@ -568,7 +568,16 @@ async def update_job_posting(
         )
 
     try:
-        row = await run_database_operation(request.app.state.pool, operation)
+        # Non-idempotent write: the UPDATE stamps updated_at/status_updated_at = NOW()
+        # and may move group_id, so a retry after the DB applied the change would
+        # re-stamp timestamps or re-attempt the move. Only retry pool-acquisition
+        # failures (operation provably never ran); fail fast as 503 otherwise.
+        row = await run_database_operation(
+            request.app.state.pool,
+            operation,
+            idempotent=False,
+            label="update_job_posting",
+        )
     except TargetGroupNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
