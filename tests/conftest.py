@@ -14,6 +14,10 @@ os.environ["SECRET_KEY"] = "test-secret-key-for-jwt"
 # Disable Redis in tests; rate limiting fails open. client_with_redis fixture
 # overrides this by monkeypatching create_redis_client() directly.
 os.environ["REDIS_URL"] = ""
+# Strategist is off by default — individual tests opt in via the `enabled`
+# fixture. Without this, a local .env with STRATEGIST_AGENT_ENABLED=true
+# would leak into the test session and break the feature-flag assertions.
+os.environ["STRATEGIST_AGENT_ENABLED"] = "false"
 
 from career_os_api.schemas import JobPostingExtracted
 from career_os_api.service.job_posting.platform import Platform

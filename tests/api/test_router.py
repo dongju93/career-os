@@ -177,6 +177,20 @@ def test_root_endpoint_returns_hello_world(client: TestClient) -> None:
     assert response.json() == {"status": 200, "message": "Hello, World!", "data": None}
 
 
+def test_site_root_redirects_to_docs(client: TestClient) -> None:
+    response = client.get("/", follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers["location"] == f"{API_PREFIX}/docs"
+
+
+def test_liveness_probe_returns_ok(client: TestClient) -> None:
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
 def test_cors_preflight_response_includes_request_id(client: TestClient) -> None:
     response = client.options(
         f"{API_PREFIX}/job-postings",

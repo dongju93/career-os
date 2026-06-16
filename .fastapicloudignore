@@ -1,1 +1,9 @@
 career_os_web/
+tests/
+temp/
+migrations/
+coverage.xml
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+htmlcov/

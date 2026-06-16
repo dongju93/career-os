@@ -1,7 +1,9 @@
 from typing import ClassVar, Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 _PRODUCTION_SECRET_MIN_LENGTH = 32
 _WEAK_SECRET_PLACEHOLDERS: frozenset[str] = frozenset(
@@ -22,9 +24,13 @@ class Settings(BaseSettings):
     )
 
     environment: Literal["local", "test", "production"] = "local"
-    # When True, redirect_uri and frontend_url automatically point to localhost.
-    # Set DEV=true in .env for local development instead of overriding each URL.
-    dev: bool = False
+    log_level: LogLevel = "INFO"
+    # TrustedHostMiddleware is enabled only when this list is non-empty.
+    trusted_hosts: list[str] = Field(default_factory=list)
+    # Response hardening for production. Headers are path-aware and avoid
+    # CORP/COEP/COOP/CSP so credentialed cross-origin fetch + ChatKit SSE
+    # from allowed_origins (the Vercel SPA) keep working.
+    enable_security_headers: bool = True
 
     # Credentials — required, no defaults
     database_url: str
@@ -38,6 +44,10 @@ class Settings(BaseSettings):
     database_pool_min_size: int = 1
     database_pool_max_size: int = 10
     database_pool_timeout: float = 30.0  # seconds to wait before PoolTimeout
+    # Recycle idle / aged connections — shorter defaults apply in production
+    # (see _apply_production_defaults) to suit Neon serverless autoscaling.
+    database_pool_max_lifetime: float = 3600.0
+    database_pool_max_idle: float = 600.0
 
     # Google OAuth — required
     google_client_id: str
@@ -117,10 +127,35 @@ class Settings(BaseSettings):
     strategist_plan_posting_limit: int = 20
 
     @model_validator(mode="after")
-    def _apply_dev_overrides(self) -> Settings:
-        if self.dev:
-            self.redirect_uri = "http://localhost:8000/v1/auth/google/callback"
-            self.frontend_url = "http://localhost:5173"
+    def _apply_local_overrides(self) -> Settings:
+        if self.environment == "local":
+            if "redirect_uri" not in self.model_fields_set:
+                self.redirect_uri = "http://localhost:8000/v1/auth/google/callback"
+            if "frontend_url" not in self.model_fields_set:
+                self.frontend_url = "http://localhost:5173"
+        return self
+
+    @model_validator(mode="after")
+    def _apply_production_defaults(self) -> Settings:
+        if self.environment != "production":
+            return self
+
+        fields = self.model_fields_set
+        if "database_pool_max_size" not in fields:
+            self.database_pool_max_size = 3
+        if "database_pool_min_size" not in fields:
+            self.database_pool_min_size = 1
+        if "database_pool_max_lifetime" not in fields:
+            self.database_pool_max_lifetime = 300.0
+        if "database_pool_max_idle" not in fields:
+            self.database_pool_max_idle = 60.0
+        if "log_level" not in fields:
+            self.log_level = "WARNING"
+        if "trusted_hosts" not in fields:
+            self.trusted_hosts = [
+                "career-os.fastapicloud.dev",
+                "*.fastapicloud.dev",
+            ]
         return self
 
     @model_validator(mode="after")

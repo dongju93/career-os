@@ -6,6 +6,8 @@ from typing import Any
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from career_os_api.constants import API_V1
+
 _request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
 
 
@@ -19,6 +21,85 @@ class RequestIdFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = get_request_id()  # type: ignore[attr-defined]
         return True
+
+
+def _request_is_https(scope: Scope) -> bool:
+    if scope.get("scheme") == "https":
+        return True
+    for name, value in scope.get("headers", []):
+        if name == b"x-forwarded-proto":
+            return value.decode().lower().split(",", 1)[0].strip() == "https"
+    return False
+
+
+def _is_interactive_docs(path: str) -> bool:
+    return (
+        path
+        in {
+            f"/{API_V1}/docs",
+            f"/{API_V1}/redoc",
+            f"/{API_V1}/openapi.json",
+        }
+        or path.startswith(f"/{API_V1}/docs/")
+        or path.startswith(f"/{API_V1}/redoc/")
+    )
+
+
+def _is_auth_navigation(path: str) -> bool:
+    return path.startswith(f"/{API_V1}/auth/")
+
+
+def build_security_headers(path: str, *, is_https: bool) -> list[tuple[str, str]]:
+    """Return response headers safe for this API's cross-origin SPA clients.
+
+    Frontend (e.g. https://career-os-sigma.vercel.app) talks to this backend
+    with ``credentials: 'include'`` and ``X-Career-OS-Client: web``. OAuth uses
+    full-page redirects through ``/v1/auth/google`` → Google →
+    ``/v1/auth/google/callback`` → the SPA ``/auth/callback``.
+
+    Do not emit CORP / COEP / COOP / CSP here — they can break credentialed
+    fetch and ChatKit SSE from a separate origin.
+    """
+    headers: list[tuple[str, str]] = [("X-Content-Type-Options", "nosniff")]
+
+    if _is_interactive_docs(path):
+        headers.append(("X-Frame-Options", "SAMEORIGIN"))
+    elif _is_auth_navigation(path):
+        # Top-level OAuth navigations — avoid leaking callback query state.
+        headers.append(("Referrer-Policy", "no-referrer"))
+
+    if is_https:
+        headers.append(("Strict-Transport-Security", "max-age=31536000"))
+
+    return headers
+
+
+class SecurityHeadersMiddleware:
+    """Attach minimal, cross-origin-safe security headers per request path."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "/")
+        response_headers = build_security_headers(
+            path,
+            is_https=_request_is_https(scope),
+        )
+
+        async def _send(message: Any) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for name, value in response_headers:
+                    if name.lower() not in headers:
+                        headers.append(name, value)
+            await send(message)
+
+        await self.app(scope, receive, _send)
 
 
 class RequestIdMiddleware:

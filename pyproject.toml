@@ -64,6 +64,9 @@ known-first-party = ["career_os_api"]
 quote-style = "double"
 indent-style = "space"
 
+[tool.fastapi]
+entrypoint = "main:career_os"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

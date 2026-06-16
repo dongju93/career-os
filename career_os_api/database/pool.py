@@ -13,5 +13,7 @@ async def create_postgres_pool() -> AsyncGenerator[AsyncConnectionPool]:
         min_size=settings.database_pool_min_size,
         max_size=settings.database_pool_max_size,
         timeout=settings.database_pool_timeout,
+        max_lifetime=settings.database_pool_max_lifetime,
+        max_idle=settings.database_pool_max_idle,
     ) as pool:
         yield pool

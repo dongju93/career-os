@@ -6,9 +6,11 @@ from agents import set_default_openai_client, set_tracing_disabled
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from openai import AsyncOpenAI
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from career_os_api.chatkit.server import CareerOsChatKitServer
 from career_os_api.chatkit.store import PostgresChatKitStore
@@ -17,7 +19,11 @@ from career_os_api.constants import API_V1
 from career_os_api.database.ddl import init_schema
 from career_os_api.database.pool import create_postgres_pool
 from career_os_api.database.retry import DatabaseUnavailableError
-from career_os_api.middleware import RequestIdFilter, RequestIdMiddleware
+from career_os_api.middleware import (
+    RequestIdFilter,
+    RequestIdMiddleware,
+    SecurityHeadersMiddleware,
+)
 from career_os_api.rate_limit.client import create_redis_client
 from career_os_api.responses import api_error_response, api_validation_error_response
 from career_os_api.router import v1_router
@@ -29,7 +35,10 @@ _log_handler.setFormatter(
     )
 )
 _log_handler.addFilter(RequestIdFilter())
-logging.basicConfig(level=logging.INFO, handlers=[_log_handler])
+logging.basicConfig(
+    level=getattr(logging, settings.log_level),
+    handlers=[_log_handler],
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,11 +85,18 @@ async def lifespan(app: FastAPI):
             await redis_client.aclose()
 
 
+_production_servers = (
+    [{"url": "https://career-os.fastapicloud.dev"}]
+    if settings.environment == "production"
+    else None
+)
+
 career_os = FastAPI(
     lifespan=lifespan,
     title="Career OS API",
     docs_url=f"/{API_V1}/docs",
     redoc_url=f"/{API_V1}/redoc",
+    servers=_production_servers,
 )
 
 career_os.add_middleware(
@@ -98,6 +114,26 @@ career_os.add_middleware(
     max_age=settings.jwt_expire_minutes * 60,
 )
 career_os.add_middleware(RequestIdMiddleware)
+career_os.add_middleware(GZipMiddleware, minimum_size=1000)
+if settings.environment == "production" and settings.enable_security_headers:
+    career_os.add_middleware(SecurityHeadersMiddleware)
+if settings.trusted_hosts:
+    career_os.add_middleware(
+        TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts
+    )
+
+
+@career_os.get("/health", include_in_schema=False)
+def liveness_probe() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@career_os.get("/", include_in_schema=False)
+def redirect_root_to_docs() -> RedirectResponse:
+    return RedirectResponse(
+        url=f"/{API_V1}/docs",
+        status_code=status.HTTP_302_FOUND,
+    )
 
 
 @career_os.exception_handler(HTTPException)
