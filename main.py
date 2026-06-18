@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from openai import AsyncOpenAI
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.types import Event, Hint
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -31,6 +33,19 @@ from career_os_api.rate_limit.client import create_redis_client
 from career_os_api.responses import api_error_response, api_validation_error_response
 from career_os_api.router import v1_router
 
+
+def _before_send_sentry_event(event: Event, hint: Hint) -> Event | None:
+    exc_info = hint.get("exc_info")
+    if isinstance(exc_info, tuple) and len(exc_info) >= 2:
+        exc = exc_info[1]
+        if isinstance(exc, StarletteHTTPException) and (
+            400 <= exc.status_code < 500
+            or exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        ):
+            return None
+    return event
+
+
 if settings.sentry_dsn:
     sentry_sdk.init(
         dsn=settings.sentry_dsn,
@@ -44,6 +59,7 @@ if settings.sentry_dsn:
             ),
         ],
         send_default_pii=False,
+        before_send=_before_send_sentry_event,
     )
 
 _log_handler = logging.StreamHandler()

@@ -11,6 +11,8 @@ os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
 os.environ["GOOGLE_CLIENT_ID"] = "test-google-client-id"
 os.environ["GOOGLE_CLIENT_SECRET"] = "test-google-client-secret"
 os.environ["SECRET_KEY"] = "test-secret-key-for-jwt"
+# Disable Sentry in tests even when a local .env defines SENTRY_DSN.
+os.environ["SENTRY_DSN"] = ""
 # Disable Redis in tests; rate limiting fails open. client_with_redis fixture
 # overrides this by monkeypatching create_redis_client() directly.
 os.environ["REDIS_URL"] = ""
