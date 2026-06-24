@@ -4,6 +4,7 @@ import { Navigate, useSearchParams } from 'react-router';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 import {
   DATABASE_UNAVAILABLE_CODE,
   INTERNAL_SERVER_ERROR_CODE,
@@ -69,6 +70,7 @@ function getLoginErrorMessage(errorCode: string | null): string | null {
 }
 
 export function LoginPage() {
+  useDocumentTitle('로그인');
   const user = useAuthStore((state) => state.user);
   const error = useAuthStore((state) => state.error);
   const isLoading = useAuthStore((state) => state.isLoading);

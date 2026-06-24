@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 import { cn } from '@/lib/utils';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { fetchJobPostings } from '../services/job-postings';
@@ -261,6 +262,7 @@ function GroupFilterBar({
 }
 
 export function JobPostingsPage() {
+  useDocumentTitle('채용공고');
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Math.max(1, Number(searchParams.get('page') ?? '1'));
   const groupParam = searchParams.get('group');

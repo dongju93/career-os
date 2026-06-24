@@ -2,6 +2,7 @@ import { Loader2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Card, CardContent } from '@/components/ui/card';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 import { toUserFacingError } from '../services/api-error';
 import { fetchAuthMe } from '../services/auth';
 import { useAuthStore } from '../store/auth-store';
@@ -13,6 +14,7 @@ import {
 } from '../utils/auth-redirect';
 
 export function AuthCallbackPage() {
+  useDocumentTitle('로그인 처리 중');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { setAuth, setError, setLoading } = useAuthStore();

@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TagInput } from '@/components/ui/tag-input';
 import { Textarea } from '@/components/ui/textarea';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { fetchUserProfile, saveUserProfile } from '../services/user-profile';
 import type { UserProfile, UserProfileUpsert } from '../types/user-profile';
@@ -100,6 +101,7 @@ function ProfileLoadError({
 }
 
 export function ProfilePage() {
+  useDocumentTitle('프로필');
   const [form, setForm] = useState<ProfileFormState>(toProfileFormState(null));
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<UserFacingError | null>(null);

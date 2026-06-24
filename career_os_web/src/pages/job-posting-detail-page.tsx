@@ -37,6 +37,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 import {
   ApiError,
   toUserFacingError,
@@ -341,6 +342,9 @@ function JobPostingArtifactCard({ jobId }: { jobId: number }) {
 export function JobPostingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [detail, setDetail] = useState<JobPostingDetail | null>(null);
+  useDocumentTitle(
+    detail ? `${detail.company_name} ${detail.job_title}` : '채용공고 상세',
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<UserFacingError | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);

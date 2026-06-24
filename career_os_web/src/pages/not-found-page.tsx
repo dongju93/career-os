@@ -2,8 +2,10 @@ import { ArrowLeft, FileQuestion } from 'lucide-react';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 
 export function NotFoundPage() {
+  useDocumentTitle('페이지를 찾을 수 없습니다');
   return (
     <div className="flex min-h-[60vh] items-center justify-center animate-fade-in">
       <Card className="mx-auto w-full max-w-md text-center">

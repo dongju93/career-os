@@ -20,6 +20,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 import { ApiError, toUserFacingError } from '../services/api-error';
 import { extractJobPosting, saveJobPosting } from '../services/job-postings';
 import { fetchJobSearchGroups } from '../services/job-search-groups';
@@ -36,6 +37,7 @@ import {
 const IDLE: AddJobPostingPhase = { phase: 'idle' };
 
 export function AddJobPostingPage() {
+  useDocumentTitle('채용공고 등록');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const preselectedGroupId = searchParams.get('group') ?? undefined;

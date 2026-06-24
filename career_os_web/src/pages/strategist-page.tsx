@@ -25,6 +25,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 import {
   ApiError,
   toUserFacingError,
@@ -435,6 +436,7 @@ function ProposedActionList({
 }
 
 export function StrategistPage() {
+  useDocumentTitle('지원 전략');
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [bootstrapError, setBootstrapError] = useState<UserFacingError | null>(
     null,

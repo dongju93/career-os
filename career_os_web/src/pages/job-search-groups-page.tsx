@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useDocumentTitle } from '@/hooks/use-document-title';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import {
   createJobSearchGroup,
@@ -168,6 +169,7 @@ function GroupCard({
 }
 
 export function JobSearchGroupsPage() {
+  useDocumentTitle('구직 활동');
   const navigate = useNavigate();
 
   const [activeGroups, setActiveGroups] = useState<JobSearchGroupItem[]>([]);

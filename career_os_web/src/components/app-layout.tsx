@@ -183,6 +183,15 @@ export function AppLayout() {
 
   return (
     <div className="relative min-h-screen overflow-hidden">
+      {/* Skip link — first focusable element; jumps keyboard/AT users past the
+          sidebar nav straight to page content. Hidden until focused. */}
+      <a
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-slate-900 focus:shadow-lg"
+        href="#main-content"
+      >
+        본문으로 건너뛰기
+      </a>
+
       {/* Ambient background blobs — visible through glass */}
       <div
         aria-hidden="true"
@@ -251,7 +260,11 @@ export function AppLayout() {
       )}
 
       {/* Main content — pages float on the vibrant background */}
-      <main className="relative md:pl-64">
+      <main
+        className="relative md:pl-64 outline-none"
+        id="main-content"
+        tabIndex={-1}
+      >
         <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
           <Suspense
             fallback={
