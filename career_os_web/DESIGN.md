@@ -459,11 +459,11 @@ active:scale-[0.97]
     ...
   </header>
 
-  <!-- Mobile sidebar overlay (when open) -->
-  <div class="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm md:hidden" />
-  <aside class="fixed inset-y-0 left-0 z-50 w-64 rounded-r-3xl border-r border glass-strong md:hidden">
-    <SidebarContent />
-  </aside>
+  <!-- Mobile sidebar: native modal <dialog> driven by showModal()/close().
+       Top layer (no z-index); ::backdrop is the dim/blur scrim. -->
+  <dialog class="fixed inset-y-0 left-0 right-auto m-0 h-dvh w-64 max-w-[80vw] rounded-r-3xl border-r border p-0 glass-strong backdrop:bg-black/20 backdrop:backdrop-blur-sm md:hidden">
+    <SidebarContent onClose={...} />  <!-- mounted only while open -->
+  </dialog>
 
   <!-- Main content -->
   <main class="relative md:pl-64">
@@ -519,16 +519,22 @@ active:scale-[0.97]
 #### Mobile Header (< `md`)
 
 - `sticky top-0 z-40 h-14 flex items-center justify-between px-4 glass-strong border-b border md:hidden`
-- Left: hamburger `Button variant="ghost"` toggling `mobileOpen` (`Menu` / `X` icon)
+- Left: hamburger `Button variant="ghost"` that **opens** the drawer (`Menu` icon only). Carries `aria-haspopup="dialog"`, `aria-expanded`, and `aria-controls` pointing at the drawer. It does not close the drawer — while the modal is open the header is `inert`, so the close affordance lives inside the drawer.
 - Center: same logo mark + "Career OS" text
 - Right: `Avatar` (h-8 w-8)
 
 #### Mobile Sidebar
 
-When `mobileOpen` is true:
+A native modal `<dialog>` (`src/components/app-layout.tsx`), driven imperatively
+via `showModal()` / `close()` (with a `dialog.open` fallback for jsdom). The
+platform supplies the **focus trap**, **inert background**, **Esc-to-close**, and
+**focus restoration to the trigger** for free; the app adds backdrop-click
+dismissal (`event.target === dialog`) and body scroll lock.
 
-- Backdrop: `fixed inset-0 z-40 bg-black/20 backdrop-blur-sm`
-- Sidebar: same `SidebarContent`, full-height, `rounded-r-3xl`, `.glass-strong`
+- Panel: `fixed inset-y-0 left-0 right-auto m-0 h-dvh w-64 max-w-[80vw] rounded-r-3xl border-r border p-0 glass-strong`, same `SidebarContent`
+- Backdrop: the `::backdrop` pseudo-element — `backdrop:bg-black/20 backdrop:backdrop-blur-sm`
+- Close: an in-drawer `메뉴 닫기` icon button in the logo row (rendered only when `SidebarContent` receives `onClose`), since the background header toggle is `inert` while the modal is open
+- `SidebarContent` is mounted only while open, so it does not add a second nav tree to the accessibility flow
 
 ---
 

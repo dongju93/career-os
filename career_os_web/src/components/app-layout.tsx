@@ -9,7 +9,7 @@ import {
   UserCircle,
   X,
 } from 'lucide-react';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useId, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { cn } from '@/lib/utils';
 import { logoutUser } from '../services/auth';
@@ -79,6 +79,18 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           </span>
           <span className="block text-xs text-gray-600">채용 관리 시스템</span>
         </div>
+        {/* The drawer is a modal <dialog>, so the background header toggle is
+            inert while it is open — the close affordance must live inside. */}
+        {onClose && (
+          <button
+            aria-label="메뉴 닫기"
+            className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            type="button"
+            onClick={onClose}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       <nav className="flex flex-1 flex-col gap-1">
@@ -181,6 +193,37 @@ export function AppLayout() {
 
   const userInitial = UserInitials(user?.name ?? null, user?.email ?? null);
 
+  const drawerRef = useRef<HTMLDialogElement>(null);
+  const drawerId = useId();
+
+  // Drive the native <dialog> imperatively. showModal() gives us a focus trap,
+  // an inert background, Esc-to-close, and focus restoration to the trigger for
+  // free. jsdom (the test env) ships no showModal()/close(), so fall back to
+  // toggling the `open` property there.
+  useEffect(() => {
+    const drawer = drawerRef.current;
+    if (!drawer) return;
+    if (mobileOpen) {
+      if (drawer.open) return;
+      if (typeof drawer.showModal === 'function') drawer.showModal();
+      else drawer.open = true;
+    } else if (drawer.open) {
+      if (typeof drawer.close === 'function') drawer.close();
+      else drawer.open = false;
+    }
+  }, [mobileOpen]);
+
+  // The modal backdrop blocks pointer input but not scrolling of the page
+  // behind it, so pin body overflow while the drawer is open.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileOpen]);
+
   return (
     <div className="relative min-h-screen overflow-hidden">
       {/* Skip link — first focusable element; jumps keyboard/AT users past the
@@ -214,16 +257,15 @@ export function AppLayout() {
       {/* Mobile header — glass-strong */}
       <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border px-4 glass-strong md:hidden">
         <Button
+          aria-controls={drawerId}
+          aria-expanded={mobileOpen}
+          aria-haspopup="dialog"
           size="icon"
           variant="ghost"
-          onClick={() => setMobileOpen((o) => !o)}
+          onClick={() => setMobileOpen(true)}
         >
-          {mobileOpen ? (
-            <X className="h-5 w-5" />
-          ) : (
-            <Menu className="h-5 w-5" />
-          )}
-          <span className="sr-only">메뉴</span>
+          <Menu className="h-5 w-5" />
+          <span className="sr-only">메뉴 열기</span>
         </Button>
 
         <div className="flex items-center gap-2">
@@ -245,19 +287,28 @@ export function AppLayout() {
         </AvatarRoot>
       </header>
 
-      {/* Mobile sidebar overlay */}
-      {mobileOpen && (
-        <>
-          <div
-            aria-hidden="true"
-            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm md:hidden"
-            onClick={() => setMobileOpen(false)}
-          />
-          <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col rounded-r-3xl border-r border glass-strong md:hidden">
-            <SidebarContent onClose={() => setMobileOpen(false)} />
-          </aside>
-        </>
-      )}
+      {/* Mobile sidebar — native modal <dialog>. showModal() supplies the focus
+          trap, inert background, Esc-to-close, and trigger focus restoration;
+          we only add backdrop-click dismissal and body scroll lock. Rendered
+          in the top layer, so it needs no z-index. Content is mounted only
+          while open to avoid a second nav tree in the accessibility flow. */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop-click is a
+          mouse-only convenience; the keyboard dismiss path is the modal
+          dialog's native Esc handling from showModal(). */}
+      <dialog
+        ref={drawerRef}
+        aria-label="주요 메뉴"
+        className="fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-none w-64 max-w-[80vw] rounded-r-3xl border-r border p-0 glass-strong backdrop:bg-black/20 backdrop:backdrop-blur-sm md:hidden"
+        id={drawerId}
+        onClick={(event) => {
+          // A click whose target is the dialog element itself (not its
+          // content) landed on the ::backdrop — dismiss the drawer.
+          if (event.target === drawerRef.current) setMobileOpen(false);
+        }}
+        onClose={() => setMobileOpen(false)}
+      >
+        {mobileOpen && <SidebarContent onClose={() => setMobileOpen(false)} />}
+      </dialog>
 
       {/* Main content — pages float on the vibrant background */}
       <main

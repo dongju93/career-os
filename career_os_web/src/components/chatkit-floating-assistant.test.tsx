@@ -126,4 +126,29 @@ describe('ChatKitFloatingAssistant', () => {
 
     expect(chatkitMocks.showHistory).toHaveBeenCalledTimes(1);
   });
+
+  it('exposes dialog popup semantics on the launcher', () => {
+    signIn();
+    render(<ChatKitFloatingAssistant />);
+
+    const launcher = screen.getByRole('button', { name: LAUNCHER_LABEL });
+    expect(launcher).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(launcher).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('points the launcher at the live panel once it has been opened', async () => {
+    signIn();
+    render(<ChatKitFloatingAssistant />);
+    await openPanel();
+    // Close to bring the launcher back; the panel stays mounted (hidden).
+    await userEvent.click(screen.getByRole('button', { name: '닫기' }));
+
+    const launcher = screen.getByRole('button', { name: LAUNCHER_LABEL });
+    const controls = launcher.getAttribute('aria-controls');
+    expect(controls).toBeTruthy();
+    expect(document.getElementById(controls as string)).toHaveAttribute(
+      'role',
+      'dialog',
+    );
+  });
 });

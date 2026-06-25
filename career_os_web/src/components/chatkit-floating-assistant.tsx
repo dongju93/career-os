@@ -1,6 +1,6 @@
 import { ChatKit, useChatKit } from '@openai/chatkit-react';
 import { History, MessageCircle, MessageCirclePlus, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
   chatKitFetch,
@@ -41,6 +41,7 @@ export function ChatKitFloatingAssistant() {
   const launcherRef = useRef<HTMLButtonElement>(null);
   const firstActionRef = useRef<HTMLButtonElement>(null);
   const prevOpenRef = useRef(false);
+  const panelId = useId();
 
   const { control, focusComposer, setThreadId, showHistory, hideHistory } =
     useChatKit({
@@ -132,6 +133,9 @@ export function ChatKitFloatingAssistant() {
           ref={launcherRef}
           type="button"
           aria-label="AI 어시스턴트 열기"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-controls={hasOpened ? panelId : undefined}
           onClick={handleOpen}
           className={cn(
             'fixed right-4 bottom-4 z-60 flex h-13 w-13 items-center justify-center rounded-full bg-linear-to-br from-primary to-teal-400 text-primary-foreground shadow-lg shadow-primary/30 transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
@@ -142,8 +146,14 @@ export function ChatKitFloatingAssistant() {
         </button>
       )}
 
+      {/* Intentionally a NON-modal dialog: as a persistent corner assistant it
+          must leave the page interactive/scrollable while open, and its body is
+          a third-party embed we cannot honestly focus-trap. So: no `aria-modal`,
+          no background inert. Keyboard support is ESC-to-close + focus restore
+          (below); the launcher exposes aria-expanded/aria-controls. */}
       {hasOpened && (
         <div
+          id={panelId}
           role="dialog"
           aria-label="AI 어시스턴트"
           className={cn(
