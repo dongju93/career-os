@@ -44,6 +44,15 @@ class UpdateCurrentUserRequest(BaseModel):
         return v.strip()
 
 
+class LoginCodeExchangeRequest(BaseModel):
+    login_code: Annotated[str, Field(min_length=1, max_length=200)]
+
+
+class AccessTokenResponse(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+
+
 # ── Job Postings ──────────────────────────────────────────────────────────────
 
 

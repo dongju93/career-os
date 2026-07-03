@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from psycopg.errors import UniqueViolation
 
 from career_os_api.auth.dependencies import get_current_user
+from career_os_api.auth.jwt import create_access_token
 from career_os_api.auth.risc import (
     SUPPORTED_EVENT_TYPES,
     RiscVerificationError,
@@ -21,6 +22,10 @@ from career_os_api.auth.risc_handlers import apply_risc_event
 from career_os_api.chatkit.routes import router as chatkit_router
 from career_os_api.config import settings
 from career_os_api.constants import API_V1
+from career_os_api.database.auth_exchange import (
+    create_exchange_code,
+    redeem_exchange_code,
+)
 from career_os_api.database.job_postings import (
     TargetGroupNotFoundError,
     get_job_posting,
@@ -45,6 +50,7 @@ from career_os_api.database.users import update_user_name, upsert_user
 from career_os_api.rate_limit import quota, rate_limit
 from career_os_api.responses import ApiResponse
 from career_os_api.schemas import (
+    AccessTokenResponse,
     CurrentUserResponse,
     JobPostingCreateRequest,
     JobPostingExtracted,
@@ -57,6 +63,7 @@ from career_os_api.schemas import (
     JobSearchGroupItem,
     JobSearchGroupPage,
     JobSearchGroupUpdate,
+    LoginCodeExchangeRequest,
     UpdateCurrentUserRequest,
     UserProfile,
     UserProfileUpsertRequest,
@@ -113,6 +120,11 @@ def _resolve_callback_url(
     if origin in allowed_origins:
         return callback_url
     return None
+
+
+def _append_query_params(url: str, params: dict[str, str]) -> str:
+    separator = "&" if urlparse(url).query else "?"
+    return f"{url}{separator}{urlencode(params)}"
 
 
 # ── System ────────────────────────────────────────────────────────────────────
@@ -198,15 +210,22 @@ async def google_callback(request: Request) -> RedirectResponse:
             user = await upsert_user(conn, google_id, email, name, picture)
             if not await has_any_group(conn, user["id"]):
                 await create_initial_group(conn, user["id"])
-            return user
+            # Minted alongside the session so browsers that drop the
+            # cross-site session cookie (Safari ITP, Chrome third-party
+            # cookie blocking) can still complete login via /auth/token.
+            login_code = await create_exchange_code(conn, user["id"])
+            return user, login_code
 
-    user = await run_database_operation(request.app.state.pool, operation)
+    user, login_code = await run_database_operation(request.app.state.pool, operation)
 
     request.session.clear()
     request.session["user_id"] = str(user["id"])
     request.session["issued_at"] = int(datetime.now(UTC).timestamp())
 
-    return RedirectResponse(target, status_code=status.HTTP_302_FOUND)
+    return RedirectResponse(
+        _append_query_params(target, {"login_code": login_code}),
+        status_code=status.HTTP_302_FOUND,
+    )
 
 
 @v1_router.get("/auth/me", tags=["auth"], dependencies=[rate_limit(20, per="minute")])
@@ -221,6 +240,43 @@ async def read_current_user(
             email=current_user["email"],
             name=current_user["name"],
             picture=current_user["picture"],
+        ),
+    )
+
+
+@v1_router.post(
+    "/auth/token",
+    tags=["auth"],
+    # No rate_limit() dependency: this endpoint is intentionally
+    # unauthenticated (it is how a client becomes authenticated), and
+    # rate_limit() keys its bucket on current_user, which doesn't exist yet
+    # here. The code itself (32 random bytes, 60s TTL, single-use) is the
+    # security control against guessing.
+    responses={400: {"description": "코드가 유효하지 않거나 만료되었습니다"}},
+)
+async def exchange_login_code(
+    data: LoginCodeExchangeRequest,
+    request: Request,
+) -> ApiResponse[AccessTokenResponse]:
+    async def operation(conn):
+        return await redeem_exchange_code(conn, data.login_code)
+
+    user_id = await run_database_operation(
+        request.app.state.pool,
+        operation,
+        idempotent=False,
+        label="redeem_exchange_code",
+    )
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="코드가 유효하지 않거나 만료되었습니다.",
+        )
+    return ApiResponse(
+        status=status.HTTP_200_OK,
+        message="로그인 토큰을 발급했습니다.",
+        data=AccessTokenResponse(
+            access_token=create_access_token({"sub": str(user_id)})
         ),
     )
 

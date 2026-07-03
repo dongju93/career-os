@@ -126,6 +126,18 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 );
 """
 
+CREATE_AUTH_EXCHANGE_CODES_TABLE = """
+CREATE TABLE IF NOT EXISTS auth_exchange_codes (
+    code        TEXT         PRIMARY KEY,
+    user_id     UUID         NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    expires_at  TIMESTAMPTZ  NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_exchange_codes_expires_at
+    ON auth_exchange_codes (expires_at);
+"""
+
 CREATE_RISC_EVENTS_TABLE = """
 CREATE TABLE IF NOT EXISTS risc_events (
     id          BIGINT  GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -244,6 +256,10 @@ COMMENT ON COLUMN users.google_id IS 'Google sub claim (고유 사용자 식별�
 COMMENT ON COLUMN users.email     IS 'Google 계정 이메일';
 COMMENT ON COLUMN users.auth_session_revoked_at IS '이 시각 이전에 발급된 앱 세션/JWT를 거부하는 RISC 세션 폐기 경계';
 
+COMMENT ON TABLE  auth_exchange_codes            IS 'OAuth 콜백 직후 발급되는 1회용 단기 코드 (세션 쿠키가 차단된 브라우저를 위한 Bearer 토큰 교환용)';
+COMMENT ON COLUMN auth_exchange_codes.code       IS '무작위 생성된 1회용 교환 코드';
+COMMENT ON COLUMN auth_exchange_codes.expires_at IS '이 시각 이후 코드는 교환 불가 (기본 60초 TTL)';
+
 COMMENT ON TABLE  risc_events            IS 'Google RISC(Cross-Account Protection) Security Event Token 수신 이력';
 COMMENT ON COLUMN risc_events.jti        IS 'SET JWT의 jti 클레임 (중복 전송 방지용 고유 ID)';
 COMMENT ON COLUMN risc_events.event_type IS 'RISC 이벤트 타입 URI';
@@ -263,6 +279,7 @@ COMMENT ON COLUMN job_search_groups.memo     IS '구직 활동 관련 자유 메
 
 async def _apply_schema(conn: AsyncConnection) -> None:
     await conn.execute(CREATE_USERS_TABLE)
+    await conn.execute(CREATE_AUTH_EXCHANGE_CODES_TABLE)
     await conn.execute(CREATE_USER_PROFILES_TABLE)
     await conn.execute(CREATE_JOB_SEARCH_GROUPS_TABLE)
     await conn.execute(CREATE_JOB_POSTINGS_TABLE)

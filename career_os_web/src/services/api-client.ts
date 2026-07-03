@@ -9,6 +9,30 @@ const BASE_RETRY_DELAY_MS = 500;
 const SESSION_CLIENT_HEADER = 'X-Career-OS-Client';
 const SESSION_CLIENT_HEADER_VALUE = 'web';
 
+// In-memory only (never persisted) fallback for browsers that drop the
+// cross-site session cookie (Safari ITP, Chrome third-party cookie
+// blocking). Obtained via POST /v1/auth/token right after login; lost on a
+// full page reload, at which point the session cookie is retried instead.
+let accessToken: string | null = null;
+
+export function setAccessToken(token: string | null) {
+  accessToken = token;
+}
+
+function withAccessTokenHeader(headers: HeadersInit | undefined) {
+  if (!accessToken) return headers;
+
+  if (headers instanceof Headers || Array.isArray(headers)) {
+    const nextHeaders = new Headers(headers);
+    if (!nextHeaders.has('Authorization')) {
+      nextHeaders.set('Authorization', `Bearer ${accessToken}`);
+    }
+    return nextHeaders;
+  }
+
+  return { Authorization: `Bearer ${accessToken}`, ...headers };
+}
+
 function shouldRetry(error: unknown): boolean {
   return (
     error instanceof TypeError ||
@@ -50,7 +74,9 @@ export async function fetchWithApiRetry(
       const response = await fetch(input, {
         ...init,
         credentials: init?.credentials ?? 'include',
-        headers: withCareerOsSessionHeaders(init?.headers),
+        headers: withCareerOsSessionHeaders(
+          withAccessTokenHeader(init?.headers),
+        ),
       });
       if (response.ok) return response;
 

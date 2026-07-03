@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { Card, CardContent } from '@/components/ui/card';
 import { useDocumentTitle } from '@/hooks/use-document-title';
 import { toUserFacingError } from '../services/api-error';
-import { fetchAuthMe } from '../services/auth';
+import { exchangeLoginCode, fetchAuthMe } from '../services/auth';
 import { useAuthStore } from '../store/auth-store';
 import {
   buildLoginPath,
@@ -25,6 +25,7 @@ export function AuthCallbackPage() {
     didRun.current = true;
 
     const oauthError = searchParams.get('error');
+    const loginCode = searchParams.get('login_code');
     const rawNext = searchParams.get('next');
     const nextPath = readStoredRedirectPath(
       rawNext ? getSafeRedirectPath(rawNext) : '/job-postings',
@@ -42,7 +43,14 @@ export function AuthCallbackPage() {
       return;
     }
 
-    fetchAuthMe()
+    // Best-effort: obtains a Bearer token so login still completes when the
+    // session cookie was dropped in transit. If this fails, fetchAuthMe()
+    // still succeeds normally whenever the cookie did survive.
+    (loginCode
+      ? exchangeLoginCode(loginCode).catch(() => undefined)
+      : Promise.resolve()
+    )
+      .then(() => fetchAuthMe())
       .then((data) => {
         setAuth({
           id: data.user_id,
