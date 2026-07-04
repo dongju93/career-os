@@ -25,6 +25,7 @@ from career_os_api.database.ddl import init_schema
 from career_os_api.database.pool import create_postgres_pool
 from career_os_api.database.retry import DatabaseUnavailableError
 from career_os_api.middleware import (
+    PartitionedSessionCookieMiddleware,
     RequestIdFilter,
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
@@ -147,6 +148,7 @@ career_os.add_middleware(
     same_site="none",
     max_age=settings.jwt_expire_minutes * 60,
 )
+career_os.add_middleware(PartitionedSessionCookieMiddleware)
 career_os.add_middleware(RequestIdMiddleware)
 career_os.add_middleware(GZipMiddleware, minimum_size=1000)
 if settings.environment == "production" and settings.enable_security_headers:
