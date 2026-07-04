@@ -179,8 +179,14 @@ async def google_callback(request: Request) -> RedirectResponse:
     # Always redirect back to the frontend. Returning JSON here caused mobile
     # browsers to download the response as `callback.txt` when the session
     # cookie carrying `callback_url` was dropped during the cross-site OAuth
-    # round trip.
-    target = request.session.get("callback_url") or settings.frontend_url
+    # round trip. Falls back to /auth/callback (not bare frontend_url) since
+    # that's the only route that reads `login_code`/`error` query params —
+    # landing on `/` would send login_code straight to ProtectedRoute, which
+    # never looks at it.
+    target = (
+        request.session.get("callback_url")
+        or f"{settings.frontend_url.rstrip('/')}/auth/callback"
+    )
 
     try:
         token = await oauth.google.authorize_access_token(request)
