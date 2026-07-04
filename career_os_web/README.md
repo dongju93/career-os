@@ -247,6 +247,7 @@ components/     ← 레이아웃 + 재사용 UI 프리미티브
 ### 인증
 
 - 백엔드 세션 쿠키 기반. `fetchWithApiRetry`가 모든 요청에 `X-Career-OS-Client: web` 헤더를 자동으로 추가합니다.
+- Bearer 토큰 fallback: OAuth 콜백 리다이렉트의 `login_code`를 `exchangeLoginCode()`가 `/auth/token`으로 교환해 메모리(모듈 변수)에만 보관합니다. 세션 쿠키가 크로스 사이트 차단(Safari ITP, Chrome 서드파티 쿠키 차단 등)으로 유실되는 브라우저에서도 로그인을 완료시키기 위한 용도이며, 페이지를 새로고침하면 사라집니다 (의도적으로 영속화하지 않음 — `localStorage`에 저장하지 않습니다).
 - `useAuthStore`는 현재 사용자 정보를 `localStorage`에 영속합니다. 로그아웃 시 반드시 `resetAuthStore()`를 호출해 메모리 상태와 스토리지를 함께 초기화하세요 (`clearAuth()`는 메모리만 초기화합니다).
 
 ### API 응답 검증

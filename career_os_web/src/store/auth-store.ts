@@ -4,6 +4,7 @@ import {
   persist,
   type StateStorage,
 } from 'zustand/middleware';
+import { setAccessToken } from '../services/api-client';
 
 export interface AuthUser {
   id: string;
@@ -97,4 +98,8 @@ export const useAuthStore = create<AuthState>()(
 export function resetAuthStore() {
   useAuthStore.setState(createInitialState());
   useAuthStore.persist.clearStorage();
+  // Drop the in-memory Bearer fallback token too — otherwise a logged-out
+  // user's next request would silently re-authenticate via the still-valid
+  // token even though the session cookie was cleared.
+  setAccessToken(null);
 }

@@ -185,7 +185,8 @@ OAuth 로그인으로 저장되는 사용자 계정 정보와 Google Cross-Accou
 | `GET`    | `/`                             |      | 헬스체크                                                                                                                                        |
 | `GET`    | `/health/db`                    |      | DB 연결 확인                                                                                                                                    |
 | `GET`    | `/auth/google`                  |      | Google 로그인 시작 (`?callback_url=` 지원)                                                                                                      |
-| `GET`    | `/auth/google/callback`         |      | OAuth 콜백, 세션 발급                                                                                                                           |
+| `GET`    | `/auth/google/callback`         |      | OAuth 콜백, 세션 발급 + 1회용 `login_code` 리다이렉트                                                                                          |
+| `POST`   | `/auth/token`                   |      | `login_code`를 Bearer 토큰으로 교환 (세션 쿠키가 차단된 브라우저용 fallback)                                                                    |
 | `POST`   | `/auth/google/risc`             |      | Google RISC 보안 이벤트 수신                                                                                                                    |
 | `GET`    | `/auth/me`                      |  ✓   | 현재 사용자 조회                                                                                                                                |
 | `PATCH`  | `/auth/me`                      |  ✓   | 사용자 이름 수정                                                                                                                                |

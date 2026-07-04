@@ -93,6 +93,11 @@ export const authMeResponseSchema = z.object({
   picture: z.string().nullable(),
 });
 
+export const accessTokenResponseSchema = z.object({
+  access_token: z.string(),
+  token_type: z.string(),
+});
+
 function apiResponseSchema<T extends z.ZodType>(dataSchema: T) {
   return z.object({
     status: z.number(),
@@ -113,6 +118,10 @@ export const jobPostingPageApiResponseSchema =
   apiResponseSchema(jobPostingPageSchema);
 
 export const authMeApiResponseSchema = apiResponseSchema(authMeResponseSchema);
+
+export const accessTokenApiResponseSchema = apiResponseSchema(
+  accessTokenResponseSchema,
+);
 
 const jobSearchGroupItemSchema = z.object({
   id: z.string().uuid(),

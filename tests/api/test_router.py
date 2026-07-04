@@ -246,6 +246,88 @@ def test_google_callback_does_not_include_token_in_redirect_url(
     assert "access_token" not in response.headers["location"]
 
 
+def test_google_callback_redirect_includes_login_code(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user_id = uuid.uuid7()
+    mock_token = {
+        "userinfo": {
+            "sub": "google-sub-123",
+            "email": "user@example.com",
+            "name": "Test User",
+            "picture": None,
+        }
+    }
+    fake_user = {
+        "id": user_id,
+        "google_id": "google-sub-123",
+        "email": "user@example.com",
+        "name": "Test User",
+        "picture": None,
+        "is_active": True,
+        "auth_session_revoked_at": None,
+    }
+
+    monkeypatch.setattr(
+        app_module.oauth.google,
+        "authorize_access_token",
+        AsyncMock(return_value=mock_token),
+    )
+    monkeypatch.setattr(app_module, "upsert_user", AsyncMock(return_value=fake_user))
+    monkeypatch.setattr(app_module, "has_any_group", AsyncMock(return_value=True))
+    monkeypatch.setattr(
+        app_module, "create_exchange_code", AsyncMock(return_value="fake-login-code")
+    )
+
+    response = client.get(
+        f"{API_PREFIX}/auth/google/callback",
+        follow_redirects=False,
+    )
+
+    assert response.status_code in (302, 307)
+    location = response.headers["location"]
+    assert "login_code=fake-login-code" in location
+    # No callback_url in session (e.g. dropped cross-site cookie) must still
+    # land on /auth/callback — the only route that reads login_code — not
+    # bare frontend_url, which ProtectedRoute would swallow silently.
+    assert location.startswith(f"{app_module.settings.frontend_url}/auth/callback")
+
+
+def test_exchange_login_code_returns_access_token_for_valid_code(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user_id = uuid.uuid7()
+    monkeypatch.setattr(
+        app_module, "redeem_exchange_code", AsyncMock(return_value=user_id)
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/auth/token", json={"login_code": "a-valid-code"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data"]["token_type"] == "bearer"
+    assert body["data"]["access_token"]
+
+
+def test_exchange_login_code_returns_400_for_invalid_code(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        app_module, "redeem_exchange_code", AsyncMock(return_value=None)
+    )
+
+    response = client.post(
+        f"{API_PREFIX}/auth/token", json={"login_code": "not-a-real-code"}
+    )
+
+    assert response.status_code == 400
+
+
 def test_list_job_postings_endpoint_returns_paginated_results(
     client: TestClient,
     fake_pool: FakePool,
