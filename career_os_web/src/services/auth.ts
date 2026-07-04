@@ -16,7 +16,8 @@ export async function logoutUser(): Promise<void> {
 }
 
 // Fallback for browsers that drop the cross-site session cookie (Safari ITP,
-// Chrome third-party cookie blocking): stashes a Bearer token in memory.
+// Chrome third-party cookie blocking): obtains a Bearer token that setAccessToken
+// persists so it survives a full page reload (see api-client.ts).
 export async function exchangeLoginCode(loginCode: string): Promise<void> {
   const response = await fetchWithApiRetry(
     `${import.meta.env.VITE_API_BASE_URL}/v1/auth/token`,

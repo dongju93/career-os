@@ -1,5 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
-import { fetchWithApiRetry, withCareerOsSessionHeaders } from './api-client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  fetchWithApiRetry,
+  setAccessToken,
+  withCareerOsSessionHeaders,
+} from './api-client';
+
+const ACCESS_TOKEN_STORAGE_KEY = 'career-os-access-token';
 
 function okResponse(body: unknown = {}) {
   return {
@@ -240,5 +246,47 @@ describe('withCareerOsSessionHeaders', () => {
     expect(result).toBeInstanceOf(Headers);
     expect((result as Headers).get('X-Career-OS-Client')).toBe('web');
     expect((result as Headers).get('Content-Type')).toBe('application/json');
+  });
+});
+
+describe('access token persistence', () => {
+  afterEach(() => {
+    setAccessToken(null);
+    vi.resetModules();
+  });
+
+  it('persists the token to localStorage and attaches it as a Bearer header', async () => {
+    setAccessToken('login-token');
+    expect(window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)).toBe(
+      'login-token',
+    );
+
+    const fetchMock = vi.fn().mockResolvedValue(okResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    await fetchWithApiRetry('/test', undefined, 'failed');
+
+    expect(fetchMock.mock.calls[0][1].headers).toMatchObject({
+      Authorization: 'Bearer login-token',
+    });
+  });
+
+  it('clears the persisted token when set to null (logout)', () => {
+    setAccessToken('login-token');
+    setAccessToken(null);
+    expect(window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)).toBeNull();
+  });
+
+  it('rehydrates a persisted token on module load so it survives a reload', async () => {
+    window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, 'persisted-token');
+    vi.resetModules();
+    const { fetchWithApiRetry: reloadedFetch } = await import('./api-client');
+
+    const fetchMock = vi.fn().mockResolvedValue(okResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    await reloadedFetch('/test', undefined, 'failed');
+
+    expect(fetchMock.mock.calls[0][1].headers).toMatchObject({
+      Authorization: 'Bearer persisted-token',
+    });
   });
 });

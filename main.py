@@ -25,7 +25,6 @@ from career_os_api.database.ddl import init_schema
 from career_os_api.database.pool import create_postgres_pool
 from career_os_api.database.retry import DatabaseUnavailableError
 from career_os_api.middleware import (
-    PartitionedSessionCookieMiddleware,
     RequestIdFilter,
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
@@ -141,6 +140,17 @@ career_os.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# The session cookie's only load-bearing job is the OAuth `state` round-trip
+# across the top-level `/auth/google` → Google → `/auth/google/callback`
+# navigations. It must NOT carry the CHIPS `Partitioned` attribute: a
+# partitioned cookie is keyed by the top-level site at set-time, but the
+# callback request is issued while the top-level site is accounts.google.com,
+# so Chrome omits the cookie and authlib raises MismatchingStateError (login
+# fails, especially on mobile). Partitioning also can't help authenticated
+# cross-site XHR here — the SPA and API are different registrable domains, so
+# the login cookie lands in one partition while every SPA fetch reads another.
+# Cross-site auth is instead carried by the Bearer token minted via
+# login_code → POST /auth/token. Keep `SameSite=None; Secure` (unpartitioned).
 career_os.add_middleware(
     SessionMiddleware,
     secret_key=settings.secret_key,
@@ -148,7 +158,6 @@ career_os.add_middleware(
     same_site="none",
     max_age=settings.jwt_expire_minutes * 60,
 )
-career_os.add_middleware(PartitionedSessionCookieMiddleware)
 career_os.add_middleware(RequestIdMiddleware)
 career_os.add_middleware(GZipMiddleware, minimum_size=1000)
 if settings.environment == "production" and settings.enable_security_headers:

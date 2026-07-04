@@ -98,8 +98,10 @@ export const useAuthStore = create<AuthState>()(
 export function resetAuthStore() {
   useAuthStore.setState(createInitialState());
   useAuthStore.persist.clearStorage();
-  // Drop the in-memory Bearer fallback token too — otherwise a logged-out
-  // user's next request would silently re-authenticate via the still-valid
-  // token even though the session cookie was cleared.
+  // Drop the Bearer fallback token too — this clears both the in-memory copy
+  // and its persisted localStorage entry (see api-client.ts). Otherwise a
+  // logged-out user's next request (or a later reload) would silently
+  // re-authenticate via the still-valid token even though the session was
+  // cleared.
   setAccessToken(null);
 }
