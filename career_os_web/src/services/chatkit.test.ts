@@ -1,6 +1,15 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setAccessToken } from './api-client';
 import { chatKitFetch, getChatKitApiUrl, getChatKitDomainKey } from './chatkit';
+
+const CHATKIT_SCRIPT_SRC =
+  'https://cdn.platform.openai.com/deployments/chatkit/chatkit.js';
+
+function chatKitScripts() {
+  return document.querySelectorAll<HTMLScriptElement>(
+    `script[src="${CHATKIT_SCRIPT_SRC}"]`,
+  );
+}
 
 function okResponse() {
   return { ok: true, status: 200 } as unknown as Response;
@@ -72,5 +81,60 @@ describe('chatkit service', () => {
     expect(new Headers(init.headers).get('Authorization')).toBe(
       'Bearer login-token',
     );
+  });
+});
+
+describe('loadChatKitScript', () => {
+  beforeEach(() => {
+    // Reset the module registry so the loader's cached promise starts empty in
+    // every test, and clear any script a previous test injected (Testing
+    // Library cleanup does not remove manually-appended <script> tags).
+    vi.resetModules();
+    for (const script of chatKitScripts()) {
+      script.remove();
+    }
+  });
+
+  it('injects the ChatKit CDN script exactly once across repeated calls', async () => {
+    const { loadChatKitScript } = await import('./chatkit');
+
+    loadChatKitScript();
+    loadChatKitScript();
+
+    const scripts = chatKitScripts();
+    expect(scripts.length).toBe(1);
+    expect(scripts[0].async).toBe(true);
+  });
+
+  it('resolves once the injected script fires its load event', async () => {
+    const { loadChatKitScript } = await import('./chatkit');
+
+    const promise = loadChatKitScript();
+    chatKitScripts()[0].dispatchEvent(new Event('load'));
+
+    await expect(promise).resolves.toBeUndefined();
+  });
+
+  it('rejects and allows a retry when the script fails to load', async () => {
+    const { loadChatKitScript } = await import('./chatkit');
+
+    const first = loadChatKitScript();
+    chatKitScripts()[0].dispatchEvent(new Event('error'));
+    await expect(first).rejects.toThrow(/ChatKit/);
+
+    // The failed load cleared the cache, so a retry injects a fresh script.
+    loadChatKitScript();
+    expect(chatKitScripts().length).toBe(1);
+  });
+
+  it('reuses an existing script tag instead of injecting a duplicate', async () => {
+    const existing = document.createElement('script');
+    existing.src = CHATKIT_SCRIPT_SRC;
+    document.head.appendChild(existing);
+
+    const { loadChatKitScript } = await import('./chatkit');
+
+    await expect(loadChatKitScript()).resolves.toBeUndefined();
+    expect(chatKitScripts().length).toBe(1);
   });
 });

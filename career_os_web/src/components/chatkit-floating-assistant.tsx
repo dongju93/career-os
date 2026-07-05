@@ -6,6 +6,7 @@ import {
   chatKitFetch,
   getChatKitApiUrl,
   getChatKitDomainKey,
+  loadChatKitScript,
 } from '../services/chatkit';
 import { useAuthStore } from '../store/auth-store';
 
@@ -111,6 +112,14 @@ export function ChatKitFloatingAssistant() {
   if (!user) return null;
 
   function handleOpen() {
+    // Pull in the ChatKit CDN script on demand. Kept unconditional (not gated
+    // on `hasOpened`): it is a no-op after a successful load and lets a failed
+    // load retry on reopen. `<ChatKit>` waits for the custom element, so it is
+    // safe whether this resolves before or after the embed mounts below.
+    void loadChatKitScript().catch(() => {
+      // A CDN failure leaves ChatKit waiting for its custom element rather than
+      // crashing the app; the failed request is still visible to Sentry.
+    });
     setHasOpened(true);
     setOpen(true);
   }

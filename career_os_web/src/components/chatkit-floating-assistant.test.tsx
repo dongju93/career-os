@@ -78,6 +78,18 @@ describe('ChatKitFloatingAssistant', () => {
     expect(screen.queryByRole('button', { name: LAUNCHER_LABEL })).toBeNull();
   });
 
+  it('injects the ChatKit CDN script when the panel is first opened', async () => {
+    signIn();
+    render(<ChatKitFloatingAssistant />);
+    await openPanel();
+
+    expect(
+      document.querySelector(
+        'script[src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js"]',
+      ),
+    ).not.toBeNull();
+  });
+
   it('closes the panel via the close button', async () => {
     signIn();
     render(<ChatKitFloatingAssistant />);

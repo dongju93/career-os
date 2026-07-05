@@ -5,10 +5,13 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Career OS Web</title>
-    <script
-      src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js"
-      async
-    ></script>
+    <!--
+      The ChatKit web-component script is intentionally NOT loaded here. It is
+      injected on demand the first time a signed-in user opens the AI assistant
+      (see `loadChatKitScript` in `src/services/chatkit.ts`), so the login page
+      and authenticated pages where the assistant is never opened do not pay for
+      a third-party CDN script they don't use.
+    -->
   </head>
   <body>
     <div id="root"></div>
