@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { setAccessToken } from './api-client';
 import { chatKitFetch, getChatKitApiUrl, getChatKitDomainKey } from './chatkit';
 
 function okResponse() {
@@ -6,6 +7,10 @@ function okResponse() {
 }
 
 describe('chatkit service', () => {
+  afterEach(() => {
+    setAccessToken(null);
+  });
+
   it('builds the ChatKit API URL from the configured base URL', () => {
     expect(getChatKitApiUrl()).toBe(
       'https://career-os.fastapicloud.dev/v1/chatkit',
@@ -54,5 +59,18 @@ describe('chatkit service', () => {
     await chatKitFetch('/v1/chatkit', { credentials: 'same-origin' });
 
     expect(fetchMock.mock.calls[0][1].credentials).toBe('same-origin');
+  });
+
+  it('attaches the Bearer token as a fallback for cookie-blocking browsers', async () => {
+    setAccessToken('login-token');
+    const fetchMock = vi.fn().mockResolvedValue(okResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await chatKitFetch('/v1/chatkit', { method: 'POST' });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(new Headers(init.headers).get('Authorization')).toBe(
+      'Bearer login-token',
+    );
   });
 });

@@ -52,7 +52,7 @@ export function setAccessToken(token: string | null) {
   persistAccessToken(token);
 }
 
-function withAccessTokenHeader(headers: HeadersInit | undefined) {
+export function withAccessTokenHeader(headers: HeadersInit | undefined) {
   if (!accessToken) return headers;
 
   if (headers instanceof Headers || Array.isArray(headers)) {
