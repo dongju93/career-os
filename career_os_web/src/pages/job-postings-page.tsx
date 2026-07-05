@@ -462,7 +462,7 @@ export function JobPostingsPage() {
       )}
 
       {!isLoading && !error && items.length > 0 && (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="job-postings-grid grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
             <JobPostingCard key={item.id} item={item} />
           ))}

@@ -419,6 +419,21 @@ Buttons use:
 active:scale-[0.97]
 ```
 
+### Reduced Motion
+
+All motion respects `prefers-reduced-motion: reduce`, softened case-by-case in `src/index.css` (never a blanket `* { animation-duration: 0.01ms }`, which can make looping animations *more* jarring):
+
+- `.animate-fade-in` / `.animate-slide-in` → fall back to `fade-in-soft` (opacity only, no translate).
+- `.glass-hover:hover` → keeps its colour/shadow feedback but drops the `-2px` lift.
+- `.animate-indeterminate` → stops sweeping and fills the track full-width (still reads as "in progress").
+- `.animate-pulse` and `.animate-spin` (skeletons, loaders, spinners) → become static; loading state is still conveyed by adjacent copy and the app's `aria-live` announcements.
+
+The button `active:scale-[0.97]` tap feedback is left intact — it is transient and neither looping nor a large positional shift.
+
+### Render Cost — deferred card rendering
+
+The job postings grid (`.job-postings-grid`, up to 50 cards) applies `content-visibility: auto` + `contain-intrinsic-block-size: auto 220px` to cards past the first six (`:nth-child(n + 7)`). Below-the-fold cards skip layout/paint until they near the viewport; the reserved intrinsic size prevents scrollbar jump, and the first two desktop rows are excluded so first paint isn't delayed. Degrades gracefully where unsupported.
+
 ---
 
 ## 10. Layout Architecture

@@ -311,3 +311,71 @@ a {
 .animate-indeterminate {
   animation: indeterminate-progress 1.7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
+
+/*
+  Opacity-only entry — the reduced-motion counterpart to `fade-in` /
+  `slide-in-right`. Keeps a gentle fade so content doesn't pop in abruptly,
+  but drops the translate so motion-sensitive users get no positional shift.
+*/
+@keyframes fade-in-soft {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ───────────────────────────────────────────
+   Reduced motion
+   Respect `prefers-reduced-motion: reduce`. Softened case-by-case rather
+   than with a blanket `* { animation-duration: 0.01ms }` — a global kill
+   can make looping animations *more* jarring, not less.
+   - Entry animations keep an opacity fade but drop the translate.
+   - The hover lift keeps its colour/shadow feedback but stops moving.
+   - Looping animations (indeterminate bar, pulse, spin) become static;
+     loading state is still conveyed by adjacent text and the app's
+     aria-live announcements.
+   ─────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-in {
+    animation: fade-in-soft 0.2s ease-out both;
+  }
+
+  /* Drop the -2px lift; the background/shadow feedback still transitions. */
+  .glass-hover:hover {
+    transform: none;
+  }
+
+  /* Decorative / looping motion → static. */
+  .animate-pulse,
+  .animate-spin {
+    animation: none;
+  }
+
+  /* Indeterminate bar: stop the sweep and fill the track so it still
+     reads as "in progress" (width beats Tailwind's layered `w-2/5`). */
+  .animate-indeterminate {
+    animation: none;
+    transform: none;
+    width: 100%;
+  }
+}
+
+/* ───────────────────────────────────────────
+   Render cost: defer off-screen job posting cards
+   The postings grid renders up to 50 variable-height cards. Cards past the
+   first two desktop rows are below the fold, so the browser is allowed to
+   skip their layout/paint until they approach the viewport.
+   `contain-intrinsic-block-size: auto <estimate>` reserves height so the
+   scrollbar doesn't jump; `auto` lets the browser remember each card's real
+   height after its first render.
+   The first six cards (:nth-child ≤ 6) are intentionally excluded — applying
+   content-visibility above the fold would delay first paint.
+   Degrades gracefully: ignored by browsers without support.
+   ─────────────────────────────────────────── */
+.job-postings-grid > :nth-child(n + 7) {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 220px;
+}
