@@ -23,11 +23,25 @@ interface AlertProps
   extends HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof alertVariants> {}
 
-export function Alert({ className, variant, ...props }: AlertProps) {
+// Error-class variants interrupt (assertive); informational variants wait for a
+// pause (polite). Callers can still override role / aria-live explicitly.
+function isAssertiveVariant(variant: AlertProps['variant']): boolean {
+  return variant === 'destructive' || variant === 'warning';
+}
+
+export function Alert({
+  className,
+  variant,
+  role,
+  'aria-live': ariaLive,
+  ...props
+}: AlertProps) {
+  const assertive = isAssertiveVariant(variant);
   return (
     <div
+      aria-live={ariaLive ?? (assertive ? 'assertive' : 'polite')}
       className={cn(alertVariants({ variant }), className)}
-      role="alert"
+      role={role ?? (assertive ? 'alert' : 'status')}
       {...props}
     />
   );

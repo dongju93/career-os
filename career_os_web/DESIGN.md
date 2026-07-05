@@ -691,7 +691,7 @@ placeholder:text-muted-foreground focus-visible:outline-none
 disabled:cursor-not-allowed disabled:opacity-50 transition-all
 ```
 
-**Error state** (via `error` prop): `border-red-400/60 focus-visible:ring-red-400/20`
+**Error state** (via `error` prop): `border-red-400/60 focus-visible:ring-red-400/20`. The `error` prop also sets `aria-invalid` on the control, so the visual and semantic invalid states stay in sync without per-call-site wiring. Link the error message with `aria-describedby` (see the form-error pattern in §16).
 
 ### `Textarea` (`textarea.tsx`)
 
@@ -720,6 +720,8 @@ text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:
 
 `AlertTitle`: `<h5>` — `mb-1 font-semibold leading-none tracking-tight`  
 `AlertDescription`: `<p>` — `text-sm [&_p]:leading-relaxed`
+
+**Politeness by variant:** `destructive` / `warning` render as `role="alert"` + `aria-live="assertive"` (interrupt); `default` / `success` render as `role="status"` + `aria-live="polite"` (wait for a pause). Both are overridable via explicit `role` / `aria-live` props.
 
 ### `Avatar` (`avatar.tsx`)
 
@@ -760,7 +762,17 @@ A controlled multi-tag input. Tags are displayed inline as `<Badge variant="glas
 - `Backspace` on empty input removes the last tag
 - Blur with pending content adds the tag
 
-**Props:** `value: string[]`, `onChange: (tags: string[]) => void`, `placeholder?: string`, `className?: string`, `id?: string`
+**Props:** `value: string[]`, `onChange: (tags: string[]) => void`, `placeholder?: string`, `className?: string`, `id?: string`, `error?: boolean`, `aria-invalid?`, `aria-describedby?`
+
+**Error state** (via `error` prop): `border-red-400/60 focus-within:ring-red-400/20` on the wrapper; `aria-invalid` / `aria-describedby` are forwarded to the inner `<input>` so a wrapping `FormField` can link its error message.
+
+### `LiveRegion` (`live-region.tsx`)
+
+A visually-hidden (`sr-only`) ARIA live region for transient status that has **no visible Alert of its own** — e.g. "저장 중…" / "불러오는 중…" busy states conveyed only by a spinner. Mount it persistently and toggle its `children`; screen readers announce on content change, not on mount, so render it empty (not unmounted) when idle.
+
+`politeness="polite"` (default) → `role="status"` + `aria-live="polite"`; `politeness="assertive"` → `role="alert"` + `aria-live="assertive"`. Always `aria-atomic="true"`.
+
+**Props:** `children?: ReactNode`, `politeness?: 'polite' | 'assertive'`, `className?: string`
 
 ---
 
@@ -988,6 +1000,15 @@ Tailwind defaults only. No custom breakpoints.
 **Disabled state:** `disabled:pointer-events-none disabled:opacity-50` on all interactive components.
 
 **Screen reader support:** Use `sr-only` for icon-only buttons (logout, hamburger). Radix UI primitives provide ARIA roles automatically.
+
+**Form error delivery:** Field-level validation errors are conveyed to screen readers with input-field context, not as free-floating text:
+
+- The invalid control sets `aria-invalid` (automatic from the `error` prop on `Input` / `Textarea` / `TagInput`).
+- The error message `<p>` gets a stable `id` (`${fieldId}-error`) and is linked to the control via `aria-describedby`. In the add-posting form, `FormField` (`job-posting-form-fields.tsx`) injects this link into its control child with `cloneElement`; other forms wire it explicitly (e.g. the 경력 연차 field in `profile-page.tsx`).
+- On submit failure, focus moves to the first invalid field (`requestAnimationFrame` → `getElementById(...).focus()`) so the label, invalid state, and description are announced.
+- Forms that own their validation in JS set `noValidate` on the `<form>` (see `profile-page.tsx`): native constraint bubbles otherwise suppress the `submit` event and are poorly announced.
+
+**Live status announcements:** Use variant-appropriate politeness (see the `Alert` and `LiveRegion` specs in §12). Result banners use `Alert` (success → polite, error → assertive); transient busy states with no visible banner ("저장 중…", "불러오는 중…") use a persistently-mounted `LiveRegion`.
 
 ---
 

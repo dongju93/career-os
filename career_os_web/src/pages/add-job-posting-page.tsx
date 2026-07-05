@@ -20,6 +20,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { LiveRegion } from '@/components/ui/live-region';
 import { useDocumentTitle } from '@/hooks/use-document-title';
 import { ApiError, toUserFacingError } from '../services/api-error';
 import { extractJobPosting, saveJobPosting } from '../services/job-postings';
@@ -28,6 +29,7 @@ import type { JobSearchGroupItem } from '../types/job-search-group';
 import { JobPostingFormFields } from './job-posting-form-fields';
 import {
   type AddJobPostingPhase,
+  type JobPostingFormErrors,
   type JobPostingFormState,
   toExtracted,
   toFormState,
@@ -35,6 +37,23 @@ import {
 } from './job-posting-form-state';
 
 const IDLE: AddJobPostingPhase = { phase: 'idle' };
+
+// Focus order for the first-error jump; ids match the field ids in
+// JobPostingFormFields so getElementById resolves the real control.
+const ERROR_FIELD_ORDER: (keyof JobPostingFormErrors)[] = [
+  'company_name',
+  'job_title',
+];
+
+function focusFirstError(errors: JobPostingFormErrors) {
+  const firstErrorField = ERROR_FIELD_ORDER.find((field) => errors[field]);
+  if (!firstErrorField) return;
+  // Defer to the next frame so the invalid state (and its aria-describedby)
+  // is committed before the screen reader reads the focused control.
+  requestAnimationFrame(() => {
+    document.getElementById(firstErrorField)?.focus();
+  });
+}
 
 export function AddJobPostingPage() {
   useDocumentTitle('채용공고 등록');
@@ -126,6 +145,7 @@ export function AddJobPostingPage() {
     const errors = validateForm(form);
     if (Object.keys(errors).length > 0) {
       setPagePhase({ ...pagePhase, errors });
+      focusFirstError(errors);
       return;
     }
 
@@ -173,6 +193,7 @@ export function AddJobPostingPage() {
   if (pagePhase.phase === 'saved') {
     return (
       <div className="mx-auto max-w-4xl animate-fade-in space-y-6">
+        <LiveRegion politeness="polite">채용공고를 저장했습니다.</LiveRegion>
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             채용공고 등록
@@ -214,6 +235,13 @@ export function AddJobPostingPage() {
 
   return (
     <div className="mx-auto max-w-4xl animate-fade-in space-y-6">
+      <LiveRegion politeness="polite">
+        {isExtracting
+          ? '채용공고를 불러오는 중입니다…'
+          : isSaving
+            ? '채용공고를 저장하는 중입니다…'
+            : ''}
+      </LiveRegion>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="mb-2 text-xs font-semibold tracking-[0.15em] text-primary uppercase">

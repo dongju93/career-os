@@ -1,5 +1,5 @@
 import { AlertCircle, ChevronRight, ExternalLink } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { cloneElement, isValidElement, type ReactNode } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -48,14 +48,26 @@ function FormField({
   children: ReactNode;
   id?: string;
 }) {
+  // Only link a description when there is both a field id and an error to point
+  // at; otherwise the control keeps its default (undescribed) accessible name.
+  const errorId = id && error ? `${id}-error` : undefined;
+  const control =
+    errorId && isValidElement<{ 'aria-describedby'?: string }>(children)
+      ? cloneElement(children, { 'aria-describedby': errorId })
+      : children;
+
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>
         {label}
         {required && <span className="text-red-400 ml-0.5">*</span>}
       </Label>
-      {children}
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {control}
+      {error && (
+        <p className="text-xs text-red-400" id={errorId}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }

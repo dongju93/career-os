@@ -196,4 +196,45 @@ describe('ProfilePage', () => {
       await screen.findByText('입력 값이 올바르지 않습니다.'),
     ).toBeInTheDocument();
   });
+
+  it('marks the 경력 연차 field invalid with a linked description and focuses it on bad input', async () => {
+    const user = userEvent.setup();
+    let putAttempted = false;
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string, init?: RequestInit) => {
+        if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+          return jsonResponse(authMeBody);
+        }
+        if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/profile`) {
+          if (init?.method === 'PUT') {
+            putAttempted = true;
+            return jsonResponse(apiResponse(existingProfile));
+          }
+          return jsonResponse(apiResponse(existingProfile));
+        }
+        throw new Error(`Unexpected fetch: ${input}`);
+      }),
+    );
+
+    renderRoute('/profile');
+
+    const years = await screen.findByLabelText<HTMLInputElement>('경력 연차');
+    await user.clear(years);
+    await user.type(years, '999');
+    await user.click(screen.getByRole('button', { name: '프로필 저장' }));
+
+    expect(years).toBeInvalid();
+    expect(years).toHaveAccessibleDescription(
+      '경력 연차는 0~60 사이의 정수로 입력해주세요.',
+    );
+    await waitFor(() => expect(years).toHaveFocus());
+    expect(putAttempted).toBe(false);
+
+    // Editing the field clears the error so a valid retry is unobstructed.
+    await user.clear(years);
+    await user.type(years, '7');
+    expect(years).toBeValid();
+  });
 });

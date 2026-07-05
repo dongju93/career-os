@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LiveRegion } from '@/components/ui/live-region';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TagInput } from '@/components/ui/tag-input';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,6 +30,9 @@ const SKILLS_MAX = 50;
 const LOCATIONS_MAX = 20;
 const YEARS_MIN = 0;
 const YEARS_MAX = 60;
+const YEARS_ERROR_MESSAGE = `경력 연차는 ${YEARS_MIN}~${YEARS_MAX} 사이의 정수로 입력해주세요.`;
+const YEARS_FIELD_ID = 'profile-years';
+const YEARS_ERROR_ID = 'profile-years-error';
 
 interface ProfileFormState {
   headline: string;
@@ -110,6 +114,9 @@ export function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<UserFacingError | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  // Field-level (not page-level) so the invalid control is what the screen
+  // reader describes; server failures still use the page-level saveError Alert.
+  const [yearsError, setYearsError] = useState<string | null>(null);
 
   const loadProfile = useCallback((signal?: AbortSignal) => {
     setIsLoading(true);
@@ -146,14 +153,15 @@ export function ProfilePage() {
         Number(years) > YEARS_MAX)
     ) {
       setSaveSuccess(false);
-      setSaveError({
-        code: 'VALIDATION',
-        message: `경력 연차는 ${YEARS_MIN}~${YEARS_MAX} 사이의 정수로 입력해주세요.`,
+      setYearsError(YEARS_ERROR_MESSAGE);
+      requestAnimationFrame(() => {
+        document.getElementById(YEARS_FIELD_ID)?.focus();
       });
       return;
     }
 
     setIsSaving(true);
+    setYearsError(null);
     setSaveError(null);
     setSaveSuccess(false);
 
@@ -195,6 +203,9 @@ export function ProfilePage() {
 
   return (
     <div className="animate-fade-in space-y-6">
+      <LiveRegion politeness="polite">
+        {isSaving ? '프로필을 저장하는 중입니다…' : ''}
+      </LiveRegion>
       <div>
         <p className="mb-2 text-xs font-semibold tracking-[0.15em] text-primary uppercase">
           Career Profile
@@ -212,7 +223,13 @@ export function ProfilePage() {
 
       <Card>
         <CardContent className="p-6">
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          {/*
+            noValidate hands validation to handleSubmit: native constraint
+            bubbles would otherwise suppress the submit event (blocking our JS
+            checks) and are poorly announced by screen readers. We keep the
+            min/max/step attributes on the number input for spinner UX.
+          */}
+          <form className="space-y-6" noValidate onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label htmlFor="profile-headline">한 줄 소개</Label>
               <Input
@@ -227,10 +244,12 @@ export function ProfilePage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="profile-years">경력 연차</Label>
+              <Label htmlFor={YEARS_FIELD_ID}>경력 연차</Label>
               <Input
-                id="profile-years"
+                id={YEARS_FIELD_ID}
+                aria-describedby={yearsError ? YEARS_ERROR_ID : undefined}
                 className="sm:max-w-40"
+                error={!!yearsError}
                 inputMode="numeric"
                 max={YEARS_MAX}
                 min={YEARS_MIN}
@@ -238,13 +257,19 @@ export function ProfilePage() {
                 step={1}
                 type="number"
                 value={form.yearsExperience}
-                onChange={(e) =>
+                onChange={(e) => {
+                  if (yearsError) setYearsError(null);
                   setForm((prev) => ({
                     ...prev,
                     yearsExperience: e.target.value,
-                  }))
-                }
+                  }));
+                }}
               />
+              {yearsError && (
+                <p className="text-xs text-red-400" id={YEARS_ERROR_ID}>
+                  {yearsError}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

@@ -279,4 +279,54 @@ describe('AddJobPostingPage', () => {
       fetchMock.mock.calls.some(([, init]) => init?.method === 'POST'),
     ).toBe(false);
   });
+
+  it('blocks save on an empty required field, marking it invalid with a linked description and focus', async () => {
+    const user = userEvent.setup();
+
+    const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
+      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+      if (
+        (input as string).startsWith(
+          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups`,
+        )
+      ) {
+        return jsonResponse(emptyGroupsResponse);
+      }
+      if (input.includes('/v1/job-postings/extraction?url=')) {
+        return jsonResponse(apiResponse(buildExtractedPosting()));
+      }
+      throw new Error(`Unexpected fetch request: ${input}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderRoute('/job-postings/new');
+
+    await user.type(
+      await screen.findByPlaceholderText('https://www.saramin.co.kr/...'),
+      postingUrl,
+    );
+    await user.click(screen.getByRole('button', { name: /불러오기/ }));
+
+    const companyName =
+      await screen.findByLabelText<HTMLInputElement>(/^회사명/);
+    await user.clear(companyName);
+    await user.click(screen.getByRole('button', { name: /^저장$/ }));
+
+    expect(companyName).toBeInvalid();
+    expect(companyName).toHaveAccessibleDescription('회사명을 입력해주세요.');
+    await waitFor(() => expect(companyName).toHaveFocus());
+    expect(
+      fetchMock.mock.calls.some(([, init]) => init?.method === 'POST'),
+    ).toBe(false);
+  });
 });
