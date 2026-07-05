@@ -1,4 +1,4 @@
-import { withCareerOsSessionHeaders } from './api-client';
+import { withAccessTokenHeader, withCareerOsSessionHeaders } from './api-client';
 
 /**
  * Absolute URL of the backend ChatKit endpoint. ChatKit posts its streaming
@@ -20,9 +20,10 @@ export function getChatKitDomainKey(): string {
 
 /**
  * Fetch wrapper passed to ChatKit's `api.fetch`. It reuses the app's session
- * auth (cookie + `X-Career-OS-Client: web`) but deliberately does NOT go
- * through `fetchWithApiRetry`: ChatKit responses are streamed, must not be
- * retried, and are not the `ApiResponse` envelope that Zod schemas validate.
+ * auth (cookie + `X-Career-OS-Client: web`, with the Bearer token fallback for
+ * browsers that block the cross-site session cookie) but deliberately does
+ * NOT go through `fetchWithApiRetry`: ChatKit responses are streamed, must not
+ * be retried, and are not the `ApiResponse` envelope that Zod schemas validate.
  */
 export async function chatKitFetch(
   input: RequestInfo | URL,
@@ -31,6 +32,6 @@ export async function chatKitFetch(
   return fetch(input, {
     ...init,
     credentials: init?.credentials ?? 'include',
-    headers: withCareerOsSessionHeaders(init?.headers),
+    headers: withCareerOsSessionHeaders(withAccessTokenHeader(init?.headers)),
   });
 }
