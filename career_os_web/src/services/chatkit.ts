@@ -1,4 +1,7 @@
-import { withAccessTokenHeader, withCareerOsSessionHeaders } from './api-client';
+import {
+  withAccessTokenHeader,
+  withCareerOsSessionHeaders,
+} from './api-client';
 
 /**
  * Absolute URL of the backend ChatKit endpoint. ChatKit posts its streaming
