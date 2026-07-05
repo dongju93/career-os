@@ -3,26 +3,11 @@ import type {
   JobSearchGroupPage,
 } from '../types/job-search-group';
 import { fetchWithApiRetry } from './api-client';
-import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
+import { parseApiResponse } from './parse-response';
 import {
   jobSearchGroupApiResponseSchema,
   jobSearchGroupPageApiResponseSchema,
 } from './schemas';
-
-const CONTRACT_ERROR_MESSAGE = '서버 응답 형식이 올바르지 않습니다.';
-
-function assertContractMatch<T>(
-  result: { success: true; data: T } | { success: false },
-): T {
-  if (!result.success) {
-    throw new ApiError({
-      code: CLIENT_CONTRACT_MISMATCH,
-      message: CONTRACT_ERROR_MESSAGE,
-      status: 0,
-    });
-  }
-  return result.data;
-}
 
 export async function fetchJobSearchGroups(
   params?: {
@@ -43,9 +28,7 @@ export async function fetchJobSearchGroups(
     { signal },
     '구직 활동 그룹 목록을 불러오지 못했습니다.',
   );
-  const raw = await response.json();
-  return assertContractMatch(jobSearchGroupPageApiResponseSchema.safeParse(raw))
-    .data;
+  return parseApiResponse(jobSearchGroupPageApiResponseSchema, response);
 }
 
 export async function createJobSearchGroup(data: {
@@ -63,9 +46,7 @@ export async function createJobSearchGroup(data: {
     },
     '구직 활동 그룹을 생성하지 못했습니다.',
   );
-  const raw = await response.json();
-  return assertContractMatch(jobSearchGroupApiResponseSchema.safeParse(raw))
-    .data;
+  return parseApiResponse(jobSearchGroupApiResponseSchema, response);
 }
 
 export async function fetchJobSearchGroup(
@@ -77,9 +58,7 @@ export async function fetchJobSearchGroup(
     { signal },
     '구직 활동 그룹을 불러오지 못했습니다.',
   );
-  const raw = await response.json();
-  return assertContractMatch(jobSearchGroupApiResponseSchema.safeParse(raw))
-    .data;
+  return parseApiResponse(jobSearchGroupApiResponseSchema, response);
 }
 
 export async function updateJobSearchGroup(
@@ -100,9 +79,7 @@ export async function updateJobSearchGroup(
     },
     '구직 활동 그룹을 수정하지 못했습니다.',
   );
-  const raw = await response.json();
-  return assertContractMatch(jobSearchGroupApiResponseSchema.safeParse(raw))
-    .data;
+  return parseApiResponse(jobSearchGroupApiResponseSchema, response);
 }
 
 export async function deleteJobSearchGroup(id: string): Promise<void> {

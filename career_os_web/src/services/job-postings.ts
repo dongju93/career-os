@@ -5,27 +5,12 @@ import type {
   JobPostingUpdate,
 } from '../types/job-posting';
 import { fetchWithApiRetry } from './api-client';
-import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
+import { parseApiResponse } from './parse-response';
 import {
   jobPostingDetailApiResponseSchema,
   jobPostingExtractedApiResponseSchema,
   jobPostingPageApiResponseSchema,
 } from './schemas';
-
-const CONTRACT_ERROR_MESSAGE = '서버 응답 형식이 올바르지 않습니다.';
-
-function assertContractMatch<T>(
-  result: { success: true; data: T } | { success: false },
-): T {
-  if (!result.success) {
-    throw new ApiError({
-      code: CLIENT_CONTRACT_MISMATCH,
-      message: CONTRACT_ERROR_MESSAGE,
-      status: 0,
-    });
-  }
-  return result.data;
-}
 
 export async function extractJobPosting(
   url: string,
@@ -36,10 +21,7 @@ export async function extractJobPosting(
     { signal },
     '채용공고 정보를 가져오지 못했습니다.',
   );
-  const raw = await response.json();
-  return assertContractMatch(
-    jobPostingExtractedApiResponseSchema.safeParse(raw),
-  ).data;
+  return parseApiResponse(jobPostingExtractedApiResponseSchema, response);
 }
 
 export async function saveJobPosting(
@@ -59,9 +41,7 @@ export async function saveJobPosting(
     '저장에 실패했습니다.',
     { retryable: true }, // POST /v1/job-postings is a server-side upsert
   );
-  const raw = await response.json();
-  return assertContractMatch(jobPostingDetailApiResponseSchema.safeParse(raw))
-    .data;
+  return parseApiResponse(jobPostingDetailApiResponseSchema, response);
 }
 
 export async function fetchJobPosting(
@@ -73,9 +53,7 @@ export async function fetchJobPosting(
     { signal },
     '채용공고를 불러오지 못했습니다.',
   );
-  const raw = await response.json();
-  return assertContractMatch(jobPostingDetailApiResponseSchema.safeParse(raw))
-    .data;
+  return parseApiResponse(jobPostingDetailApiResponseSchema, response);
 }
 
 // Partial update of a saved posting (application_status / group_id / memo).
@@ -94,9 +72,7 @@ export async function updateJobPosting(
     },
     '채용공고를 수정하지 못했습니다.',
   );
-  const raw = await response.json();
-  return assertContractMatch(jobPostingDetailApiResponseSchema.safeParse(raw))
-    .data;
+  return parseApiResponse(jobPostingDetailApiResponseSchema, response);
 }
 
 export async function fetchJobPostings(
@@ -112,7 +88,5 @@ export async function fetchJobPostings(
     { signal },
     '채용공고 목록을 불러오지 못했습니다.',
   );
-  const raw = await response.json();
-  return assertContractMatch(jobPostingPageApiResponseSchema.safeParse(raw))
-    .data;
+  return parseApiResponse(jobPostingPageApiResponseSchema, response);
 }

@@ -4,26 +4,11 @@ import type {
 } from '../types/application-artifact';
 import type { ApplicationPlan } from '../types/application-plan';
 import { fetchWithApiRetry } from './api-client';
-import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
+import { parseApiResponse } from './parse-response';
 import {
   applicationArtifactApiResponseSchema,
   applicationPlanApiResponseSchema,
 } from './schemas';
-
-const CONTRACT_ERROR_MESSAGE = '서버 응답 형식이 올바르지 않습니다.';
-
-function assertContractMatch<T>(
-  result: { success: true; data: T } | { success: false },
-): T {
-  if (!result.success) {
-    throw new ApiError({
-      code: CLIENT_CONTRACT_MISMATCH,
-      message: CONTRACT_ERROR_MESSAGE,
-      status: 0,
-    });
-  }
-  return result.data;
-}
 
 // Generates a prioritized Application Plan over a job-search group.
 //
@@ -45,9 +30,7 @@ export async function generateApplicationPlan(
     },
     '지원 전략 플랜을 생성하지 못했습니다.',
   );
-  const raw = await response.json();
-  return assertContractMatch(applicationPlanApiResponseSchema.safeParse(raw))
-    .data;
+  return parseApiResponse(applicationPlanApiResponseSchema, response);
 }
 
 // Generates a single per-posting artifact (resume bullets / cover-letter points /
@@ -74,8 +57,5 @@ export async function generateArtifact(
     },
     'AI 지원 자료를 생성하지 못했습니다.',
   );
-  const raw = await response.json();
-  return assertContractMatch(
-    applicationArtifactApiResponseSchema.safeParse(raw),
-  ).data;
+  return parseApiResponse(applicationArtifactApiResponseSchema, response);
 }

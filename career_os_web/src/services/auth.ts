@@ -1,5 +1,5 @@
 import { fetchWithApiRetry, setAccessToken } from './api-client';
-import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
+import { parseApiResponse } from './parse-response';
 import {
   accessTokenApiResponseSchema,
   authMeApiResponseSchema,
@@ -28,16 +28,11 @@ export async function exchangeLoginCode(loginCode: string): Promise<void> {
     },
     '로그인 토큰 발급에 실패했습니다.',
   );
-  const raw = await response.json();
-  const result = accessTokenApiResponseSchema.safeParse(raw);
-  if (!result.success) {
-    throw new ApiError({
-      code: CLIENT_CONTRACT_MISMATCH,
-      message: '서버 응답 형식이 올바르지 않습니다.',
-      status: 0,
-    });
-  }
-  setAccessToken(result.data.data.access_token);
+  const { access_token } = await parseApiResponse(
+    accessTokenApiResponseSchema,
+    response,
+  );
+  setAccessToken(access_token);
 }
 
 export interface AuthMeResult {
@@ -53,14 +48,5 @@ export async function fetchAuthMe(): Promise<AuthMeResult> {
     undefined,
     '로그인 완료에 실패했습니다. 다시 시도해주세요.',
   );
-  const raw = await response.json();
-  const result = authMeApiResponseSchema.safeParse(raw);
-  if (!result.success) {
-    throw new ApiError({
-      code: CLIENT_CONTRACT_MISMATCH,
-      message: '서버 응답 형식이 올바르지 않습니다.',
-      status: 0,
-    });
-  }
-  return result.data.data;
+  return parseApiResponse(authMeApiResponseSchema, response);
 }

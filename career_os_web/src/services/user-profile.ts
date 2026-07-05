@@ -1,22 +1,8 @@
 import type { UserProfile, UserProfileUpsert } from '../types/user-profile';
 import { fetchWithApiRetry } from './api-client';
-import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
+import { ApiError } from './api-error';
+import { parseApiResponse } from './parse-response';
 import { userProfileApiResponseSchema } from './schemas';
-
-const CONTRACT_ERROR_MESSAGE = '서버 응답 형식이 올바르지 않습니다.';
-
-function assertContractMatch<T>(
-  result: { success: true; data: T } | { success: false },
-): T {
-  if (!result.success) {
-    throw new ApiError({
-      code: CLIENT_CONTRACT_MISMATCH,
-      message: CONTRACT_ERROR_MESSAGE,
-      status: 0,
-    });
-  }
-  return result.data;
-}
 
 // Returns the user's career profile, or `null` when none exists yet.
 // A 404 is the documented "no profile yet" signal (§3) — not an error — so we
@@ -30,9 +16,7 @@ export async function fetchUserProfile(
       { signal },
       '프로필을 불러오지 못했습니다.',
     );
-    const raw = await response.json();
-    return assertContractMatch(userProfileApiResponseSchema.safeParse(raw))
-      .data;
+    return await parseApiResponse(userProfileApiResponseSchema, response);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       return null;
@@ -56,6 +40,5 @@ export async function saveUserProfile(
     },
     '프로필을 저장하지 못했습니다.',
   );
-  const raw = await response.json();
-  return assertContractMatch(userProfileApiResponseSchema.safeParse(raw)).data;
+  return parseApiResponse(userProfileApiResponseSchema, response);
 }
