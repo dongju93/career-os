@@ -1,6 +1,8 @@
+from urllib.parse import parse_qs, urlparse
+
 import pytest
 
-from career_os_api.router import _resolve_callback_url
+from career_os_api.router import _append_query_params, _resolve_callback_url
 
 ALLOWED = [
     "https://career-os-sigma.vercel.app",
@@ -52,3 +54,18 @@ def test_valid_callback_urls(callback_url: str, expected: str) -> None:
 def test_invalid_callback_urls_return_none(callback_url: str) -> None:
     result = _resolve_callback_url(callback_url, ALLOWED, FRONTEND)
     assert result is None
+
+
+def test_append_query_params_preserves_query_and_fragment() -> None:
+    result = _append_query_params(
+        "https://career-os-sigma.vercel.app/auth/callback"
+        "?next=/home&login_code=stale#done",
+        {"login_code": "verified"},
+    )
+
+    parsed = urlparse(result)
+    assert parse_qs(parsed.query) == {
+        "next": ["/home"],
+        "login_code": ["verified"],
+    }
+    assert parsed.fragment == "done"

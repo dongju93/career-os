@@ -2,7 +2,7 @@ import logging
 import time
 from datetime import UTC, date, datetime
 from typing import Annotated, Literal
-from urllib.parse import urlencode, urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse
 from uuid import UUID
 
 from authlib.integrations.starlette_client import OAuth
@@ -123,8 +123,14 @@ def _resolve_callback_url(
 
 
 def _append_query_params(url: str, params: dict[str, str]) -> str:
-    separator = "&" if urlparse(url).query else "?"
-    return f"{url}{separator}{urlencode(params)}"
+    parsed = urlparse(url)
+    existing_params = [
+        (key, value)
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        if key not in params
+    ]
+    query = urlencode([*existing_params, *params.items()])
+    return parsed._replace(query=query).geturl()
 
 
 # ── System ────────────────────────────────────────────────────────────────────
@@ -194,7 +200,10 @@ async def google_callback(request: Request) -> RedirectResponse:
         _logger.exception("OAuth token exchange failed: %s", exc)
         request.session.clear()
         return RedirectResponse(
-            f"{target}?{urlencode({'error': 'oauth_token_exchange_failed'})}",
+            _append_query_params(
+                target,
+                {"error": "oauth_token_exchange_failed"},
+            ),
             status_code=status.HTTP_303_SEE_OTHER,
         )
 
@@ -202,7 +211,10 @@ async def google_callback(request: Request) -> RedirectResponse:
     if not user_info or not user_info.get("sub"):
         request.session.clear()
         return RedirectResponse(
-            f"{target}?{urlencode({'error': 'Google 사용자 정보를 가져올 수 없습니다'})}",
+            _append_query_params(
+                target,
+                {"error": "Google 사용자 정보를 가져올 수 없습니다"},
+            ),
             status_code=status.HTTP_303_SEE_OTHER,
         )
 
