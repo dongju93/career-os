@@ -1,3 +1,4 @@
+from html import escape
 from urllib.parse import urlparse
 
 import httpx2
@@ -21,6 +22,10 @@ WANTED_DETAIL_FIELDS: list[tuple[str, str]] = [
     ("benefits", "Benefits"),
     ("recruitment_process", "Hiring Process"),
 ]
+
+
+def _escape_text(value: object) -> str:
+    return escape(str(value))
 
 
 async def fetch_wanted_job_posting(url: str, client: AsyncHttpClient) -> bytes:
@@ -100,23 +105,26 @@ def _build_posting_html(data: dict) -> bytes:
 
     # --- Header: identity and key facts ---
     if title := (job.get("title") or detail.get("title")):
-        parts.append(f"<h1 class='job_title'>{title}</h1>")
+        parts.append(f"<h1 class='job_title'>{_escape_text(title)}</h1>")
     if name := company.get("name"):
-        parts.append(f"<p class='company_name'>{name}</p>")
+        parts.append(f"<p class='company_name'>{_escape_text(name)}</p>")
     if industry := company.get("industry_name"):
-        parts.append(f"<p class='industry'>{industry}</p>")
+        parts.append(f"<p class='industry'>{_escape_text(industry)}</p>")
     if location := address.get("full_location"):
-        parts.append(f"<p class='location'>{location}</p>")
+        parts.append(f"<p class='location'>{_escape_text(location)}</p>")
     if exp_name := exp_level.get("name"):
-        parts.append(f"<p class='experience_req'>{exp_name}</p>")
+        parts.append(f"<p class='experience_req'>{_escape_text(exp_name)}</p>")
     if expire := job.get("expire_time"):
-        parts.append(f"<p class='deadline'>{expire}</p>")
+        parts.append(f"<p class='deadline'>{_escape_text(expire)}</p>")
 
     # Salary ranges need both bounds; a half-open range is too ambiguous for extraction.
     annual_from = job.get("annual_from")
     annual_to = job.get("annual_to")
     if annual_from is not None and annual_to is not None:
-        parts.append(f"<p class='salary'>{annual_from} ~ {annual_to}</p>")
+        parts.append(
+            f"<p class='salary'>{_escape_text(annual_from)} ~ "
+            f"{_escape_text(annual_to)}</p>"
+        )
 
     # --- Detail sections (raw HTML fragments preserved) ---
     for field_key, label in WANTED_DETAIL_FIELDS:
@@ -130,12 +138,14 @@ def _build_posting_html(data: dict) -> bytes:
 
     # --- Metadata ---
     if tags := job.get("job_hash_tags"):
-        tag_labels = [t.get("title", "") for t in tags if t.get("title")]
+        tag_labels = [_escape_text(t["title"]) for t in tags if t.get("title")]
         if tag_labels:
             parts.append(f"<p class='tags'>{' '.join(tag_labels)}</p>")
 
     if tech_stacks := job.get("tech_stacks"):
-        stack_names = [s.get("title", "") for s in tech_stacks if s.get("title")]
+        stack_names = [
+            _escape_text(stack["title"]) for stack in tech_stacks if stack.get("title")
+        ]
         if stack_names:
             parts.append(f"<p class='tech_stack'>{', '.join(stack_names)}</p>")
 

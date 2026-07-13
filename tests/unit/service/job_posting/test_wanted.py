@@ -88,6 +88,22 @@ async def test_fetch_wanted_job_posting_builds_html_from_api_response() -> None:
     assert "Preferred Qualifications" not in html
 
 
+def test_build_posting_html_escapes_scalars_and_preserves_detail_html() -> None:
+    payload = json.loads(json.dumps(SAMPLE_API_RESPONSE))
+    payload["job"]["title"] = "R&D <Platform>"
+    payload["job"]["company"]["name"] = "A & B"
+    payload["job"]["job_hash_tags"] = [
+        {"title": "<img src='https://cdn.wanted.co.kr/injected.png'>"}
+    ]
+
+    html = wanted_module._build_posting_html(payload).decode("utf-8")
+
+    assert "R&amp;D &lt;Platform&gt;" in html
+    assert "A &amp; B" in html
+    assert "&lt;img src=&#x27;https://cdn.wanted.co.kr/injected.png&#x27;&gt;" in html
+    assert "<img src='https://cdn.wanted.co.kr/img/posting.png' />" in html
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("annual_from", "annual_to"),
