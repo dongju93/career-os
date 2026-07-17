@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from urllib.parse import parse_qsl, urlencode, urlparse
 from uuid import UUID
 
+from authlib.integrations.base_client import MismatchingStateError
 from authlib.integrations.starlette_client import OAuth
 from fastapi import (
     APIRouter,
@@ -143,6 +144,20 @@ def _resolve_callback_url(
     return None
 
 
+def _oauth_failure_redirect(request: Request, target: str) -> RedirectResponse:
+    """Drop the half-finished OAuth session and bounce back to the frontend.
+
+    Shared by every failure path in the callback so the client-visible contract
+    (`?error=oauth_token_exchange_failed`) stays identical regardless of why the
+    exchange failed.
+    """
+    request.session.clear()
+    return RedirectResponse(
+        _append_query_params(target, {"error": "oauth_token_exchange_failed"}),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
 def _append_query_params(url: str, params: dict[str, str]) -> str:
     parsed = urlparse(url)
     existing_params = [
@@ -270,16 +285,22 @@ async def google_callback(request: Request) -> RedirectResponse:
 
     try:
         token = await oauth.google.authorize_access_token(request)
+    except MismatchingStateError:
+        # Authlib raises this both for a state that disagrees with the session
+        # and for a callback with no stored state at all (`state_data is None`),
+        # so crawlers probing the callback URL, replayed links, and users whose
+        # session cookie was dropped mid-flow all land here. None of these are
+        # server faults: log at warning without a traceback so they stop being
+        # reported as errors, and still send the user back to the frontend.
+        _logger.warning(
+            "OAuth callback rejected: request state has no matching session state "
+            "(user_agent=%s)",
+            request.headers.get("user-agent", "-"),
+        )
+        return _oauth_failure_redirect(request, target)
     except Exception as exc:
         _logger.exception("OAuth token exchange failed: %s", exc)
-        request.session.clear()
-        return RedirectResponse(
-            _append_query_params(
-                target,
-                {"error": "oauth_token_exchange_failed"},
-            ),
-            status_code=status.HTTP_303_SEE_OTHER,
-        )
+        return _oauth_failure_redirect(request, target)
 
     user_info = token.get("userinfo")
     if not user_info or not user_info.get("sub"):

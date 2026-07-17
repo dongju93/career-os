@@ -6,6 +6,7 @@ from unittest.mock import ANY, AsyncMock
 
 import fakeredis
 import pytest
+from authlib.integrations.base_client import MismatchingStateError
 from fastapi.testclient import TestClient
 from psycopg import OperationalError
 
@@ -292,6 +293,62 @@ def test_google_callback_redirect_includes_login_code(
     # land on /auth/callback — the only route that reads login_code — not
     # bare frontend_url, which ProtectedRoute would swallow silently.
     assert location.startswith(f"{app_module.settings.frontend_url}/auth/callback")
+
+
+def test_google_callback_logs_state_mismatch_as_warning_without_traceback(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Crawlers and replayed callback links reach the callback with no matching
+    # session state; authlib reports that as MismatchingStateError. It is a
+    # client-side condition, so it must not be logged as an error with a
+    # traceback, while the user-visible redirect stays unchanged.
+    monkeypatch.setattr(
+        app_module.oauth.google,
+        "authorize_access_token",
+        AsyncMock(side_effect=MismatchingStateError()),
+    )
+
+    with caplog.at_level("WARNING", logger=app_module.__name__):
+        response = client.get(
+            f"{API_PREFIX}/auth/google/callback?state=stale&code=abc",
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert "error=oauth_token_exchange_failed" in response.headers["location"]
+
+    records = [r for r in caplog.records if r.name == app_module.__name__]
+    assert len(records) == 1
+    assert records[0].levelname == "WARNING"
+    assert records[0].exc_info is None
+
+
+def test_google_callback_logs_unexpected_exchange_failure_as_error(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr(
+        app_module.oauth.google,
+        "authorize_access_token",
+        AsyncMock(side_effect=RuntimeError("token endpoint unreachable")),
+    )
+
+    with caplog.at_level("WARNING", logger=app_module.__name__):
+        response = client.get(
+            f"{API_PREFIX}/auth/google/callback",
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert "error=oauth_token_exchange_failed" in response.headers["location"]
+
+    records = [r for r in caplog.records if r.name == app_module.__name__]
+    assert len(records) == 1
+    assert records[0].levelname == "ERROR"
+    assert records[0].exc_info is not None
 
 
 def test_exchange_login_code_returns_access_token_for_valid_code(
