@@ -1,0 +1,15 @@
+-- Add the missing index on auth_exchange_codes.user_id.
+--
+-- auth_exchange_codes.user_id is a FK to users(id) ON DELETE CASCADE. Without an
+-- index on the referencing column, deleting a user forces a sequential scan of
+-- auth_exchange_codes to find rows to cascade-delete (and holds locks during it).
+-- This is the same cascade-FK concern already handled explicitly for
+-- chatkit_items.user_id; auth_exchange_codes was the one remaining cascade FK
+-- without a covering index.
+--
+-- The table is small and short-lived (60s TTL, opportunistic cleanup), so impact
+-- is low today, but the index keeps cascade deletes index-driven and consistent
+-- with the schema's own stated principle.
+--
+-- Safe to re-run (IF NOT EXISTS guard).
+CREATE INDEX IF NOT EXISTS idx_auth_exchange_codes_user_id ON auth_exchange_codes (user_id);

@@ -1,0 +1,23 @@
+-- Drop the unused partial index idx_job_postings_status_active.
+--
+-- Rationale: this index was created (2026-06-17-3) on the assumption that the
+-- list endpoint and strategist agent filter by the active-status set
+-- (saved/applied/interviewing). Verification against the actual queries shows
+-- no query can use it:
+--   * The list endpoints (_LIST_BY_USER_SQL / _LIST_BY_GROUP_SQL) apply NO
+--     application_status filter — they intentionally return ALL statuses,
+--     including terminal ones (offer/rejected/withdrawn).
+--   * The strategist query filters `application_status = $1` with a bind
+--     parameter. PostgreSQL cannot prove at plan time that a runtime parameter
+--     is contained in the index's literal IN (...) predicate, so it never
+--     matches a partial index — a partial index requires the query predicate
+--     to imply the index predicate at plan time.
+-- No query uses the literal `application_status IN ('saved','applied',
+-- 'interviewing')` predicate anywhere in the codebase.
+--
+-- The index's key columns (user_id, scraped_at DESC) are already fully covered
+-- by idx_job_postings_user_id_scraped_at, so dropping it removes pure
+-- write/storage overhead with zero read-path regression.
+--
+-- Safe to re-run (IF EXISTS guard).
+DROP INDEX IF EXISTS idx_job_postings_status_active;

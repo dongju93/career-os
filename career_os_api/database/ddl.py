@@ -136,6 +136,11 @@ CREATE TABLE IF NOT EXISTS auth_exchange_codes (
 
 CREATE INDEX IF NOT EXISTS idx_auth_exchange_codes_expires_at
     ON auth_exchange_codes (expires_at);
+
+-- FK to users(id) ON DELETE CASCADE requires an index on user_id so
+-- cascade-deletes do not scan the full table.
+CREATE INDEX IF NOT EXISTS idx_auth_exchange_codes_user_id
+    ON auth_exchange_codes (user_id);
 """
 
 CREATE_RISC_EVENTS_TABLE = """
@@ -197,11 +202,6 @@ CREATE INDEX IF NOT EXISTS idx_job_postings_group_id_scraped_at
 
 CREATE INDEX IF NOT EXISTS idx_job_postings_user_id_scraped_at
     ON job_postings (user_id, scraped_at DESC);
-
--- Partial index for active-status queries (list endpoint + strategist agent).
-CREATE INDEX IF NOT EXISTS idx_job_postings_status_active
-    ON job_postings (user_id, scraped_at DESC)
-    WHERE application_status IN ('saved', 'applied', 'interviewing');
 
 -- GIN indexes for array containment queries on job_postings and user_profiles.
 CREATE INDEX IF NOT EXISTS idx_job_postings_tech_stack
