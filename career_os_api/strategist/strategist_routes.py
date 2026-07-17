@@ -32,7 +32,14 @@ from career_os_api.database.retry import run_database_operation
 from career_os_api.database.user_profiles import get_user_profile
 from career_os_api.middleware import get_request_id
 from career_os_api.rate_limit import quota, rate_limit
-from career_os_api.responses import ApiResponse
+from career_os_api.responses import (
+    AUTHENTICATION_ERROR_RESPONSE,
+    CONFLICT_ERROR_RESPONSE,
+    NOT_FOUND_ERROR_RESPONSE,
+    UPSTREAM_ERROR_RESPONSE,
+    VALIDATION_ERROR_RESPONSE,
+    ApiResponse,
+)
 from career_os_api.schemas import (
     ApplicationArtifact,
     ApplicationPlan,
@@ -89,12 +96,22 @@ async def run_strategist_artifact(
 @router.post(
     "/agent/plan",
     tags=["agent"],
+    summary="맞춤형 지원 전략 플랜 생성",
+    description=(
+        "현재 사용자의 커리어 프로필과 지정한 구직 활동 그룹의 저장 공고를 분석해 우선순위, "
+        "적합도, 부족 역량 및 다음 행동을 포함한 지원 전략을 생성합니다. `group_id`를 생략하면 "
+        "현재 그룹을 사용합니다. 에이전트가 제안하는 상태 변경·그룹 이동·메모 저장 액션은 자동 실행되지 "
+        "않으며, 클라이언트가 검토 후 별도 API를 호출해야 합니다. 전략 기능 플래그가 꺼져 있으면 404입니다."
+    ),
+    operation_id="create_application_plan",
+    response_description="생성된 지원 전략 플랜",
     dependencies=[rate_limit(5, per="minute"), quota(30, per="day")],
     responses={
-        401: {"description": "인증 실패"},
-        404: {"description": "그룹을 찾을 수 없음"},
-        409: {"description": "프로필 또는 구직 활동 그룹이 없음"},
-        502: {"description": "플랜 생성(에이전트 실행) 실패"},
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_404_NOT_FOUND: NOT_FOUND_ERROR_RESPONSE,
+        status.HTTP_409_CONFLICT: CONFLICT_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
+        status.HTTP_502_BAD_GATEWAY: UPSTREAM_ERROR_RESPONSE,
     },
 )
 async def create_application_plan(
@@ -274,12 +291,21 @@ async def _filter_owned_plan_output(
 @router.post(
     "/agent/artifact",
     tags=["agent"],
+    summary="맞춤형 지원 자료 생성",
+    description=(
+        "현재 사용자의 커리어 프로필과 저장된 채용 공고 한 건을 바탕으로 이력서 bullet, 자기소개서 "
+        "또는 면접 준비 자료를 생성합니다. 공고와 프로필은 서버에서 소유권을 확인한 뒤 모델에 전달하며, "
+        "생성 결과의 `job_id`와 `artifact_type`은 요청 값으로 고정됩니다. 전략 기능 플래그가 꺼져 있으면 404입니다."
+    ),
+    operation_id="create_application_artifact",
+    response_description="생성된 맞춤형 지원 자료",
     dependencies=[rate_limit(5, per="minute"), quota(20, per="day")],
     responses={
-        401: {"description": "인증 실패"},
-        404: {"description": "채용 공고를 찾을 수 없음"},
-        409: {"description": "프로필이 없음"},
-        502: {"description": "자료 생성(에이전트 실행) 실패"},
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_404_NOT_FOUND: NOT_FOUND_ERROR_RESPONSE,
+        status.HTTP_409_CONFLICT: CONFLICT_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
+        status.HTTP_502_BAD_GATEWAY: UPSTREAM_ERROR_RESPONSE,
     },
 )
 async def create_application_artifact(

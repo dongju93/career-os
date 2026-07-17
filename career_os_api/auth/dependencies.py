@@ -8,7 +8,14 @@ from career_os_api.auth.jwt import decode_access_token
 from career_os_api.database.retry import run_database_operation
 from career_os_api.database.users import UserRow, find_user_by_id
 
-_bearer_scheme = HTTPBearer(auto_error=False)
+_bearer_scheme = HTTPBearer(
+    auto_error=False,
+    scheme_name="BearerAuth",
+    description=(
+        "OAuth 로그인 후 발급된 Bearer JWT를 사용합니다. "
+        "웹 클라이언트는 유효한 세션 쿠키와 X-Career-OS-Client: web 헤더를 사용할 수도 있습니다."
+    ),
+)
 _SESSION_CLIENT_HEADER = "x-career-os-client"
 _SESSION_CLIENT_HEADER_VALUE = "web"
 

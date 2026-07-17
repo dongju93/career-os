@@ -12,7 +12,15 @@ from career_os_api.service.job_posting.platform import (
     validate_posting_id,
 )
 
-PostingId = Annotated[str, Field(min_length=1, max_length=50)]
+PostingId = Annotated[
+    str,
+    Field(
+        min_length=1,
+        max_length=50,
+        description="채용 플랫폼에서 사용하는 공고 식별자",
+        examples=["4930"],
+    ),
+]
 
 
 def _validate_platform_posting_id(posting_id: str, info: ValidationInfo) -> str:
@@ -26,14 +34,22 @@ def _validate_platform_posting_id(posting_id: str, info: ValidationInfo) -> str:
 
 
 class CurrentUserResponse(BaseModel):
-    user_id: UUID
-    email: str
-    name: str | None
-    picture: str | None
+    user_id: UUID = Field(description="Career OS 사용자 UUID")
+    email: str = Field(description="Google 계정 이메일")
+    name: str | None = Field(default=None, description="사용자 표시 이름")
+    picture: str | None = Field(default=None, description="Google 프로필 이미지 URL")
 
 
 class UpdateCurrentUserRequest(BaseModel):
-    name: Annotated[str, Field(min_length=1, max_length=100)]
+    name: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=100,
+            description="변경할 사용자 표시 이름",
+            examples=["홍길동"],
+        ),
+    ]
 
     @field_validator("name")
     @classmethod
@@ -45,12 +61,21 @@ class UpdateCurrentUserRequest(BaseModel):
 
 
 class LoginCodeExchangeRequest(BaseModel):
-    login_code: Annotated[str, Field(min_length=1, max_length=200)]
+    login_code: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=200,
+            description="OAuth callback URL에서 받은 일회용 로그인 교환 코드",
+        ),
+    ]
 
 
 class AccessTokenResponse(BaseModel):
-    access_token: str
-    token_type: Literal["bearer"] = "bearer"
+    access_token: str = Field(description="API 호출에 사용할 Bearer access token")
+    token_type: Literal["bearer"] = Field(
+        default="bearer", description="인증 토큰 타입"
+    )
 
 
 # ── Job Postings ──────────────────────────────────────────────────────────────
@@ -77,19 +102,38 @@ class _JobPostingBase(BaseModel):
     """
 
     # Identity (derived from URL, echoed back for traceability)
-    platform: Platform
+    platform: Platform = Field(description="채용 플랫폼", examples=["saramin"])
     posting_id: PostingId
-    posting_url: str  # TEXT — no length limit
+    posting_url: str = Field(
+        description="원본 채용 공고 URL",
+        examples=["https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930"],
+    )  # TEXT — no length limit
 
     # Strict common
-    company_name: Annotated[str, Field(max_length=200)]
-    job_title: Annotated[str, Field(min_length=1, max_length=500)]
-    experience_req: Annotated[str, Field(max_length=100)] | None = None
-    deadline: Annotated[str, Field(max_length=100)] | None = None
-    location: Annotated[str, Field(max_length=300)] | None = None
+    company_name: Annotated[
+        str, Field(max_length=200, description="회사명", examples=["Career OS"])
+    ]
+    job_title: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=500,
+            description="채용 직무명",
+            examples=["Backend Engineer"],
+        ),
+    ]
+    experience_req: (
+        Annotated[str, Field(max_length=100, description="경력 요건")] | None
+    ) = None
+    deadline: (
+        Annotated[str, Field(max_length=100, description="채용 마감일 원문")] | None
+    ) = None
+    location: Annotated[str, Field(max_length=300, description="근무지")] | None = None
 
     # General
-    employment_type: Annotated[str, Field(max_length=50)] | None = None
+    employment_type: (
+        Annotated[str, Field(max_length=50, description="고용 형태")] | None
+    ) = None
     job_description: str | None = None  # TEXT
     responsibilities: str | None = None  # TEXT
     qualifications: str | None = None  # TEXT
@@ -98,16 +142,30 @@ class _JobPostingBase(BaseModel):
     hiring_process: str | None = None  # TEXT
 
     # Platform-specific
-    education_req: Annotated[str, Field(max_length=100)] | None = None
-    salary: Annotated[str, Field(max_length=200)] | None = None
+    education_req: (
+        Annotated[str, Field(max_length=100, description="학력 요건")] | None
+    ) = None
+    salary: Annotated[str, Field(max_length=200, description="급여 정보")] | None = None
     tech_stack: list[str] | None = None
     tags: list[str] | None = None
-    application_method: Annotated[str, Field(max_length=200)] | None = None
-    application_form: Annotated[str, Field(max_length=200)] | None = None
-    contact_person: Annotated[str, Field(max_length=100)] | None = None
-    homepage: Annotated[str, Field(max_length=500)] | None = None
-    job_category: Annotated[str, Field(max_length=200)] | None = None
-    industry: Annotated[str, Field(max_length=200)] | None = None
+    application_method: (
+        Annotated[str, Field(max_length=200, description="지원 방법")] | None
+    ) = None
+    application_form: (
+        Annotated[str, Field(max_length=200, description="지원 양식")] | None
+    ) = None
+    contact_person: (
+        Annotated[str, Field(max_length=100, description="채용 담당자")] | None
+    ) = None
+    homepage: (
+        Annotated[str, Field(max_length=500, description="회사 홈페이지 URL")] | None
+    ) = None
+    job_category: (
+        Annotated[str, Field(max_length=200, description="직무 카테고리")] | None
+    ) = None
+    industry: Annotated[str, Field(max_length=200, description="산업 분야")] | None = (
+        None
+    )
 
     @field_validator("job_title")
     @classmethod
@@ -174,7 +232,10 @@ class JobPostingExtracted(_JobPostingBase):
 class JobPostingCreateRequest(JobPostingExtracted):
     """POST /v1/job-postings body — extraction result plus optional target group."""
 
-    group_id: UUID | None = None
+    group_id: UUID | None = Field(
+        default=None,
+        description="저장할 구직 활동 그룹 UUID. 생략하면 현재 활성 그룹을 사용합니다.",
+    )
 
 
 class JobPostingStored(_JobPostingBase):
@@ -188,14 +249,18 @@ class JobPostingStored(_JobPostingBase):
     into a 500 if the check ran here.
     """
 
-    id: int
-    group_id: UUID
-    application_status: ApplicationStatus
-    status_updated_at: datetime | None = None
-    memo: Annotated[str, Field(max_length=2000)] | None = None
-    scraped_at: datetime
-    created_at: datetime
-    updated_at: datetime
+    id: int = Field(description="Career OS 내부 채용 공고 ID", examples=[101])
+    group_id: UUID = Field(description="소속 구직 활동 그룹 UUID")
+    application_status: ApplicationStatus = Field(description="지원 진행 상태")
+    status_updated_at: datetime | None = Field(
+        default=None, description="지원 진행 상태가 마지막으로 변경된 시각"
+    )
+    memo: Annotated[str, Field(max_length=2000, description="사용자 메모")] | None = (
+        None
+    )
+    scraped_at: datetime = Field(description="원본 공고를 마지막으로 수집한 시각")
+    created_at: datetime = Field(description="레코드 생성 시각")
+    updated_at: datetime = Field(description="레코드 수정 시각")
 
 
 class JobPostingUpdateRequest(BaseModel):
@@ -207,9 +272,19 @@ class JobPostingUpdateRequest(BaseModel):
     is a valid "clear the memo" instruction and is allowed.
     """
 
-    application_status: ApplicationStatus | None = None
-    group_id: UUID | None = None
-    memo: Annotated[str, Field(max_length=2000)] | None = None
+    application_status: ApplicationStatus | None = Field(
+        default=None, description="변경할 지원 진행 상태"
+    )
+    group_id: UUID | None = Field(
+        default=None, description="이동할 구직 활동 그룹 UUID"
+    )
+    memo: (
+        Annotated[
+            str,
+            Field(max_length=2000, description="저장할 메모. null이면 기존 메모 삭제"),
+        ]
+        | None
+    ) = None
 
     @model_validator(mode="after")
     def reject_empty_or_null_not_null_columns(self) -> JobPostingUpdateRequest:
@@ -266,10 +341,20 @@ class JobPostingPage(BaseModel):
 
 
 class JobSearchGroupCreate(BaseModel):
-    name: Annotated[str, Field(min_length=1, max_length=100)]
-    started_at: date | None = None
-    ended_at: date | None = None
-    memo: str | None = None
+    name: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=100,
+            description="구직 활동 그룹 이름",
+            examples=["2026년 상반기 백엔드 지원"],
+        ),
+    ]
+    started_at: date | None = Field(
+        default=None, description="구직 활동 시작일. 생략하면 오늘 날짜"
+    )
+    ended_at: date | None = Field(default=None, description="구직 활동 종료일")
+    memo: str | None = Field(default=None, description="그룹 메모")
 
     @model_validator(mode="after")
     def check_dates(self) -> JobSearchGroupCreate:
@@ -279,10 +364,16 @@ class JobSearchGroupCreate(BaseModel):
 
 
 class JobSearchGroupUpdate(BaseModel):
-    name: Annotated[str, Field(min_length=1, max_length=100)] | None = None
-    started_at: date | None = None
-    ended_at: date | None = None
-    memo: str | None = None
+    name: (
+        Annotated[
+            str,
+            Field(min_length=1, max_length=100, description="변경할 그룹 이름"),
+        ]
+        | None
+    ) = None
+    started_at: date | None = Field(default=None, description="변경할 구직 활동 시작일")
+    ended_at: date | None = Field(default=None, description="변경할 구직 활동 종료일")
+    memo: str | None = Field(default=None, description="변경할 그룹 메모")
 
 
 class JobSearchGroupItem(BaseModel):
@@ -333,13 +424,43 @@ class UserProfileUpsertRequest(BaseModel):
     validation fails before the DB insert.
     """
 
-    headline: Annotated[str, Field(max_length=200)] | None = None
-    years_experience: Annotated[int, Field(ge=0, le=60)] | None = None
-    target_roles: Annotated[list[_ProfileTag], Field(max_length=20)] | None = None
-    skills: Annotated[list[_ProfileTag], Field(max_length=50)] | None = None
-    locations: Annotated[list[_ProfileTag], Field(max_length=20)] | None = None
-    salary_expectation: Annotated[str, Field(max_length=200)] | None = None
-    summary: Annotated[str, Field(max_length=8000)] | None = None
+    headline: (
+        Annotated[
+            str,
+            Field(
+                max_length=200,
+                description="커리어 한 줄 소개",
+                examples=["5년차 백엔드 엔지니어"],
+            ),
+        ]
+        | None
+    ) = None
+    years_experience: (
+        Annotated[int, Field(ge=0, le=60, description="총 경력 연수", examples=[5])]
+        | None
+    ) = None
+    target_roles: (
+        Annotated[list[_ProfileTag], Field(max_length=20, description="희망 직무 목록")]
+        | None
+    ) = None
+    skills: (
+        Annotated[list[_ProfileTag], Field(max_length=50, description="보유 기술 목록")]
+        | None
+    ) = None
+    locations: (
+        Annotated[
+            list[_ProfileTag], Field(max_length=20, description="희망 근무지 목록")
+        ]
+        | None
+    ) = None
+    salary_expectation: (
+        Annotated[str, Field(max_length=200, description="희망 연봉 또는 보상 조건")]
+        | None
+    ) = None
+    summary: (
+        Annotated[str, Field(max_length=8000, description="경력 요약 및 주요 경험")]
+        | None
+    ) = None
 
     @field_validator("headline")
     @classmethod
@@ -387,15 +508,17 @@ class PlanItem(BaseModel):
     against the caller's own postings before this reaches the client.
     """
 
-    job_id: int
-    company_name: str
-    job_title: str
-    fit_score: Annotated[int, Field(ge=0, le=100)]
-    matched_skills: list[str]
-    missing_skills: list[str]
-    deadline_urgency: DeadlineUrgency
-    recommended_action: str
-    rationale: str
+    job_id: int = Field(description="분석 대상 저장 공고 ID", examples=[101])
+    company_name: str = Field(description="회사명")
+    job_title: str = Field(description="직무명")
+    fit_score: Annotated[
+        int, Field(ge=0, le=100, description="프로필과 공고의 적합도 점수")
+    ]
+    matched_skills: list[str] = Field(description="프로필과 일치하는 역량")
+    missing_skills: list[str] = Field(description="보완이 필요한 역량")
+    deadline_urgency: DeadlineUrgency = Field(description="마감일 긴급도")
+    recommended_action: str = Field(description="권장 다음 행동")
+    rationale: str = Field(description="적합도와 권장 행동에 대한 근거")
 
 
 ProposedActionType = Literal["set_status", "assign_group", "save_memo"]
@@ -416,8 +539,8 @@ class ProposedAction(BaseModel):
       - save_memo    → memo
     """
 
-    action_type: ProposedActionType
-    job_id: int
+    action_type: ProposedActionType = Field(description="제안 액션 유형")
+    job_id: int = Field(description="액션 대상 저장 공고 ID", examples=[101])
     application_status: ApplicationStatus | None = Field(
         default=None, description="set_status 액션의 목표 상태"
     )
@@ -425,7 +548,7 @@ class ProposedAction(BaseModel):
         default=None, description="assign_group 액션의 목표 그룹 UUID"
     )
     memo: str | None = Field(default=None, description="save_memo 액션의 메모 내용")
-    reason: str
+    reason: str = Field(description="액션을 제안한 이유")
 
 
 class ApplicationPlan(BaseModel):
@@ -436,9 +559,14 @@ class ApplicationPlan(BaseModel):
     clients can always treat it as optional.
     """
 
-    summary: str
-    items: Annotated[list[PlanItem], Field(max_length=10)]
-    proposed_actions: list[ProposedAction] = []
+    summary: str = Field(description="전체 지원 전략 요약")
+    items: Annotated[
+        list[PlanItem],
+        Field(max_length=10, description="우선순위가 정렬된 공고별 분석"),
+    ]
+    proposed_actions: list[ProposedAction] = Field(
+        default=[], description="사용자 확인이 필요한 후속 액션 제안"
+    )
 
 
 class ApplicationPlanRequest(BaseModel):
@@ -448,8 +576,21 @@ class ApplicationPlanRequest(BaseModel):
     user steering passed verbatim into the run input.
     """
 
-    group_id: UUID | None = None
-    focus: Annotated[str, Field(max_length=300)] | None = None
+    group_id: UUID | None = Field(
+        default=None,
+        description="분석할 구직 활동 그룹 UUID. 생략하면 현재 그룹을 사용합니다.",
+    )
+    focus: (
+        Annotated[
+            str,
+            Field(
+                max_length=300,
+                description="전략 생성 시 반영할 사용자 요청",
+                examples=["백엔드 포지션 우선"],
+            ),
+        ]
+        | None
+    ) = None
 
 
 # The three tailored-artifact kinds the strategist can generate for a single posting.
@@ -465,9 +606,15 @@ class ArtifactRequest(BaseModel):
     before any model call. focus is optional free-text steering.
     """
 
-    job_id: int
-    artifact_type: ArtifactType
-    focus: Annotated[str, Field(max_length=300)] | None = None
+    job_id: int = Field(description="지원 자료를 생성할 저장 공고 ID", examples=[101])
+    artifact_type: ArtifactType = Field(description="생성할 지원 자료 유형")
+    focus: (
+        Annotated[
+            str,
+            Field(max_length=300, description="지원 자료에 반영할 사용자 요청"),
+        ]
+        | None
+    ) = None
 
 
 class ApplicationArtifact(BaseModel):
@@ -480,7 +627,9 @@ class ApplicationArtifact(BaseModel):
     request values before returning.
     """
 
-    artifact_type: ArtifactType
-    job_id: int
-    title: str
-    content_markdown: Annotated[str, Field(max_length=12000)]
+    artifact_type: ArtifactType = Field(description="생성된 지원 자료 유형")
+    job_id: int = Field(description="지원 자료의 대상 공고 ID", examples=[101])
+    title: str = Field(description="지원 자료 제목")
+    content_markdown: Annotated[
+        str, Field(max_length=12000, description="Markdown 형식의 생성 결과 본문")
+    ]

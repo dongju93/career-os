@@ -6,7 +6,16 @@ from urllib.parse import parse_qsl, urlencode, urlparse
 from uuid import UUID
 
 from authlib.integrations.starlette_client import OAuth
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import JSONResponse, RedirectResponse
 from psycopg.errors import UniqueViolation
 
@@ -48,7 +57,19 @@ from career_os_api.database.retry import run_database_operation
 from career_os_api.database.user_profiles import get_user_profile, upsert_user_profile
 from career_os_api.database.users import update_user_name, upsert_user
 from career_os_api.rate_limit import quota, rate_limit
-from career_os_api.responses import ApiResponse
+from career_os_api.responses import (
+    AUTHENTICATION_ERROR_RESPONSE,
+    BAD_REQUEST_ERROR_RESPONSE,
+    CONFLICT_ERROR_RESPONSE,
+    FORBIDDEN_ERROR_RESPONSE,
+    NOT_FOUND_ERROR_RESPONSE,
+    PAYLOAD_TOO_LARGE_ERROR_RESPONSE,
+    SERVICE_UNAVAILABLE_ERROR_RESPONSE,
+    UNSUPPORTED_MEDIA_TYPE_ERROR_RESPONSE,
+    UPSTREAM_ERROR_RESPONSE,
+    VALIDATION_ERROR_RESPONSE,
+    ApiResponse,
+)
 from career_os_api.schemas import (
     AccessTokenResponse,
     CurrentUserResponse,
@@ -136,12 +157,27 @@ def _append_query_params(url: str, params: dict[str, str]) -> str:
 # ── System ────────────────────────────────────────────────────────────────────
 
 
-@v1_router.get("/", tags=["system"])
+@v1_router.get(
+    "/",
+    tags=["system"],
+    summary="API 기본 상태 확인",
+    description="Career OS API가 요청을 처리할 수 있는지 확인하는 간단한 liveness API입니다.",
+    operation_id="get_api_status",
+    response_description="API가 정상적으로 실행 중임을 나타내는 상태 envelope",
+)
 def root() -> ApiResponse[None]:
     return ApiResponse(status=status.HTTP_200_OK, message="Hello, World!")
 
 
-@v1_router.get("/health/db", tags=["system"])
+@v1_router.get(
+    "/health/db",
+    tags=["system"],
+    summary="데이터베이스 연결 상태 확인",
+    description="API가 사용하는 PostgreSQL 연결 풀에서 간단한 쿼리를 실행해 연결 상태를 확인합니다.",
+    operation_id="check_database_health",
+    response_description="데이터베이스 연결 상태",
+    responses={status.HTTP_503_SERVICE_UNAVAILABLE: SERVICE_UNAVAILABLE_ERROR_RESPONSE},
+)
 async def db_health(request: Request) -> JSONResponse:
     async def operation(conn):
         result = await conn.execute("SELECT 1")
@@ -162,10 +198,31 @@ async def db_health(request: Request) -> JSONResponse:
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 
-@v1_router.get("/auth/google", tags=["auth"])
+@v1_router.get(
+    "/auth/google",
+    tags=["auth"],
+    summary="Google OAuth 로그인 시작",
+    description=(
+        "Google OAuth 인증 화면으로 리다이렉트합니다. `callback_url`은 허용된 프론트엔드 "
+        "origin 또는 `/`로 시작하는 경로만 사용할 수 있습니다."
+    ),
+    operation_id="start_google_login",
+    response_class=RedirectResponse,
+    status_code=status.HTTP_302_FOUND,
+    responses={
+        status.HTTP_302_FOUND: {"description": "Google OAuth 인증 화면으로 리다이렉트"},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
+    },
+)
 async def google_login(
     request: Request,
-    callback_url: Annotated[str | None, Query()] = None,
+    callback_url: Annotated[
+        str | None,
+        Query(
+            description="로그인 완료 후 돌아갈 허용된 프론트엔드 경로 또는 URL",
+            examples=["/auth/callback"],
+        ),
+    ] = None,
 ):
     if callback_url:
         safe_url = _resolve_callback_url(
@@ -179,7 +236,24 @@ async def google_login(
 @v1_router.get(
     "/auth/google/callback",
     tags=["auth"],
-    status_code=status.HTTP_303_SEE_OTHER,
+    summary="Google OAuth callback 처리",
+    description=(
+        "Google authorization code를 검증하고 서버 세션과 일회용 `login_code`를 발급한 뒤 "
+        "프론트엔드 callback URL로 리다이렉트합니다. 세션 쿠키를 사용할 수 없는 브라우저는 "
+        "login code를 `/v1/auth/token`으로 교환할 수 있습니다."
+    ),
+    operation_id="complete_google_login",
+    response_class=RedirectResponse,
+    status_code=status.HTTP_302_FOUND,
+    response_description="로그인 성공 후 프론트엔드 callback으로 리다이렉트",
+    responses={
+        status.HTTP_302_FOUND: {
+            "description": "로그인 성공 후 프론트엔드 callback으로 리다이렉트"
+        },
+        status.HTTP_303_SEE_OTHER: {
+            "description": "OAuth 처리 실패 후 오류 정보와 함께 리다이렉트"
+        },
+    },
 )
 async def google_callback(request: Request) -> RedirectResponse:
     # Always redirect back to the frontend. Returning JSON here caused mobile
@@ -246,7 +320,16 @@ async def google_callback(request: Request) -> RedirectResponse:
     )
 
 
-@v1_router.get("/auth/me", tags=["auth"], dependencies=[rate_limit(20, per="minute")])
+@v1_router.get(
+    "/auth/me",
+    tags=["auth"],
+    summary="현재 사용자 조회",
+    description="Bearer JWT 또는 웹 세션으로 인증된 현재 사용자의 기본 계정 정보를 조회합니다.",
+    operation_id="get_current_user",
+    response_description="현재 사용자 정보",
+    dependencies=[rate_limit(20, per="minute")],
+    responses={status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE},
+)
 async def read_current_user(
     current_user: _CurrentUser,
 ) -> ApiResponse[CurrentUserResponse]:
@@ -265,12 +348,25 @@ async def read_current_user(
 @v1_router.post(
     "/auth/token",
     tags=["auth"],
+    summary="OAuth login code를 access token으로 교환",
+    description=(
+        "OAuth callback URL에 포함된 일회용 `login_code`를 검증하고 Bearer access token을 "
+        "발급합니다. login code는 한 번만 사용할 수 있고 짧은 시간 동안만 유효합니다."
+    ),
+    operation_id="exchange_oauth_login_code",
+    response_description="발급된 Bearer access token",
     # No rate_limit() dependency: this endpoint is intentionally
     # unauthenticated (it is how a client becomes authenticated), and
     # rate_limit() keys its bucket on current_user, which doesn't exist yet
     # here. The code itself (32 random bytes, 60s TTL, single-use) is the
     # security control against guessing.
-    responses={400: {"description": "코드가 유효하지 않거나 만료되었습니다"}},
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            **BAD_REQUEST_ERROR_RESPONSE,
+            "description": "login code가 유효하지 않거나 만료되었습니다.",
+        },
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
+    },
 )
 async def exchange_login_code(
     data: LoginCodeExchangeRequest,
@@ -302,10 +398,15 @@ async def exchange_login_code(
 @v1_router.patch(
     "/auth/me",
     tags=["auth"],
+    summary="현재 사용자 이름 수정",
+    description="인증된 사용자의 표시 이름을 수정합니다. 이메일과 Google 프로필 사진은 변경하지 않습니다.",
+    operation_id="update_current_user",
+    response_description="수정된 사용자 정보",
     dependencies=[rate_limit(10, per="minute"), quota(50, per="day")],
     responses={
-        401: {"description": "인증 실패"},
-        404: {"description": "사용자를 찾을 수 없습니다"},
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_404_NOT_FOUND: NOT_FOUND_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
     },
 )
 async def update_current_user(
@@ -335,7 +436,14 @@ async def update_current_user(
 
 
 @v1_router.post(
-    "/auth/logout", tags=["auth"], dependencies=[rate_limit(20, per="minute")]
+    "/auth/logout",
+    tags=["auth"],
+    summary="현재 세션 종료",
+    description="서버 세션을 삭제합니다. Bearer JWT를 사용하는 클라이언트는 보관 중인 토큰도 직접 삭제해야 합니다.",
+    operation_id="logout_current_user",
+    response_description="세션 종료 결과",
+    dependencies=[rate_limit(20, per="minute")],
+    responses={status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE},
 )
 async def logout_current_user(
     request: Request, current_user: _CurrentUser
@@ -353,14 +461,40 @@ _MAX_RISC_BODY_BYTES = 65_536
 @v1_router.post(
     "/auth/google/risc",
     tags=["auth"],
+    summary="Google RISC 보안 이벤트 수신",
+    description=(
+        "Google Cross-Account Protection의 Security Event Token(SET)을 검증하고 계정 비활성화, "
+        "세션 폐기 등의 보안 이벤트를 반영합니다. 요청 본문은 JSON이 아닌 compact JWT입니다."
+    ),
+    operation_id="receive_google_risc_event",
     status_code=status.HTTP_202_ACCEPTED,
+    response_description="RISC 이벤트 수락 결과",
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/secevent+jwt": {
+                    "schema": {
+                        "type": "string",
+                        "format": "jwt",
+                        "description": "Google이 서명한 RFC 8417 Security Event Token",
+                    }
+                }
+            },
+        }
+    },
     responses={
-        202: {"description": "Security Event Token accepted"},
-        400: {"description": "Malformed or unsupported Security Event Token"},
-        401: {"description": "Signature or claim verification failed"},
-        413: {"description": "Request body too large"},
-        415: {"description": "Content-Type must be application/secevent+jwt"},
-        503: {"description": "RISC verification temporarily unavailable"},
+        status.HTTP_202_ACCEPTED: {
+            "description": "Security Event Token을 수락하고 이벤트를 반영했습니다."
+        },
+        status.HTTP_400_BAD_REQUEST: BAD_REQUEST_ERROR_RESPONSE,
+        status.HTTP_401_UNAUTHORIZED: {
+            **AUTHENTICATION_ERROR_RESPONSE,
+            "description": "Security Event Token 서명 또는 claim 검증에 실패했습니다.",
+        },
+        status.HTTP_413_CONTENT_TOO_LARGE: PAYLOAD_TOO_LARGE_ERROR_RESPONSE,
+        status.HTTP_415_UNSUPPORTED_MEDIA_TYPE: UNSUPPORTED_MEDIA_TYPE_ERROR_RESPONSE,
+        status.HTTP_503_SERVICE_UNAVAILABLE: SERVICE_UNAVAILABLE_ERROR_RESPONSE,
     },
 )
 async def receive_google_risc_event(request: Request) -> Response:
@@ -381,7 +515,7 @@ async def receive_google_risc_event(request: Request) -> Response:
         total += len(chunk)
         if total > _MAX_RISC_BODY_BYTES:
             raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                 detail="Request body exceeds maximum allowed size",
             )
         chunks.append(chunk)
@@ -430,17 +564,49 @@ async def receive_google_risc_event(request: Request) -> Response:
 
 
 @v1_router.get(
-    "/job-postings", tags=["job-postings"], dependencies=[rate_limit(60, per="minute")]
+    "/job-postings",
+    tags=["job-postings"],
+    summary="저장된 채용 공고 목록 조회",
+    description=(
+        "현재 사용자가 저장한 채용 공고를 offset pagination으로 조회합니다. `group_id`를 지정하면 "
+        "해당 사용자의 구직 활동 그룹에 속한 공고만 반환합니다. 목록 응답은 본문 전문을 제외한 "
+        "경량 projection입니다."
+    ),
+    operation_id="list_saved_job_postings",
+    response_description="페이지네이션된 저장 채용 공고 목록",
+    dependencies=[rate_limit(60, per="minute")],
+    responses={
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_403_FORBIDDEN: FORBIDDEN_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
+    },
 )
 async def list_job_postings(
     request: Request,
     current_user: _CurrentUser,
-    offset: Annotated[int, Query(ge=0, description="Number of records to skip")] = 0,
+    offset: Annotated[
+        int,
+        Query(
+            ge=0,
+            description="건너뛸 레코드 수",
+            examples=[0],
+        ),
+    ] = 0,
     limit: Annotated[
-        int, Query(ge=1, le=100, description="Max records to return")
+        int,
+        Query(
+            ge=1,
+            le=100,
+            description="한 번에 반환할 최대 레코드 수",
+            examples=[20],
+        ),
     ] = 20,
     group_id: Annotated[
-        UUID | None, Query(description="Filter by job search group")
+        UUID | None,
+        Query(
+            description="특정 구직 활동 그룹으로 필터링할 UUID",
+            examples=["0196f4e8-3f2f-7c1f-b1a4-0d37d6b9a001"],
+        ),
     ] = None,
 ) -> ApiResponse[JobPostingPage]:
     async def operation(conn):
@@ -475,23 +641,45 @@ async def list_job_postings(
 @v1_router.get(
     "/job-postings/extraction",
     tags=["job-postings"],
+    summary="채용 공고 URL에서 정보 추출",
+    description=(
+        "지원되는 채용 플랫폼(Saramin 또는 Wanted)의 URL을 가져와 채용 공고 구조화 정보를 "
+        "추출합니다. 이 API는 결과를 저장하지 않으며, 추출 결과를 저장하려면 `POST /v1/job-postings`를 "
+        "호출해야 합니다."
+    ),
+    operation_id="extract_job_posting_from_url",
+    response_description="추출된 채용 공고 정보",
     dependencies=[
         rate_limit(10, per="minute"),
         quota(100, per="day"),
         quota(500, per="month"),
     ],
     responses={
-        400: {"description": "Invalid URL, unsupported domain, or missing posting ID"},
-        404: {"description": "URL returned a 404 from the upstream server"},
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_400_BAD_REQUEST: BAD_REQUEST_ERROR_RESPONSE,
+        status.HTTP_404_NOT_FOUND: {
+            **NOT_FOUND_ERROR_RESPONSE,
+            "description": "외부 채용 공고 URL에서 리소스를 찾을 수 없습니다.",
+        },
         # 422 is intentionally omitted: FastAPI auto-generates the HTTPValidationError
         # schema for the missing `url` query parameter. Adding a custom 422 entry here
         # would replace that schema. Model-refusal errors also arrive as 422 at runtime;
         # their detail string distinguishes them from validation failures.
-        502: {"description": "Upstream server unreachable"},
+        status.HTTP_502_BAD_GATEWAY: UPSTREAM_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
     },
 )
 async def get_job_posting_extraction(
-    url: Annotated[str, Query(description="Job posting URL")],
+    url: Annotated[
+        str,
+        Query(
+            description="추출할 Saramin 또는 Wanted 채용 공고 URL",
+            examples=[
+                "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930",
+                "https://www.wanted.co.kr/wd/123456",
+            ],
+        ),
+    ],
     request: Request,
     _current_user: _CurrentUser,
 ) -> ApiResponse[JobPostingExtracted]:
@@ -516,17 +704,31 @@ async def get_job_posting_extraction(
 @v1_router.post(
     "/job-postings",
     tags=["job-postings"],
+    summary="채용 공고 저장 또는 갱신",
+    description=(
+        "채용 공고 추출 결과를 사용자의 구직 활동 그룹에 upsert합니다. `group_id`를 생략하면 "
+        "현재 사용자의 가장 최근 활성 그룹에 저장합니다. 동일 플랫폼의 동일 공고가 이미 있으면 "
+        "기존 레코드를 갱신하고 200을 반환하며, 신규 저장이면 201을 반환합니다."
+    ),
+    operation_id="upsert_saved_job_posting",
     dependencies=[rate_limit(30, per="minute"), quota(500, per="day")],
     status_code=status.HTTP_201_CREATED,
     responses={
         # "model" causes FastAPI to emit a full JSON Schema $ref for this status code,
         # matching the 201 body. Without it the 200 entry has no content schema and
         # generated clients treat successful updates as empty responses.
-        200: {
+        status.HTTP_200_OK: {
             "model": ApiResponse[JobPostingStored],
-            "description": "Job posting updated (existing record)",
+            "description": "기존 채용 공고를 갱신했습니다.",
         },
-        201: {"description": "Job posting created"},
+        status.HTTP_201_CREATED: {
+            "model": ApiResponse[JobPostingStored],
+            "description": "채용 공고를 새로 저장했습니다.",
+        },
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_403_FORBIDDEN: FORBIDDEN_ERROR_RESPONSE,
+        status.HTTP_409_CONFLICT: CONFLICT_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
     },
 )
 async def create_job_posting(
@@ -582,11 +784,22 @@ async def create_job_posting(
 @v1_router.get(
     "/job-postings/{job_id}",
     tags=["job-postings"],
+    summary="저장된 채용 공고 상세 조회",
+    description="현재 사용자가 저장한 채용 공고 한 건을 상세 조회합니다. 다른 사용자의 공고는 조회할 수 없습니다.",
+    operation_id="get_saved_job_posting",
+    response_description="저장된 채용 공고 상세 정보",
     dependencies=[rate_limit(60, per="minute")],
-    responses={404: {"description": "Job posting not found"}},
+    responses={
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_404_NOT_FOUND: NOT_FOUND_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
+    },
 )
 async def get_job_posting_detail(
-    job_id: int,
+    job_id: Annotated[
+        int,
+        Path(ge=1, description="저장된 채용 공고 ID", examples=[101]),
+    ],
     request: Request,
     current_user: _CurrentUser,
 ) -> ApiResponse[JobPostingStored]:
@@ -609,14 +822,26 @@ async def get_job_posting_detail(
 @v1_router.patch(
     "/job-postings/{job_id}",
     tags=["job-postings"],
+    summary="저장된 채용 공고 부분 수정",
+    description=(
+        "저장된 채용 공고의 지원 상태, 구직 활동 그룹 또는 메모만 부분 수정합니다. `memo: null`은 "
+        "기존 메모를 삭제한다는 의미이며, `application_status`와 `group_id`는 null일 수 없습니다."
+    ),
+    operation_id="update_saved_job_posting",
+    response_description="수정된 저장 채용 공고",
     dependencies=[rate_limit(30, per="minute")],
     responses={
-        404: {"description": "Job posting or target group not found"},
-        409: {"description": "Target group already contains this posting"},
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_404_NOT_FOUND: NOT_FOUND_ERROR_RESPONSE,
+        status.HTTP_409_CONFLICT: CONFLICT_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
     },
 )
 async def update_job_posting(
-    job_id: int,
+    job_id: Annotated[
+        int,
+        Path(ge=1, description="수정할 저장 채용 공고 ID", examples=[101]),
+    ],
     data: JobPostingUpdateRequest,
     request: Request,
     current_user: _CurrentUser,
@@ -681,17 +906,35 @@ async def update_job_posting(
 @v1_router.get(
     "/job-search-groups",
     tags=["job-search-groups"],
+    summary="구직 활동 그룹 목록 조회",
+    description=(
+        "현재 사용자의 구직 활동 그룹을 조회합니다. `status=active` 또는 `status=ended`로 상태를 "
+        "필터링할 수 있으며, 각 목록 항목에는 해당 그룹에 저장된 공고 수가 포함됩니다."
+    ),
+    operation_id="list_job_search_groups",
+    response_description="페이지네이션된 구직 활동 그룹 목록",
     dependencies=[rate_limit(60, per="minute")],
+    responses={
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
+    },
 )
 async def list_job_search_groups(
     request: Request,
     current_user: _CurrentUser,
     status_filter: Annotated[
         Literal["active", "ended"] | None,
-        Query(alias="status", description="Filter by group status"),
+        Query(
+            alias="status",
+            description="구직 활동 그룹 상태 필터",
+            examples=["active"],
+        ),
     ] = None,
-    offset: Annotated[int, Query(ge=0)] = 0,
-    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0, description="건너뛸 그룹 수", examples=[0])] = 0,
+    limit: Annotated[
+        int,
+        Query(ge=1, le=100, description="반환할 최대 그룹 수", examples=[20]),
+    ] = 20,
 ) -> ApiResponse[JobSearchGroupPage]:
     async def operation(conn):
         return await get_job_search_groups(
@@ -718,8 +961,19 @@ async def list_job_search_groups(
 @v1_router.post(
     "/job-search-groups",
     tags=["job-search-groups"],
+    summary="구직 활동 그룹 생성",
+    description=(
+        "채용 공고를 묶어 관리할 새로운 구직 활동 그룹을 생성합니다. `started_at`을 생략하면 "
+        "오늘 날짜가 사용됩니다. 사용자는 항상 하나 이상의 그룹을 보유해야 합니다."
+    ),
+    operation_id="create_job_search_group",
+    response_description="생성된 구직 활동 그룹",
     dependencies=[rate_limit(10, per="minute"), quota(50, per="day")],
     status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
+    },
 )
 async def create_job_search_group_handler(
     data: JobSearchGroupCreate,
@@ -754,10 +1008,26 @@ async def create_job_search_group_handler(
 @v1_router.get(
     "/job-search-groups/{group_id}",
     tags=["job-search-groups"],
+    summary="구직 활동 그룹 상세 조회",
+    description="현재 사용자의 구직 활동 그룹 한 건을 UUID로 조회합니다.",
+    operation_id="get_job_search_group",
+    response_description="구직 활동 그룹 상세 정보",
     dependencies=[rate_limit(60, per="minute")],
+    responses={
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_403_FORBIDDEN: FORBIDDEN_ERROR_RESPONSE,
+        status.HTTP_404_NOT_FOUND: NOT_FOUND_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
+    },
 )
 async def get_job_search_group_handler(
-    group_id: UUID,
+    group_id: Annotated[
+        UUID,
+        Path(
+            description="조회할 구직 활동 그룹 UUID",
+            examples=["0196f4e8-3f2f-7c1f-b1a4-0d37d6b9a001"],
+        ),
+    ],
     request: Request,
     current_user: _CurrentUser,
 ) -> ApiResponse[JobSearchGroup]:
@@ -785,10 +1055,29 @@ async def get_job_search_group_handler(
 @v1_router.patch(
     "/job-search-groups/{group_id}",
     tags=["job-search-groups"],
+    summary="구직 활동 그룹 수정",
+    description=(
+        "구직 활동 그룹의 이름, 시작일, 종료일 또는 메모를 부분 수정합니다. 시작일과 종료일의 "
+        "순서는 서버에서 병합된 최종 상태 기준으로 검증합니다."
+    ),
+    operation_id="update_job_search_group",
+    response_description="수정된 구직 활동 그룹",
     dependencies=[rate_limit(20, per="minute"), quota(100, per="day")],
+    responses={
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_403_FORBIDDEN: FORBIDDEN_ERROR_RESPONSE,
+        status.HTTP_404_NOT_FOUND: NOT_FOUND_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
+    },
 )
 async def update_job_search_group_handler(
-    group_id: UUID,
+    group_id: Annotated[
+        UUID,
+        Path(
+            description="수정할 구직 활동 그룹 UUID",
+            examples=["0196f4e8-3f2f-7c1f-b1a4-0d37d6b9a001"],
+        ),
+    ],
     data: JobSearchGroupUpdate,
     request: Request,
     current_user: _CurrentUser,
@@ -850,11 +1139,30 @@ async def update_job_search_group_handler(
 @v1_router.delete(
     "/job-search-groups/{group_id}",
     tags=["job-search-groups"],
+    summary="구직 활동 그룹 삭제",
+    description=(
+        "현재 사용자의 구직 활동 그룹을 삭제합니다. 사용자의 마지막 그룹은 구직 공고의 소속을 "
+        "잃지 않도록 삭제할 수 없습니다."
+    ),
+    operation_id="delete_job_search_group",
+    response_description="삭제 완료. 응답 본문은 없습니다.",
     dependencies=[rate_limit(10, per="minute")],
     status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_404_NOT_FOUND: NOT_FOUND_ERROR_RESPONSE,
+        status.HTTP_409_CONFLICT: CONFLICT_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
+    },
 )
 async def delete_job_search_group_handler(
-    group_id: UUID,
+    group_id: Annotated[
+        UUID,
+        Path(
+            description="삭제할 구직 활동 그룹 UUID",
+            examples=["0196f4e8-3f2f-7c1f-b1a4-0d37d6b9a001"],
+        ),
+    ],
     request: Request,
     current_user: _CurrentUser,
 ) -> Response:
@@ -890,8 +1198,18 @@ async def delete_job_search_group_handler(
 @v1_router.get(
     "/profile",
     tags=["profile"],
+    summary="커리어 프로필 조회",
+    description=(
+        "현재 사용자의 커리어 프로필을 조회합니다. 프로필이 아직 생성되지 않은 경우 404를 반환하며, "
+        "지원 전략 생성 전에 프로필을 먼저 작성해야 합니다."
+    ),
+    operation_id="get_current_user_profile",
+    response_description="현재 사용자의 커리어 프로필",
     dependencies=[rate_limit(60, per="minute")],
-    responses={404: {"description": "Profile not found"}},
+    responses={
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_404_NOT_FOUND: NOT_FOUND_ERROR_RESPONSE,
+    },
 )
 async def read_current_user_profile(
     request: Request,
@@ -916,14 +1234,23 @@ async def read_current_user_profile(
 @v1_router.put(
     "/profile",
     tags=["profile"],
+    summary="커리어 프로필 전체 교체",
+    description=(
+        "현재 사용자의 커리어 프로필을 전체 교체 방식으로 저장합니다. 처음 생성되면 201, 기존 프로필을 "
+        "교체하면 200을 반환합니다. 요청에서 생략한 필드는 null로 저장됩니다."
+    ),
+    operation_id="replace_current_user_profile",
+    response_description="저장된 커리어 프로필",
     dependencies=[rate_limit(20, per="minute")],
     responses={
         # "model" forces FastAPI to emit a body schema for the non-default 201,
         # so generated clients treat the create response as non-empty.
-        201: {
+        status.HTTP_201_CREATED: {
             "model": ApiResponse[UserProfile],
-            "description": "Profile created",
+            "description": "커리어 프로필을 새로 생성했습니다.",
         },
+        status.HTTP_401_UNAUTHORIZED: AUTHENTICATION_ERROR_RESPONSE,
+        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
     },
 )
 async def replace_current_user_profile(

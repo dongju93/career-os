@@ -125,9 +125,75 @@ _production_servers = (
     else None
 )
 
+_API_DESCRIPTION = """
+Career OS의 구직 활동 관리 및 지원 전략 생성 API입니다.
+
+## 인증
+
+보호된 API는 `Authorization: Bearer <JWT>` 헤더 또는 웹 클라이언트용 세션 쿠키와
+`X-Career-OS-Client: web` 헤더로 인증합니다. OAuth 로그인은 `/v1/auth/google`에서
+시작하고, 쿠키를 사용할 수 없는 브라우저는 callback의 `login_code`를
+`/v1/auth/token`으로 교환할 수 있습니다.
+
+## 응답 형식
+
+성공 응답은 `status`, `message`, `data`를 포함하는 공통 envelope를 사용합니다.
+오류 응답은 RFC 7807 `application/problem+json` 형식입니다.
+
+## 페이지네이션
+
+목록 API는 `offset`과 `limit` 기반 페이지네이션을 사용하며, 응답의 `data` 안에
+`items`, `total`, `offset`, `limit`을 제공합니다.
+
+## 주의사항
+
+`/v1/chatkit`은 ChatKit 프로토콜에 따라 스트리밍 또는 JSON 응답을 반환합니다.
+`/v1/agent/*`는 기능 플래그가 활성화된 환경에서만 사용할 수 있으며,
+생성된 지원 전략이나 지원 자료는 참고용으로 검토 후 사용해야 합니다.
+"""
+
+_OPENAPI_TAGS = [
+    {
+        "name": "system",
+        "description": "서비스 상태와 데이터베이스 연결 상태를 확인하는 공개 API",
+    },
+    {
+        "name": "auth",
+        "description": "Google OAuth 로그인, 토큰 교환, 세션 및 사용자 계정 API",
+    },
+    {
+        "name": "job-postings",
+        "description": "채용 공고 추출, 저장, 조회 및 지원 상태 관리 API",
+    },
+    {
+        "name": "job-search-groups",
+        "description": "구직 활동 단위의 생성, 조회, 수정 및 삭제 API",
+    },
+    {
+        "name": "profile",
+        "description": "지원 전략에 사용하는 사용자의 커리어 프로필 API",
+    },
+    {
+        "name": "chatkit",
+        "description": "저장된 채용 공고를 조회하는 ChatKit 기반 대화 API",
+    },
+    {
+        "name": "agent",
+        "description": "커리어 프로필과 저장 공고를 바탕으로 지원 전략을 생성하는 API",
+    },
+]
+
 career_os = FastAPI(
     lifespan=lifespan,
     title="Career OS API",
+    summary="구직 활동 관리와 맞춤형 지원 전략을 제공하는 백엔드 API",
+    description=_API_DESCRIPTION,
+    version="0.1.0",
+    contact={
+        "name": "Career OS Engineering",
+        "url": "https://github.com/dongju93/career-os",
+    },
+    openapi_tags=_OPENAPI_TAGS,
     docs_url=f"/{API_V1}/docs",
     redoc_url=f"/{API_V1}/redoc",
     servers=_production_servers,
