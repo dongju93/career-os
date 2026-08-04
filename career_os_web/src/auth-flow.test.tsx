@@ -33,6 +33,26 @@ function apiResponse<T>(data: T, status = 200) {
 }
 
 describe('authentication flow', () => {
+  it('shows an accessible status while checking the session', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise(() => {})),
+    );
+
+    renderRoute('/job-postings');
+
+    expect(screen.getByRole('main', { name: '인증 확인 중' })).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(
+      screen.getByText('안전하게 계정 정보를 확인하고 있습니다.'),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('heading', { name: /^채용공고$/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it('redirects unauthenticated visitors to the login page with the original path', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
