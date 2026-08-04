@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../store/auth-store';
@@ -175,6 +175,42 @@ describe('JobSearchGroupsPage', () => {
         started_at: formatLocalDateInputValue(),
       });
     });
+  });
+
+  it('uses the shared dialog and field error accessibility contract', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', makeGroupsFetchMock([activeGroup], []));
+
+    renderRoute('/job-search-groups');
+
+    await screen.findByText('2026년 상반기 취업');
+    await user.click(
+      screen.getAllByRole('button', { name: /새 구직 활동/i })[0],
+    );
+
+    const dialog = await screen.findByRole('dialog', {
+      name: '새 구직 활동',
+    });
+    const nameInput = within(dialog).getByRole('textbox', { name: '이름' });
+
+    expect(nameInput).toHaveClass('input-clean');
+    expect(
+      within(dialog).getByRole('button', { name: '대화상자 닫기' }),
+    ).toBeInTheDocument();
+
+    await user.clear(nameInput);
+    await user.click(within(dialog).getByRole('button', { name: '저장' }));
+
+    await waitFor(() => expect(nameInput).toHaveFocus());
+    expect(nameInput).toHaveAttribute('aria-invalid', 'true');
+    expect(nameInput).toHaveAccessibleDescription('그룹 이름을 입력해주세요.');
+
+    await user.type(nameInput, '새 활동');
+
+    expect(nameInput).not.toHaveAttribute('aria-invalid');
+    expect(
+      within(dialog).queryByText('그룹 이름을 입력해주세요.'),
+    ).not.toBeInTheDocument();
   });
 
   it('ends an active group after inline confirmation', async () => {

@@ -37,7 +37,10 @@ Every surface layers translucent frosted-glass panels on a bright, light backgro
 - Glass surfaces use white-channel backgrounds with `backdrop-filter: blur(20px) saturate(120%)` and dark-channel borders (`rgba(0,0,0,0.06)`), not white borders.
 - Shadows use near-black with very low alpha. Tailwind `gray-*` utilities are currently used for neutral helper text, timestamps, and avatar shells.
 - Rounded corners: `rounded-2xl` on cards, `rounded-xl` on interactive elements, `rounded-full` on badges, chips, and avatars.
-- Never use Mantine component primitives for new UI — use the custom components in `src/components/ui/`.
+- `src/components/ui/` is the public UI boundary. Mantine may back a
+  project-owned high-level overlay such as `Dialog`, but pages never import
+  Mantine controls directly; buttons, fields, errors, and dialog content use
+  the shared project primitives.
 - Primary action and body copy is Korean. Brand labels, page super-labels, platform IDs, and the login badge may use English exactly as implemented.
 - Icons come from `lucide-react`; `LoginPage` keeps an inline Google brand SVG for the OAuth button.
 
@@ -421,7 +424,7 @@ active:scale-[0.97]
 
 ### Reduced Motion
 
-All motion respects `prefers-reduced-motion: reduce`, softened case-by-case in `src/index.css` (never a blanket `* { animation-duration: 0.01ms }`, which can make looping animations *more* jarring):
+All motion respects `prefers-reduced-motion: reduce`, softened case-by-case in `src/index.css` (never a blanket `* { animation-duration: 0.01ms }`, which can make looping animations _more_ jarring):
 
 - `.animate-fade-in` / `.animate-slide-in` → fall back to `fade-in-soft` (opacity only, no translate).
 - `.glass-hover:hover` → keeps its colour/shadow feedback but drops the `-2px` lift.
@@ -626,7 +629,11 @@ Each nav item is a React Router `<NavLink>` rendered with `isActive` from the ro
 
 ## 12. UI Component Specifications
 
-All components live in `src/components/ui/`. They use Radix UI primitives where needed and are styled with CVA variants and/or direct Tailwind classes. Import `cn` from `@/lib/utils` when class merging is needed.
+All components live in `src/components/ui/`. They use Radix or Mantine only as
+an internal behavior layer where needed and are styled with CVA variants and/or
+direct Tailwind classes. Pages import this project-owned layer rather than the
+underlying component library. Import `cn` from `@/lib/utils` when class merging
+is needed.
 
 ### `Button` (`button.tsx`)
 
@@ -721,6 +728,21 @@ min-h-24 py-3 resize-none
 ```
 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70
 ```
+
+### `Dialog` (`dialog.tsx`)
+
+The project-owned modal-dialog boundary, backed internally by Mantine `Modal`.
+Its required string `title` prop prevents call sites from omitting the visible
+title that Mantine connects with `aria-labelledby`; non-empty copy remains a
+review convention. The wrapper keeps focus trapping, Escape-to-close, scroll
+locking, focus restoration, centering, close-button naming, and overlay/content
+styling consistent. Page code supplies only `opened`, `onClose`, `title`, and
+children, so it cannot disable those accessibility behaviors.
+
+Use `Dialog` for page-level modal forms and confirmations. Its content must use
+the project `Button`, `Input`, `Textarea`, `Label`, and `Alert` primitives. The
+native mobile navigation drawer and non-modal ChatKit assistant have different
+interaction contracts and are not interchangeable with this pattern.
 
 ### `Alert` (`alert.tsx`)
 
@@ -945,6 +967,20 @@ Three phases driven by local state:
 - Success icon: `rounded-full bg-emerald-400/10 text-emerald-400 border border-emerald-400/20`
 - Two CTAs: `<Button variant="outline">` (back to list) + `<Button>` (register another)
 
+### `JobSearchGroupsPage` (`src/pages/job-search-groups-page.tsx`)
+
+- Root: `animate-fade-in space-y-8`; active and ended groups render in separate
+  responsive card grids.
+- Create/edit and delete confirmation overlays use the shared `<Dialog>`
+  primitive. Dialog contents use only project `Button`, `Input`, `Textarea`,
+  `Label`, and `Alert` primitives.
+- The create/edit dialog is a semantic `<form>`: Enter submits, Cancel is an
+  explicit `type="button"`, and the name field receives initial focus.
+- An empty name is a field error: `Input error` sets `aria-invalid`, the message
+  is linked with `aria-describedby`, and focus returns to the name field.
+  Save/delete request failures use `<Alert variant="destructive">` instead of
+  being attached to an unrelated field.
+
 ### `LoginPage` (`src/pages/login-page.tsx`)
 
 - Root: `relative isolate flex min-h-screen items-center justify-center overflow-hidden px-4 py-10`
@@ -1029,7 +1065,11 @@ Tailwind defaults only. No custom breakpoints.
 
 ## 17. Mantine Configuration Notes
 
-`MantineProvider` wraps the app root for theme consistency, but **no Mantine component primitives are used anywhere in the UI**. The Mantine theme in `src/app/theme.ts`:
+`MantineProvider` wraps the app root. Mantine is restricted to implementation
+details of project-owned, high-level overlay primitives; currently
+`src/components/ui/dialog.tsx` uses `Modal` for its overlay lifecycle.
+Pages and feature components do not import Mantine controls directly. The
+Mantine theme in `src/app/theme.ts`:
 
 ```ts
 {
@@ -1043,7 +1083,12 @@ Tailwind defaults only. No custom breakpoints.
 }
 ```
 
-**Rule:** Do not add new Mantine component usages. All new UI must use the `src/components/ui/` primitives described in §12.
+**Boundary:** New screens use the `src/components/ui/` primitives described in
+§12. A new direct Mantine usage is allowed only inside that layer when a
+high-level overlay behavior is not already covered; it must expose a narrowed
+project contract and keep styling/accessibility policy centralized. Mantine
+buttons, inputs, textareas, and other page-level visual primitives are not
+allowed.
 
 ---
 
@@ -1057,6 +1102,10 @@ When adding a new authenticated page:
 - [ ] Use the `AppLayout` `max-w-6xl mx-auto` wrapper by default; narrower focused flows may use a local wrapper such as `mx-auto max-w-4xl`
 - [ ] Use `<Card>` (default `glass={true}`) for content panels
 - [ ] Use `<Button>` variants from §12 — never raw `<button>`
+- [ ] Use `<Input>` / `<Textarea>` with `<Label htmlFor>`; connect field errors
+      with `error` + `aria-describedby`, and show request failures with `<Alert>`
+- [ ] Use `<Dialog>` for page-level modal forms and confirmations; do not import
+      Mantine components in the page
 - [ ] Korean primary UI copy, with existing English brand/super-label conventions preserved
 - [ ] Icons from `lucide-react`, except approved brand SVGs such as the Google OAuth mark
 - [ ] Import `cn` from `@/lib/utils` if conditional class merging is needed

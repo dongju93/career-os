@@ -1,4 +1,3 @@
-import { Modal, Textarea, TextInput } from '@mantine/core';
 import {
   AlertCircle,
   Briefcase,
@@ -8,13 +7,17 @@ import {
   RefreshCw,
   Trash2,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Dialog } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
 import { useDocumentTitle } from '@/hooks/use-document-title';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import {
@@ -46,6 +49,17 @@ type ModalState =
   | { type: 'create' }
   | { type: 'edit'; group: JobSearchGroupItem }
   | { type: 'delete'; group: JobSearchGroupItem };
+
+type GroupFormError =
+  | { type: 'name'; message: string }
+  | { type: 'submit'; message: string };
+
+const GROUP_NAME_INPUT_ID = 'job-search-group-name';
+const GROUP_NAME_ERROR_ID = `${GROUP_NAME_INPUT_ID}-error`;
+const GROUP_STARTED_AT_INPUT_ID = 'job-search-group-started-at';
+const GROUP_ENDED_AT_INPUT_ID = 'job-search-group-ended-at';
+const GROUP_ENDED_AT_DESCRIPTION_ID = `${GROUP_ENDED_AT_INPUT_ID}-description`;
+const GROUP_MEMO_INPUT_ID = 'job-search-group-memo';
 
 function GroupCardSkeleton() {
   return (
@@ -184,7 +198,7 @@ export function JobSearchGroupsPage() {
   );
   const [formEndedAt, setFormEndedAt] = useState('');
   const [formMemo, setFormMemo] = useState('');
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<GroupFormError | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -244,9 +258,14 @@ export function JobSearchGroupsPage() {
     setModal({ type: 'closed' });
   }
 
-  async function handleFormSubmit() {
+  async function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
     if (!formName.trim()) {
-      setFormError('그룹 이름을 입력해주세요.');
+      setFormError({ type: 'name', message: '그룹 이름을 입력해주세요.' });
+      requestAnimationFrame(() =>
+        document.getElementById(GROUP_NAME_INPUT_ID)?.focus(),
+      );
       return;
     }
 
@@ -270,7 +289,7 @@ export function JobSearchGroupsPage() {
       await loadGroups();
     } catch (err) {
       const { message } = toUserFacingError(err, '저장에 실패했습니다.');
-      setFormError(message);
+      setFormError({ type: 'submit', message });
     } finally {
       setIsSaving(false);
     }
@@ -430,58 +449,93 @@ export function JobSearchGroupsPage() {
       )}
 
       {/* Create / Edit Modal */}
-      <Modal
+      <Dialog
         opened={isFormOpen}
         onClose={closeModal}
         title={isEditMode ? '구직 활동 수정' : '새 구직 활동'}
-        centered
       >
-        <div className="space-y-4">
-          <TextInput
-            label="이름"
-            placeholder="예: 2026년 상반기 취업"
-            required
-            value={formName}
-            onChange={(e) => setFormName(e.currentTarget.value)}
-          />
-          <TextInput
-            label="시작일"
-            type="date"
-            value={formStartedAt}
-            onChange={(e) => setFormStartedAt(e.currentTarget.value)}
-          />
-          <TextInput
-            label="종료일"
-            type="date"
-            value={formEndedAt}
-            onChange={(e) => setFormEndedAt(e.currentTarget.value)}
-            description="비워두면 진행 중으로 유지됩니다"
-          />
-          <Textarea
-            label="메모"
-            placeholder="이번 구직 활동에 대한 메모 (선택)"
-            rows={3}
-            value={formMemo}
-            onChange={(e) => setFormMemo(e.currentTarget.value)}
-          />
-          {formError && <p className="text-sm text-red-500">{formError}</p>}
+        <form className="space-y-4" noValidate onSubmit={handleFormSubmit}>
+          <div className="space-y-1.5">
+            <Label htmlFor={GROUP_NAME_INPUT_ID}>이름</Label>
+            <Input
+              aria-describedby={
+                formError?.type === 'name' ? GROUP_NAME_ERROR_ID : undefined
+              }
+              data-autofocus
+              error={formError?.type === 'name'}
+              id={GROUP_NAME_INPUT_ID}
+              placeholder="예: 2026년 상반기 취업"
+              required
+              value={formName}
+              onChange={(event) => {
+                setFormName(event.currentTarget.value);
+                if (formError?.type === 'name') setFormError(null);
+              }}
+            />
+            {formError?.type === 'name' && (
+              <p className="text-xs text-red-500" id={GROUP_NAME_ERROR_ID}>
+                {formError.message}
+              </p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={GROUP_STARTED_AT_INPUT_ID}>시작일</Label>
+            <Input
+              id={GROUP_STARTED_AT_INPUT_ID}
+              type="date"
+              value={formStartedAt}
+              onChange={(event) => setFormStartedAt(event.currentTarget.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={GROUP_ENDED_AT_INPUT_ID}>종료일</Label>
+            <p
+              className="text-xs text-muted-foreground"
+              id={GROUP_ENDED_AT_DESCRIPTION_ID}
+            >
+              비워두면 진행 중으로 유지됩니다
+            </p>
+            <Input
+              aria-describedby={GROUP_ENDED_AT_DESCRIPTION_ID}
+              id={GROUP_ENDED_AT_INPUT_ID}
+              type="date"
+              value={formEndedAt}
+              onChange={(event) => setFormEndedAt(event.currentTarget.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={GROUP_MEMO_INPUT_ID}>메모</Label>
+            <Textarea
+              id={GROUP_MEMO_INPUT_ID}
+              placeholder="이번 구직 활동에 대한 메모 (선택)"
+              rows={3}
+              value={formMemo}
+              onChange={(event) => setFormMemo(event.currentTarget.value)}
+            />
+          </div>
+          {formError?.type === 'submit' && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>저장 오류</AlertTitle>
+              <AlertDescription>{formError.message}</AlertDescription>
+            </Alert>
+          )}
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" onClick={closeModal}>
+            <Button type="button" variant="outline" onClick={closeModal}>
               취소
             </Button>
-            <Button loading={isSaving} onClick={handleFormSubmit}>
+            <Button loading={isSaving} type="submit">
               저장
             </Button>
           </div>
-        </div>
-      </Modal>
+        </form>
+      </Dialog>
 
       {/* Delete Confirmation Modal */}
-      <Modal
+      <Dialog
         opened={modal.type === 'delete'}
         onClose={closeModal}
         title="구직 활동 삭제"
-        centered
       >
         {modal.type === 'delete' && (
           <div className="space-y-4">
@@ -495,7 +549,11 @@ export function JobSearchGroupsPage() {
               </p>
             </div>
             {deleteError && (
-              <p className="text-sm text-red-500">{deleteError}</p>
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>삭제 오류</AlertTitle>
+                <AlertDescription>{deleteError}</AlertDescription>
+              </Alert>
             )}
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={closeModal}>
@@ -512,7 +570,7 @@ export function JobSearchGroupsPage() {
             </div>
           </div>
         )}
-      </Modal>
+      </Dialog>
     </div>
   );
 }
