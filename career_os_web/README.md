@@ -82,11 +82,11 @@ pnpm dev
 | ---------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **React 19**                 | UI 라이브러리            | 컴포넌트 기반 UI 작성 모델이 안정적이고 생태계가 가장 넓음. SPA를 시작점으로 두면서도 이후 라우팅, 테스트, 최적화 도구 선택지가 풍부함                                       |
 | **TypeScript 7**             | 정적 타입 시스템         | 화면 상태와 API 응답 계약을 컴파일 단계에서 검증할 수 있어 리팩터링 안정성이 높음. native preview는 기존 TypeScript 생태계를 유지하면서 타입 체크 성능 개선을 기대할 수 있음 |
-| **Vite 8**                   | 개발 서버·번들러         | 개발 서버 시작과 HMR이 빠르고 설정 부담이 낮음. React, Tailwind CSS, Vitest 등 현대 프론트엔드 도구와의 플러그인 생태계가 성숙함                                             |
+| **Vite 8**                   | 개발 서버·번들러         | 개발 서버 시작과 HMR이 빠르고 설정 부담이 낮음. React, StyleX, Vitest 등 현대 프론트엔드 도구와의 플러그인 생태계가 성숙함                                             |
 | **Mantine 9**                | UI 컴포넌트 라이브러리   | 접근성, 테마, 기본 컴포넌트 품질을 빠르게 확보할 수 있음. 모든 UI를 직접 구현하는 비용을 줄이면서도 커스터마이징 여지가 충분함                                               |
 | **React Router 7**           | 클라이언트 사이드 라우팅 | React 생태계의 대표 라우터로 SPA 라우팅부터 확장된 데이터·프레임워크 모드까지 선택지가 넓음. URL 기반 화면 구조와 인증 흐름을 명확히 표현하기 좋음                           |
 | **Zustand 5**                | 전역 상태 관리           | Provider 중심 구조 없이 hook 기반으로 필요한 전역 상태만 작게 관리할 수 있음. Redux 계열보다 보일러플레이트가 적고 Context보다 렌더링 제어가 쉬움                            |
-| **Tailwind CSS 4**           | 유틸리티 퍼스트 CSS      | 디자인 토큰과 유틸리티 클래스로 일관된 UI를 빠르게 구성할 수 있음. 런타임 CSS-in-JS 없이 빌드 타임에 스타일을 생성해 번들·런타임 부담이 낮음                                 |
+| **StyleX**           | 컴파일 기반 스타일링      | 타입이 있는 스타일 선언과 조건부 조합으로 UI를 구성함. Vite 플러그인이 정적 CSS를 생성하며 공통 컴포넌트는 `xstyle`로 속성별 덮어쓰기를 지원함                                 |
 | **React Compiler**           | 빌드 타임 최적화         | React 팀이 제공하는 자동 메모이제이션 경로라 수동 최적화 코드의 남용을 줄일 수 있음. React 19 기반 프로젝트에서 장기적인 최적화 방향과 잘 맞음                               |
 | **Biome**                    | 린터·포매터              | 포맷터와 린터를 한 도구로 통합해 ESLint·Prettier 조합보다 설정과 실행 흐름이 단순함. Rust 기반이라 대규모 검사에서도 피드백이 빠름                                           |
 | **Vitest + Testing Library** | 단위·컴포넌트 테스트     | Vite 기반 프로젝트와 설정·변환 파이프라인을 공유해 테스트 환경 구성이 단순함. Testing Library는 구현 세부보다 사용자 관점 검증을 유도함                                      |
@@ -102,14 +102,14 @@ pnpm dev
 **글래스모피즘(Glassmorphism)** 테마를 기반으로, 실용적인 구직 관리 도구에 시각적 깊이감을 부여합니다.
 
 - **배경 레이어**: 페이지 전체에 흐릿한 색상 그라디언트 블롭(cyan/teal/purple)을 배치해 생동감 있는 배경을 구성합니다.
-- **Glass 카드**: `backdrop-filter: blur` + 반투명 흰색 배경으로 배경이 살짝 비쳐 보이는 유리 효과를 연출합니다. `.glass`, `.glass-strong`, `.glass-light` 세 단계로 강도를 구분해 레이어 계층을 표현합니다.
-- **컬러 토큰**: 전체 색상은 `src/index.css`의 CSS 커스텀 프로퍼티(`--primary: hsl(185 72% 42%)`)로 정의하고, Tailwind `@theme inline`으로 유틸리티 클래스와 연결합니다. 한 곳만 바꾸면 전체 테마가 반영되는 구조입니다.
+- **Glass 카드**: `backdrop-filter: blur` + 반투명 흰색 배경으로 배경이 살짝 비쳐 보이는 유리 효과를 연출합니다. `surfaces.glass`, `surfaces.glassStrong`, `surfaces.glassLight` 세 단계로 강도를 구분해 레이어 계층을 표현합니다.
+- **컬러 토큰**: 전체 색상은 `src/index.css`의 CSS 커스텀 프로퍼티(`--primary: 185 72% 42%`)로 정의하고, StyleX 선언에서 `hsl(var(--primary))`로 참조합니다. 한 곳만 바꾸면 전체 테마가 반영되는 구조입니다.
 
 ```
 배경 블롭 (cyan/purple)
-  └─ .glass-strong 사이드바 (backdrop-filter: blur(24px))
-       └─ .glass 카드 (backdrop-filter: blur(20px))
-            └─ .glass-light 내부 칩 (backdrop-filter: blur(12px))
+  └─ surfaces.glassStrong 사이드바 (backdrop-filter: blur(24px))
+       └─ surfaces.glass 카드 (backdrop-filter: blur(20px))
+            └─ surfaces.glassLight 내부 칩 (backdrop-filter: blur(12px))
 ```
 
 ### 상태 설계 (State Design)
@@ -167,7 +167,7 @@ pnpm dev
 
 ### 접근성
 
-- 모든 아이콘 전용 버튼(`size="icon"`)에 `<span className="sr-only">` 레이블을 추가합니다.
+- 모든 아이콘 전용 버튼(`size="icon"`)에 StyleX로 시각적으로 숨긴 `<span>` 레이블을 추가합니다.
 - `:focus-visible` 링 스타일로 키보드 사용자의 포커스 위치를 항상 가시화합니다.
 - 외부 링크(`<a target="_blank">`)에 `rel="noreferrer"` + `title` 속성을 부여합니다.
 - 배경 장식 요소(블롭, accent bar 등)는 `aria-hidden="true"`로 스크린 리더에서 제외합니다.
