@@ -1,7 +1,8 @@
 import { ChatKit, useChatKit } from '@openai/chatkit-react';
+import * as stylex from '@stylexjs/stylex';
 import { History, MessageCircle, MessageCirclePlus, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { surfaces } from '@/styles/surfaces';
 import {
   chatKitFetch,
   getChatKitApiUrl,
@@ -26,8 +27,6 @@ import { useAuthStore } from '../store/auth-store';
 // Shared styling for the three header icon buttons. We use native <button>
 // elements (not the <Button> primitive) because the new-chat button needs a
 // forwarded ref for focus management, and <Button> does not forward refs.
-const HEADER_ACTION_CLASS =
-  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
 export function ChatKitFloatingAssistant() {
   const user = useAuthStore((state) => state.user);
@@ -146,12 +145,9 @@ export function ChatKitFloatingAssistant() {
           aria-expanded={open}
           aria-controls={hasOpened ? panelId : undefined}
           onClick={handleOpen}
-          className={cn(
-            'fixed right-4 bottom-4 z-60 flex h-13 w-13 items-center justify-center rounded-full bg-linear-to-br from-primary to-teal-400 text-primary-foreground shadow-lg shadow-primary/30 transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-            'md:right-6 md:bottom-6 md:h-14 md:w-14',
-          )}
+          {...stylex.props([styles.launcher, styles.launcherViewport])}
         >
-          <MessageCircle className="h-6 w-6" />
+          <MessageCircle {...stylex.props(styles.launcherIcon)} />
         </button>
       )}
 
@@ -165,49 +161,231 @@ export function ChatKitFloatingAssistant() {
           id={panelId}
           role="dialog"
           aria-label="AI 어시스턴트"
-          className={cn(
-            'glass-strong fixed z-60 flex flex-col overflow-hidden rounded-2xl',
-            'inset-x-3 top-16 bottom-3',
-            'md:inset-x-auto md:top-auto md:right-6 md:bottom-6 md:h-[min(680px,calc(100vh-6rem))] md:w-[min(420px,calc(100vw-2rem))]',
-            !open && 'hidden',
-          )}
+          {...stylex.props([
+            styles.panel,
+            surfaces.glassStrong,
+            styles.panelMobile,
+            styles.panelViewport,
+            !open && styles.hidden,
+          ])}
         >
-          <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-            <h2 className="text-sm font-bold tracking-tight">AI 어시스턴트</h2>
-            <div className="flex items-center gap-1">
+          <div {...stylex.props(styles.header)}>
+            <h2 {...stylex.props(styles.heading)}>AI 어시스턴트</h2>
+            <div {...stylex.props(styles.actions)}>
               <button
                 ref={firstActionRef}
                 type="button"
                 aria-label="새 채팅"
                 onClick={handleNewChat}
-                className={HEADER_ACTION_CLASS}
+                {...stylex.props(headerActionStyle)}
               >
-                <MessageCirclePlus className="h-4 w-4" />
+                <MessageCirclePlus {...stylex.props(styles.icon2)} />
               </button>
               <button
                 type="button"
                 aria-label="이전 채팅"
                 onClick={handleShowHistory}
-                className={HEADER_ACTION_CLASS}
+                {...stylex.props(headerActionStyle)}
               >
-                <History className="h-4 w-4" />
+                <History {...stylex.props(styles.icon2)} />
               </button>
               <button
                 type="button"
                 aria-label="닫기"
                 onClick={() => setOpen(false)}
-                className={HEADER_ACTION_CLASS}
+                {...stylex.props(headerActionStyle)}
               >
-                <X className="h-4 w-4" />
+                <X {...stylex.props(styles.icon2)} />
               </button>
             </div>
           </div>
 
-          <div className="min-h-0 flex-1">
-            <ChatKit control={control} className="h-full w-full" />
+          <div {...stylex.props(styles.body)}>
+            <ChatKit control={control} {...stylex.props(styles.icon3)} />
           </div>
         </div>
       )}
     </>
   );
 }
+
+const styles = stylex.create({
+  headerAction: {
+    display: 'inline-flex',
+    height: '2rem',
+    width: '2rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '.5rem',
+    color: {
+      default: 'hsl(var(--muted-foreground))',
+      ':hover': 'hsl(var(--foreground))',
+    },
+    transitionProperty:
+      'color, background-color, border-color, outline-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+    backgroundColor: {
+      default: null,
+      ':hover': 'color-mix(in oklab, #000 5%, transparent)',
+    },
+    outlineStyle: {
+      default: null,
+      ':focus-visible': 'solid',
+    },
+    outlineWidth: {
+      default: null,
+      ':focus-visible': '2px',
+    },
+    outlineColor: {
+      default: null,
+      ':focus-visible': 'hsl(var(--ring))',
+    },
+    outlineOffset: {
+      default: null,
+      ':focus-visible': '0px',
+    },
+  },
+  launcher: {
+    position: 'fixed',
+    right: '1rem',
+    bottom: '1rem',
+    zIndex: 60,
+    display: 'flex',
+    height: '3.25rem',
+    width: '3.25rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to bottom right in oklab, hsl(var(--primary)), oklch(77.7% .152 181.912))',
+    color: 'hsl(var(--primary-foreground))',
+    boxShadow:
+      '0 10px 15px -3px color-mix(in oklab, hsl(var(--primary)) 30%, transparent), 0 4px 6px -4px color-mix(in oklab, hsl(var(--primary)) 30%, transparent)',
+    transitionProperty: 'transform, translate, scale, rotate',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '200ms',
+    scale: {
+      default: null,
+      ':hover': '1.05',
+      ':active': '0.95',
+    },
+    outlineStyle: {
+      default: null,
+      ':focus-visible': 'solid',
+    },
+    outlineWidth: {
+      default: null,
+      ':focus-visible': '2px',
+    },
+    outlineColor: {
+      default: null,
+      ':focus-visible': 'hsl(var(--ring))',
+    },
+    outlineOffset: {
+      default: null,
+      ':focus-visible': '2px',
+    },
+  },
+  launcherViewport: {
+    right: {
+      default: '1rem',
+      '@media (min-width: 48rem)': '1.5rem',
+    },
+    bottom: {
+      default: '1rem',
+      '@media (min-width: 48rem)': '1.5rem',
+    },
+    height: {
+      default: '3.25rem',
+      '@media (min-width: 48rem)': '3.5rem',
+    },
+    width: {
+      default: '3.25rem',
+      '@media (min-width: 48rem)': '3.5rem',
+    },
+  },
+  launcherIcon: {
+    height: '1.5rem',
+    width: '1.5rem',
+  },
+  panel: {
+    position: 'fixed',
+    zIndex: 60,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: '1rem',
+  },
+  panelMobile: {
+    top: '4rem',
+    bottom: '0.75rem',
+    left: '0.75rem',
+    right: '0.75rem',
+  },
+  panelViewport: {
+    top: {
+      default: '4rem',
+      '@media (min-width: 48rem)': 'auto',
+    },
+    bottom: {
+      default: '0.75rem',
+      '@media (min-width: 48rem)': '1.5rem',
+    },
+    left: {
+      default: '0.75rem',
+      '@media (min-width: 48rem)': 'auto',
+    },
+    right: {
+      default: '0.75rem',
+      '@media (min-width: 48rem)': '1.5rem',
+    },
+    height: {
+      default: null,
+      '@media (min-width: 48rem)': 'min(680px,calc(100vh-6rem))',
+    },
+    width: {
+      default: null,
+      '@media (min-width: 48rem)': 'min(420px,calc(100vw-2rem))',
+    },
+  },
+  hidden: {
+    display: 'none',
+  },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: '1px',
+    borderColor: 'color-mix(in oklab, hsl(var(--border)) 60%, transparent)',
+    paddingLeft: '1rem',
+    paddingRight: '1rem',
+    paddingTop: '0.75rem',
+    paddingBottom: '0.75rem',
+  },
+  heading: {
+    fontSize: '.875rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  actions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.25rem',
+  },
+  icon2: {
+    height: '1rem',
+    width: '1rem',
+  },
+  body: {
+    minHeight: '0rem',
+    flex: '1',
+  },
+  icon3: {
+    height: '100%',
+    width: '100%',
+  },
+});
+
+const headerActionStyle = styles.headerAction;

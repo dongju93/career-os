@@ -1,24 +1,35 @@
+import * as stylex from '@stylexjs/stylex';
 import type { HTMLAttributes } from 'react';
-import { cn } from '@/lib/utils';
+import type { AppStyles } from '@/lib/styles';
+import { withClassName } from '@/lib/styles';
+import { surfaces } from '@/styles/surfaces';
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
+  xstyle?: AppStyles;
   glass?: boolean;
   interactive?: boolean;
 }
 
 export function Card({
   className,
+  xstyle,
   glass = true,
   interactive = false,
   ...props
 }: CardProps) {
   return (
     <div
-      className={cn(
-        'rounded-2xl',
-        glass
-          ? cn('glass', interactive && 'glass-hover cursor-pointer')
-          : 'surface',
+      {...withClassName(
+        [
+          styles.card,
+          glass
+            ? [
+                surfaces.glass,
+                interactive && [styles.interactiveCursor, surfaces.glassHover],
+              ]
+            : surfaces.surface,
+          xstyle,
+        ],
         className,
       )}
       {...props}
@@ -28,11 +39,13 @@ export function Card({
 
 export function CardHeader({
   className,
+  xstyle,
   ...props
-}: HTMLAttributes<HTMLDivElement>) {
+}: HTMLAttributes<HTMLDivElement> & { xstyle?: AppStyles }) {
   return (
     <div
-      className={cn('flex flex-col space-y-1.5 p-6', className)}
+      data-stack=""
+      {...withClassName([styles.header, xstyle], className)}
       {...props}
     />
   );
@@ -40,37 +53,83 @@ export function CardHeader({
 
 export function CardTitle({
   className,
+  xstyle,
   ...props
-}: HTMLAttributes<HTMLHeadingElement>) {
+}: HTMLAttributes<HTMLHeadingElement> & { xstyle?: AppStyles }) {
   return (
-    <h3
-      className={cn('text-xl font-bold leading-none tracking-tight', className)}
-      {...props}
-    />
+    <h3 {...withClassName([styles.title, xstyle], className)} {...props} />
   );
 }
 
 export function CardDescription({
   className,
+  xstyle,
   ...props
-}: HTMLAttributes<HTMLParagraphElement>) {
+}: HTMLAttributes<HTMLParagraphElement> & { xstyle?: AppStyles }) {
   return (
-    <p className={cn('text-sm text-muted-foreground', className)} {...props} />
+    <p {...withClassName([styles.description, xstyle], className)} {...props} />
   );
 }
 
 export function CardContent({
   className,
+  xstyle,
   ...props
-}: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('p-6 pt-0', className)} {...props} />;
+}: HTMLAttributes<HTMLDivElement> & { xstyle?: AppStyles }) {
+  return (
+    <div {...withClassName([styles.content, xstyle], className)} {...props} />
+  );
 }
 
 export function CardFooter({
   className,
+  xstyle,
   ...props
-}: HTMLAttributes<HTMLDivElement>) {
+}: HTMLAttributes<HTMLDivElement> & { xstyle?: AppStyles }) {
   return (
-    <div className={cn('flex items-center p-6 pt-0', className)} {...props} />
+    <div {...withClassName([styles.footer, xstyle], className)} {...props} />
   );
 }
+
+const styles = stylex.create({
+  card: {
+    borderRadius: '1rem',
+  },
+  interactiveCursor: {
+    cursor: 'pointer',
+  },
+  header: {
+    display: 'flex',
+    flexDirection: 'column',
+    '--stack-space': '0.375rem',
+    paddingTop: '1.5rem',
+    paddingRight: '1.5rem',
+    paddingBottom: '1.5rem',
+    paddingLeft: '1.5rem',
+  },
+  title: {
+    fontSize: '1.25rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  description: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'hsl(var(--muted-foreground))',
+  },
+  content: {
+    paddingTop: '0rem',
+    paddingRight: '1.5rem',
+    paddingBottom: '1.5rem',
+    paddingLeft: '1.5rem',
+  },
+  footer: {
+    display: 'flex',
+    alignItems: 'center',
+    paddingTop: '0rem',
+    paddingRight: '1.5rem',
+    paddingBottom: '1.5rem',
+    paddingLeft: '1.5rem',
+  },
+});

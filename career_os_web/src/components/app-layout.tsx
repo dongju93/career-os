@@ -1,3 +1,4 @@
+import * as stylex from '@stylexjs/stylex';
 import {
   Briefcase,
   ChevronRight,
@@ -11,7 +12,7 @@ import {
 } from 'lucide-react';
 import { Suspense, useEffect, useId, useRef, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
-import { cn } from '@/lib/utils';
+import { surfaces } from '@/styles/surfaces';
 import { logoutUser } from '../services/auth';
 import { resetAuthStore, useAuthStore } from '../store/auth-store';
 import { ChatKitFloatingAssistant } from './chatkit-floating-assistant';
@@ -67,44 +68,43 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   }
 
   return (
-    <div className="flex h-full flex-col p-5">
+    <div {...stylex.props(styles.sidebarContentRow)}>
       {/* Logo */}
-      <div className="mb-8 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-primary to-teal-400 text-sm font-black text-slate-900 shadow-lg shadow-primary/30">
-          CO
-        </div>
+      <div {...stylex.props(styles.sidebarContentRow2)}>
+        <div {...stylex.props(styles.sidebarContentRow3)}>CO</div>
         <div>
-          <span className="block text-lg font-bold tracking-tight">
-            Career OS
+          <span {...stylex.props(styles.sidebarContentText)}>Career OS</span>
+          <span {...stylex.props(styles.sidebarContentText2)}>
+            채용 관리 시스템
           </span>
-          <span className="block text-xs text-gray-600">채용 관리 시스템</span>
         </div>
         {/* The drawer is a modal <dialog>, so the background header toggle is
             inert while it is open — the close affordance must live inside. */}
         {onClose && (
           <button
             aria-label="메뉴 닫기"
-            className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            {...stylex.props(styles.sidebarContentButton)}
             type="button"
             onClick={onClose}
           >
-            <X className="h-5 w-5" />
+            <X {...stylex.props(styles.sidebarContentX)} />
           </button>
         )}
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1">
+      <nav {...stylex.props(styles.sidebarContentNav)}>
         {navigationItems.map(({ href, icon: Icon, label, description }) => (
           <NavLink
             key={href}
             end
             className={({ isActive }) =>
-              cn(
-                'group flex items-center gap-3 rounded-xl px-3 py-2.5 no-underline transition-all duration-200',
+              stylex.props([
+                styles.sidebarContentNavLink,
+                stylex.defaultMarker(),
                 isActive
-                  ? 'bg-primary/15 text-primary border border-primary/20'
-                  : 'text-gray-600 hover:bg-muted hover:text-foreground border border-transparent',
-              )
+                  ? styles.sidebarContentNavLink2
+                  : styles.sidebarContentNavLink3,
+              ]).className
             }
             to={href}
             onClick={onClose}
@@ -112,33 +112,37 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             {({ isActive }) => (
               <>
                 <div
-                  className={cn(
-                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors',
+                  {...stylex.props([
+                    styles.sidebarContentRow4,
                     isActive
-                      ? 'bg-primary text-slate-900 shadow-sm'
-                      : 'bg-muted text-gray-600 group-hover:bg-white/10 group-hover:text-primary',
-                  )}
+                      ? styles.sidebarContentContainer
+                      : styles.sidebarContentContainer2,
+                  ])}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon {...stylex.props(styles.sidebarContentIcon)} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold">{label}</div>
+                <div {...stylex.props(styles.sidebarContentContainer3)}>
+                  <div {...stylex.props(styles.sidebarContentContainer4)}>
+                    {label}
+                  </div>
                   <div
-                    className={cn(
-                      'text-xs',
-                      isActive ? 'text-primary/70' : 'text-gray-500',
-                    )}
+                    {...stylex.props([
+                      styles.sidebarContentContainer5,
+                      isActive
+                        ? styles.sidebarContentContainer6
+                        : styles.sidebarContentContainer7,
+                    ])}
                   >
                     {description}
                   </div>
                 </div>
                 <ChevronRight
-                  className={cn(
-                    'h-4 w-4 transition-all',
+                  {...stylex.props([
+                    styles.sidebarContentChevronRight,
                     isActive
-                      ? 'translate-x-0 opacity-100 text-primary'
-                      : '-translate-x-1 opacity-0',
-                  )}
+                      ? styles.sidebarContentChevronRight2
+                      : styles.sidebarContentChevronRight3,
+                  ])}
                 />
               </>
             )}
@@ -146,9 +150,9 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         ))}
       </nav>
 
-      <div className="mt-auto pt-4">
+      <div {...stylex.props(styles.sidebarContentContainer8)}>
         {user && (
-          <div className="flex items-center gap-3 rounded-xl border-white/12 bg-muted p-3">
+          <div {...stylex.props(styles.sidebarContentRow5)}>
             <AvatarRoot>
               {user.picture && (
                 <AvatarImage
@@ -161,24 +165,26 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                 {UserInitials(user.name, user.email)}
               </AvatarFallback>
             </AvatarRoot>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">
+            <div {...stylex.props(styles.sidebarContentContainer3)}>
+              <div {...stylex.props(styles.sidebarContentContainer9)}>
                 {user.name ?? user.email}
               </div>
               {user.name && (
-                <div className="text-xs text-gray-500 truncate">
+                <div {...stylex.props(styles.sidebarContentContainer10)}>
                   {user.email}
                 </div>
               )}
             </div>
             <Button
-              className="shrink-0"
+              xstyle={styles.sidebarContentButton2}
               size="icon"
               variant="ghost"
               onClick={handleLogout}
             >
-              <LogOut className="h-4 w-4" />
-              <span className="sr-only">로그아웃</span>
+              <LogOut {...stylex.props(styles.sidebarContentIcon)} />
+              <span {...stylex.props(styles.sidebarContentText3)}>
+                로그아웃
+              </span>
             </Button>
           </div>
         )}
@@ -225,37 +231,25 @@ export function AppLayout() {
   }, [mobileOpen]);
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
+    <div {...stylex.props(styles.appLayoutContainer)}>
       {/* Skip link — first focusable element; jumps keyboard/AT users past the
           sidebar nav straight to page content. Hidden until focused. */}
-      <a
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-slate-900 focus:shadow-lg"
-        href="#main-content"
-      >
+      <a {...stylex.props(styles.appLayoutLink)} href="#main-content">
         본문으로 건너뛰기
       </a>
 
       {/* Ambient background blobs — visible through glass */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -top-32 right-[-8rem] h-[28rem] w-[28rem] rounded-full bg-linear-to-br from-cyan-400/40 via-primary/25 to-transparent blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute bottom-0 left-[-6rem] h-96 w-96 rounded-full bg-linear-to-tr from-teal-400/35 via-primary/20 to-transparent blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute top-[30%] right-[10%] h-72 w-72 rounded-full bg-linear-to-br from-purple-500/30 to-pink-500/20 blur-3xl"
-      />
+      <div aria-hidden="true" {...stylex.props(styles.appLayoutContainer2)} />
+      <div aria-hidden="true" {...stylex.props(styles.appLayoutContainer3)} />
+      <div aria-hidden="true" {...stylex.props(styles.appLayoutContainer4)} />
 
       {/* Sidebar — glass-strong, background blur clearly visible */}
-      <aside className="fixed inset-y-0 left-0 z-50 hidden w-64 flex-col rounded-r-3xl border-r border glass-strong md:flex">
+      <aside {...stylex.props([styles.appLayoutAside, surfaces.glassStrong])}>
         <SidebarContent />
       </aside>
 
       {/* Mobile header — glass-strong */}
-      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border px-4 glass-strong md:hidden">
+      <header {...stylex.props([styles.appLayoutHeader, surfaces.glassStrong])}>
         <Button
           aria-controls={drawerId}
           aria-expanded={mobileOpen}
@@ -264,18 +258,16 @@ export function AppLayout() {
           variant="ghost"
           onClick={() => setMobileOpen(true)}
         >
-          <Menu className="h-5 w-5" />
-          <span className="sr-only">메뉴 열기</span>
+          <Menu {...stylex.props(styles.sidebarContentX)} />
+          <span {...stylex.props(styles.sidebarContentText3)}>메뉴 열기</span>
         </Button>
 
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-primary to-teal-400 text-xs font-black text-slate-900 shadow-md shadow-primary/30">
-            CO
-          </div>
-          <span className="text-base font-bold tracking-tight">Career OS</span>
+        <div {...stylex.props(styles.appLayoutRow)}>
+          <div {...stylex.props(styles.appLayoutRow2)}>CO</div>
+          <span {...stylex.props(styles.appLayoutText)}>Career OS</span>
         </div>
 
-        <AvatarRoot className="h-8 w-8">
+        <AvatarRoot xstyle={styles.appLayoutAvatarRoot}>
           {user?.picture && (
             <AvatarImage
               alt={user.name ?? ''}
@@ -283,7 +275,9 @@ export function AppLayout() {
               src={user.picture}
             />
           )}
-          <AvatarFallback className="text-xs">{userInitial}</AvatarFallback>
+          <AvatarFallback xstyle={styles.sidebarContentContainer5}>
+            {userInitial}
+          </AvatarFallback>
         </AvatarRoot>
       </header>
 
@@ -298,7 +292,7 @@ export function AppLayout() {
       <dialog
         ref={drawerRef}
         aria-label="주요 메뉴"
-        className="fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-none w-64 max-w-[80vw] rounded-r-3xl border-r border p-0 glass-strong backdrop:bg-black/20 backdrop:backdrop-blur-sm md:hidden"
+        {...stylex.props([styles.appLayoutDialog, surfaces.glassStrong])}
         id={drawerId}
         onClick={(event) => {
           // A click whose target is the dialog element itself (not its
@@ -312,16 +306,14 @@ export function AppLayout() {
 
       {/* Main content — pages float on the vibrant background */}
       <main
-        className="relative md:pl-64 outline-none"
+        {...stylex.props(styles.appLayoutMain)}
         id="main-content"
         tabIndex={-1}
       >
-        <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
+        <div {...stylex.props(styles.appLayoutContainer5)}>
           <Suspense
             fallback={
-              <div className="flex h-64 items-center justify-center text-sm text-gray-500">
-                로딩 중…
-              </div>
+              <div {...stylex.props(styles.appLayoutRow3)}>로딩 중…</div>
             }
           >
             <Outlet />
@@ -333,3 +325,510 @@ export function AppLayout() {
     </div>
   );
 }
+
+const styles = stylex.create({
+  sidebarContentRow: {
+    display: 'flex',
+    height: '100%',
+    flexDirection: 'column',
+    paddingTop: '1.25rem',
+    paddingRight: '1.25rem',
+    paddingBottom: '1.25rem',
+    paddingLeft: '1.25rem',
+  },
+  sidebarContentRow2: {
+    marginBottom: '2rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+  },
+  sidebarContentRow3: {
+    display: 'flex',
+    height: '2.5rem',
+    width: '2.5rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '.75rem',
+    backgroundImage:
+      'linear-gradient(to bottom right in oklab, hsl(var(--primary)), oklch(77.7% .152 181.912))',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    fontWeight: 900,
+    color: 'oklch(20.8% .042 265.755)',
+    boxShadow:
+      '0 10px 15px -3px color-mix(in oklab, hsl(var(--primary)) 30%, transparent), 0 4px 6px -4px color-mix(in oklab, hsl(var(--primary)) 30%, transparent)',
+  },
+  sidebarContentText: {
+    display: 'block',
+    fontSize: '1.125rem',
+    lineHeight: '1.75rem',
+    fontWeight: 700,
+    letterSpacing: '-.025em',
+  },
+  sidebarContentText2: {
+    display: 'block',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  sidebarContentButton: {
+    marginLeft: 'auto',
+    display: 'inline-flex',
+    height: '2.25rem',
+    width: '2.25rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '.5rem',
+    color: {
+      default: 'oklch(44.6% .03 256.802)',
+      ':hover': 'hsl(var(--foreground))',
+    },
+    transitionProperty:
+      'color, background-color, border-color, outline-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+    backgroundColor: {
+      default: null,
+      ':hover': 'hsl(var(--muted))',
+    },
+    outlineStyle: {
+      default: null,
+      ':focus-visible': 'solid',
+    },
+    outlineWidth: {
+      default: null,
+      ':focus-visible': '2px',
+    },
+    outlineColor: {
+      default: null,
+      ':focus-visible': 'hsl(var(--ring))',
+    },
+    outlineOffset: {
+      default: null,
+      ':focus-visible': '0px',
+    },
+  },
+  sidebarContentX: {
+    height: '1.25rem',
+    width: '1.25rem',
+  },
+  sidebarContentNav: {
+    display: 'flex',
+    flex: '1',
+    flexDirection: 'column',
+    gap: '0.25rem',
+  },
+  sidebarContentNavLink: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    borderRadius: '.75rem',
+    paddingLeft: '0.75rem',
+    paddingRight: '0.75rem',
+    paddingTop: '0.625rem',
+    paddingBottom: '0.625rem',
+    textDecorationLine: 'none',
+    transitionProperty: 'all',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '200ms',
+  },
+  sidebarContentNavLink2: {
+    backgroundColor:
+      'color-mix(in oklab, hsl(var(--primary)) 15%, transparent)',
+    color: 'hsl(var(--primary))',
+    borderWidth: '1px',
+    borderColor: 'color-mix(in oklab, hsl(var(--primary)) 20%, transparent)',
+  },
+  sidebarContentNavLink3: {
+    color: {
+      default: 'oklch(44.6% .03 256.802)',
+      ':hover': 'hsl(var(--foreground))',
+    },
+    backgroundColor: {
+      default: null,
+      ':hover': 'hsl(var(--muted))',
+    },
+    borderWidth: '1px',
+    borderColor: 'transparent',
+  },
+  sidebarContentRow4: {
+    display: 'flex',
+    height: '2.25rem',
+    width: '2.25rem',
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '.5rem',
+    transitionProperty:
+      'color, background-color, border-color, outline-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+  },
+  sidebarContentContainer: {
+    backgroundColor: 'hsl(var(--primary))',
+    color: 'oklch(20.8% .042 265.755)',
+    boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+  },
+  sidebarContentContainer2: {
+    backgroundColor: {
+      default: 'hsl(var(--muted))',
+      [stylex.when.ancestor(':hover')]:
+        'color-mix(in oklab, #fff 10%, transparent)',
+    },
+    color: {
+      default: 'oklch(44.6% .03 256.802)',
+      [stylex.when.ancestor(':hover')]: 'hsl(var(--primary))',
+    },
+  },
+  sidebarContentIcon: {
+    height: '1rem',
+    width: '1rem',
+  },
+  sidebarContentContainer3: {
+    flex: '1',
+    minWidth: '0rem',
+  },
+  sidebarContentContainer4: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    fontWeight: 600,
+  },
+  sidebarContentContainer5: {
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+  },
+  sidebarContentContainer6: {
+    color: 'color-mix(in oklab, hsl(var(--primary)) 70%, transparent)',
+  },
+  sidebarContentContainer7: {
+    color: 'oklch(55.1% .027 264.364)',
+  },
+  sidebarContentChevronRight: {
+    height: '1rem',
+    width: '1rem',
+    transitionProperty: 'all',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+  },
+  sidebarContentChevronRight2: {
+    translate: '0rem 0',
+    opacity: 1,
+    color: 'hsl(var(--primary))',
+  },
+  sidebarContentChevronRight3: {
+    translate: '-0.25rem 0',
+    opacity: 0,
+  },
+  sidebarContentContainer8: {
+    marginTop: 'auto',
+    paddingTop: '1rem',
+  },
+  sidebarContentRow5: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    borderRadius: '.75rem',
+    borderColor: 'color-mix(in oklab, #fff 12%, transparent)',
+    backgroundColor: 'hsl(var(--muted))',
+    paddingTop: '0.75rem',
+    paddingRight: '0.75rem',
+    paddingBottom: '0.75rem',
+    paddingLeft: '0.75rem',
+  },
+  sidebarContentContainer9: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    fontWeight: 500,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  sidebarContentContainer10: {
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    color: 'oklch(55.1% .027 264.364)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  sidebarContentButton2: {
+    flexShrink: 0,
+  },
+  sidebarContentText3: {
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    padding: 0,
+    margin: '-1px',
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    borderWidth: 0,
+  },
+  appLayoutContainer: {
+    position: 'relative',
+    minHeight: '100vh',
+    overflow: 'hidden',
+  },
+  appLayoutLink: {
+    position: {
+      default: 'absolute',
+      ':focus': 'fixed',
+    },
+    width: {
+      default: '1px',
+      ':focus': 'auto',
+    },
+    height: {
+      default: '1px',
+      ':focus': 'auto',
+    },
+    padding: {
+      default: 0,
+      ':focus': 0,
+    },
+    margin: {
+      default: '-1px',
+      ':focus': 0,
+    },
+    overflow: {
+      default: 'hidden',
+      ':focus': 'visible',
+    },
+    clip: {
+      default: 'rect(0, 0, 0, 0)',
+      ':focus': 'auto',
+    },
+    whiteSpace: {
+      default: 'nowrap',
+      ':focus': 'normal',
+    },
+    borderWidth: 0,
+    left: {
+      default: null,
+      ':focus': '1rem',
+    },
+    top: {
+      default: null,
+      ':focus': '1rem',
+    },
+    zIndex: {
+      default: null,
+      ':focus': 100,
+    },
+    borderRadius: {
+      default: null,
+      ':focus': '.5rem',
+    },
+    backgroundColor: {
+      default: null,
+      ':focus': 'hsl(var(--primary))',
+    },
+    paddingLeft: {
+      default: null,
+      ':focus': '1rem',
+    },
+    paddingRight: {
+      default: null,
+      ':focus': '1rem',
+    },
+    paddingTop: {
+      default: null,
+      ':focus': '0.5rem',
+    },
+    paddingBottom: {
+      default: null,
+      ':focus': '0.5rem',
+    },
+    fontSize: {
+      default: null,
+      ':focus': '.875rem',
+    },
+    lineHeight: {
+      default: null,
+      ':focus': '1.25rem',
+    },
+    fontWeight: {
+      default: null,
+      ':focus': 600,
+    },
+    color: {
+      default: null,
+      ':focus': 'oklch(20.8% .042 265.755)',
+    },
+    boxShadow: {
+      default: null,
+      ':focus':
+        '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+    },
+  },
+  appLayoutContainer2: {
+    pointerEvents: 'none',
+    position: 'absolute',
+    top: '-8rem',
+    right: '-8rem',
+    height: '28rem',
+    width: '28rem',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to bottom right in oklab, color-mix(in oklab, oklch(78.9% .154 211.53) 40%, transparent), color-mix(in oklab, hsl(var(--primary)) 25%, transparent), transparent)',
+    filter: 'blur(64px)',
+  },
+  appLayoutContainer3: {
+    pointerEvents: 'none',
+    position: 'absolute',
+    bottom: '0rem',
+    left: '-6rem',
+    height: '24rem',
+    width: '24rem',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to top right in oklab, color-mix(in oklab, oklch(77.7% .152 181.912) 35%, transparent), color-mix(in oklab, hsl(var(--primary)) 20%, transparent), transparent)',
+    filter: 'blur(64px)',
+  },
+  appLayoutContainer4: {
+    pointerEvents: 'none',
+    position: 'absolute',
+    top: '30%',
+    right: '10%',
+    height: '18rem',
+    width: '18rem',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to bottom right in oklab, color-mix(in oklab, oklch(62.7% .265 303.9) 30%, transparent), color-mix(in oklab, oklch(65.6% .241 354.308) 20%, transparent))',
+    filter: 'blur(64px)',
+  },
+  appLayoutAside: {
+    position: 'fixed',
+    top: '0rem',
+    bottom: '0rem',
+    left: '0rem',
+    zIndex: 50,
+    display: {
+      default: 'none',
+      '@media (min-width: 48rem)': 'flex',
+    },
+    width: '16rem',
+    flexDirection: 'column',
+    borderTopRightRadius: '1.5rem',
+    borderBottomRightRadius: '1.5rem',
+    borderRightWidth: '1px',
+    borderWidth: '1px',
+  },
+  appLayoutHeader: {
+    position: 'sticky',
+    top: '0rem',
+    zIndex: 40,
+    display: {
+      default: 'flex',
+      '@media (min-width: 48rem)': 'none',
+    },
+    height: '3.5rem',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: '1px',
+    borderWidth: '1px',
+    paddingLeft: '1rem',
+    paddingRight: '1rem',
+  },
+  appLayoutRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  appLayoutRow2: {
+    display: 'flex',
+    height: '2rem',
+    width: '2rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '.5rem',
+    backgroundImage:
+      'linear-gradient(to bottom right in oklab, hsl(var(--primary)), oklch(77.7% .152 181.912))',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 900,
+    color: 'oklch(20.8% .042 265.755)',
+    boxShadow:
+      '0 4px 6px -1px color-mix(in oklab, hsl(var(--primary)) 30%, transparent), 0 2px 4px -2px color-mix(in oklab, hsl(var(--primary)) 30%, transparent)',
+  },
+  appLayoutText: {
+    fontSize: '1rem',
+    lineHeight: '1.5rem',
+    fontWeight: 700,
+    letterSpacing: '-.025em',
+  },
+  appLayoutAvatarRoot: {
+    height: '2rem',
+    width: '2rem',
+  },
+  appLayoutDialog: {
+    position: 'fixed',
+    top: '0rem',
+    bottom: '0rem',
+    left: '0rem',
+    right: 'auto',
+    marginTop: '0rem',
+    marginRight: '0rem',
+    marginBottom: '0rem',
+    marginLeft: '0rem',
+    height: '100dvh',
+    maxHeight: 'none',
+    width: '16rem',
+    maxWidth: '80vw',
+    borderTopRightRadius: '1.5rem',
+    borderBottomRightRadius: '1.5rem',
+    borderRightWidth: '1px',
+    borderWidth: '1px',
+    paddingTop: '0rem',
+    paddingRight: '0rem',
+    paddingBottom: '0rem',
+    paddingLeft: '0rem',
+    '::backdrop': {
+      backgroundColor: 'color-mix(in oklab, #000 20%, transparent)',
+      backdropFilter: 'blur(8px)',
+    },
+    display: {
+      default: null,
+      '@media (min-width: 48rem)': 'none',
+    },
+  },
+  appLayoutMain: {
+    position: 'relative',
+    paddingLeft: {
+      default: null,
+      '@media (min-width: 48rem)': '16rem',
+    },
+    outlineStyle: 'none',
+  },
+  appLayoutContainer5: {
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    maxWidth: '72rem',
+    paddingLeft: {
+      default: '1rem',
+      '@media (min-width: 48rem)': '2rem',
+    },
+    paddingRight: {
+      default: '1rem',
+      '@media (min-width: 48rem)': '2rem',
+    },
+    paddingTop: {
+      default: '1.5rem',
+      '@media (min-width: 48rem)': '2.5rem',
+    },
+    paddingBottom: {
+      default: '1.5rem',
+      '@media (min-width: 48rem)': '2.5rem',
+    },
+  },
+  appLayoutRow3: {
+    display: 'flex',
+    height: '16rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(55.1% .027 264.364)',
+  },
+});

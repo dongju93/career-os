@@ -1,34 +1,84 @@
-@import "tailwindcss";
-
-/* ── Tailwind theme tokens ── */
-@theme inline {
-  --font-sans:
-    "Inter", "IBM Plex Sans", "Segoe UI Variable", "Segoe UI", system-ui,
-    sans-serif;
-
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
+/* App reset, independent of the styling compiler. */
+@layer reset {
+  *,
+  ::before,
+  ::after,
+  ::backdrop,
+  ::file-selector-button {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+  html {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    tab-size: 4;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-size: inherit;
+  }
+  a {
+    text-decoration: inherit;
+  }
+  ol,
+  ul,
+  menu {
+    list-style: none;
+  }
+  img,
+  svg,
+  video,
+  canvas,
+  audio,
+  iframe,
+  embed,
+  object {
+    display: block;
+    vertical-align: middle;
+  }
+  img,
+  video {
+    max-width: 100%;
+    height: auto;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+    background-color: transparent;
+    border-radius: 0;
+  }
+  button,
+  input:where([type="button"], [type="reset"], [type="submit"]) {
+    appearance: button;
+  }
+  textarea {
+    resize: vertical;
+  }
+  table {
+    border-collapse: collapse;
+    border-color: inherit;
+    text-indent: 0;
+  }
+  [hidden]:where(:not([hidden="until-found"])) {
+    /* biome-ignore lint/complexity/noImportantStyles: native hidden must override authored display styles */
+    display: none !important;
+  }
 }
 
 /* ── Semantic color tokens ── */
 :root {
+  --font-sans:
+    "Inter", "IBM Plex Sans", "Segoe UI Variable", "Segoe UI", system-ui,
+    sans-serif;
   --background: 0 0% 100%;
   --foreground: 0 0% 9%;
   --card: 210 20% 98%;
@@ -125,257 +175,11 @@ a {
   background: rgba(0, 0, 0, 0.25);
 }
 
-/* ───────────────────────────────────────────
-   Glassmorphism — visible and tasteful
-   The background is the star; glass is the lens.
-   ─────────────────────────────────────────── */
-
-/*
-  Primary glass — for cards and floating panels.
-  Low opacity so the colorful mesh shows through clearly.
-  High blur so the distortion is obvious.
-*/
-.glass {
-  background: rgba(255, 255, 255, 0.7);
-  background-image: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.85) 0%,
-    rgba(255, 255, 255, 0.6) 100%
-  );
-  backdrop-filter: blur(20px) saturate(120%);
-  -webkit-backdrop-filter: blur(20px) saturate(120%);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow:
-    0 2px 16px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+/* Structural child relationships. Spacing values are owned by StyleX. */
+[data-stack] > :not(:last-child) {
+  margin-block-end: var(--stack-space);
 }
-
-/*
-  Stronger glass — for sidebars and headers where readability matters.
-  Still translucent, but with more substance.
-*/
-.glass-strong {
-  background: rgba(255, 255, 255, 0.85);
-  background-image: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(255, 255, 255, 0.75) 100%
-  );
-  backdrop-filter: blur(24px) saturate(120%);
-  -webkit-backdrop-filter: blur(24px) saturate(120%);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-}
-
-/*
-  Light glass — for elements on top of already-glass surfaces
-  (used sparingly, e.g. inner chips)
-*/
-.glass-light {
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(12px) saturate(120%);
-  -webkit-backdrop-filter: blur(12px) saturate(120%);
-  border: 1px solid rgba(0, 0, 0, 0.04);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
-}
-
-/* Hover lift for interactive glass cards */
-.glass-hover {
-  transition:
-    transform 250ms ease,
-    box-shadow 300ms ease,
-    background 250ms ease;
-}
-.glass-hover:hover {
-  background: rgba(255, 255, 255, 0.8);
-  background-image: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(255, 255, 255, 0.65) 100%
-  );
-  border-color: rgba(0, 0, 0, 0.1);
-  box-shadow:
-    0 6px 24px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  transform: translateY(-2px);
-}
-
-/* Solid surface for when you truly need opacity inside glass */
-.surface {
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-/* ── Buttons ── */
-.btn-primary {
-  background: linear-gradient(135deg, hsl(185 72% 40%), hsl(185 68% 34%));
-  color: #fff;
-  border: none;
-  font-weight: 700;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.08),
-    0 2px 8px rgba(6, 182, 212, 0.2);
-}
-.btn-primary:hover {
-  background: linear-gradient(135deg, hsl(185 72% 44%), hsl(185 68% 38%));
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.08),
-    0 4px 12px rgba(6, 182, 212, 0.3);
-}
-
-.btn-secondary {
-  background: rgba(0, 0, 0, 0.04);
-  color: hsl(var(--foreground));
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
-}
-.btn-secondary:hover {
-  background: rgba(0, 0, 0, 0.07);
-  border-color: rgba(0, 0, 0, 0.16);
-}
-
-.btn-ghost {
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  border: 1px solid transparent;
-}
-.btn-ghost:hover {
-  background: rgba(0, 0, 0, 0.04);
-  color: hsl(var(--foreground));
-}
-
-/* ── Inputs ── */
-.input-clean {
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  color: hsl(var(--foreground));
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
-}
-.input-clean::placeholder {
-  color: hsl(var(--muted-foreground));
-}
-.input-clean:hover {
-  border-color: rgba(0, 0, 0, 0.16);
-}
-.input-clean:focus {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: hsl(var(--primary) / 0.5);
-  box-shadow:
-    0 0 0 3px hsl(var(--primary) / 0.1),
-    inset 0 1px 2px rgba(0, 0, 0, 0.04);
-}
-
-/* ── Animations ── */
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.animate-fade-in {
-  animation: fade-in 0.4s ease-out both;
-}
-
-@keyframes slide-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(-12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-.animate-slide-in {
-  animation: slide-in-right 0.3s ease-out both;
-}
-
-@keyframes indeterminate-progress {
-  0% {
-    transform: translateX(-150%) scaleX(0.6);
-  }
-  50% {
-    transform: translateX(80%) scaleX(1);
-  }
-  100% {
-    transform: translateX(300%) scaleX(0.6);
-  }
-}
-.animate-indeterminate {
-  animation: indeterminate-progress 1.7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-/*
-  Opacity-only entry — the reduced-motion counterpart to `fade-in` /
-  `slide-in-right`. Keeps a gentle fade so content doesn't pop in abruptly,
-  but drops the translate so motion-sensitive users get no positional shift.
-*/
-@keyframes fade-in-soft {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* ───────────────────────────────────────────
-   Reduced motion
-   Respect `prefers-reduced-motion: reduce`. Softened case-by-case rather
-   than with a blanket `* { animation-duration: 0.01ms }` — a global kill
-   can make looping animations *more* jarring, not less.
-   - Entry animations keep an opacity fade but drop the translate.
-   - The hover lift keeps its colour/shadow feedback but stops moving.
-   - Looping animations (indeterminate bar, pulse, spin) become static;
-     loading state is still conveyed by adjacent text and the app's
-     aria-live announcements.
-   ─────────────────────────────────────────── */
-@media (prefers-reduced-motion: reduce) {
-  .animate-fade-in,
-  .animate-slide-in {
-    animation: fade-in-soft 0.2s ease-out both;
-  }
-
-  /* Drop the -2px lift; the background/shadow feedback still transitions. */
-  .glass-hover:hover {
-    transform: none;
-  }
-
-  /* Decorative / looping motion → static. */
-  .animate-pulse,
-  .animate-spin {
-    animation: none;
-  }
-
-  /* Indeterminate bar: stop the sweep and fill the track so it still
-     reads as "in progress" (width beats Tailwind's layered `w-2/5`). */
-  .animate-indeterminate {
-    animation: none;
-    transform: none;
-    width: 100%;
-  }
-}
-
-/* ───────────────────────────────────────────
-   Render cost: defer off-screen job posting cards
-   The postings grid renders up to 50 variable-height cards. Cards past the
-   first two desktop rows are below the fold, so the browser is allowed to
-   skip their layout/paint until they approach the viewport.
-   `contain-intrinsic-block-size: auto <estimate>` reserves height so the
-   scrollbar doesn't jump; `auto` lets the browser remember each card's real
-   height after its first render.
-   The first six cards (:nth-child ≤ 6) are intentionally excluded — applying
-   content-visibility above the fold would delay first paint.
-   Degrades gracefully: ignored by browsers without support.
-   ─────────────────────────────────────────── */
-.job-postings-grid > :nth-child(n + 7) {
+[data-postings-grid] > :nth-child(n + 7) {
   content-visibility: auto;
   contain-intrinsic-block-size: auto 220px;
 }

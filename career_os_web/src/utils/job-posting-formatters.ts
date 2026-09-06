@@ -1,4 +1,30 @@
+import * as stylex from '@stylexjs/stylex';
+import type { AppStyles } from '@/lib/styles';
 import type { ApplicationStatus, Platform } from '../types/job-posting';
+
+const styles = stylex.create({
+  statusAccent: {
+    backgroundColor:
+      'color-mix(in oklab, oklch(87.2% .01 258.338) 50%, transparent)',
+  },
+  statusAccent2: {
+    backgroundColor: 'hsl(var(--primary))',
+  },
+  statusAccent3: {
+    backgroundColor: 'oklch(82.8% .189 84.429)',
+  },
+  statusAccent4: {
+    backgroundColor: 'oklch(76.5% .177 163.223)',
+  },
+  statusAccent5: {
+    backgroundColor:
+      'color-mix(in oklab, oklch(70.4% .191 22.216) 60%, transparent)',
+  },
+  statusAccent6: {
+    backgroundColor:
+      'color-mix(in oklab, oklch(87.2% .01 258.338) 30%, transparent)',
+  },
+});
 
 export function formatRelativeDate(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -58,23 +84,23 @@ export function applicationStatusVariant(
   }
 }
 
-// Maps each status to a left-accent bar Tailwind bg class for card-level
+// Maps each status to a left-accent bar StyleX style for card-level
 // scanning — allows instant status identification without reading badge text.
-export function applicationStatusAccentClass(
+export function applicationStatusAccentStyle(
   status: ApplicationStatus,
-): string {
+): AppStyles {
   switch (status) {
     case 'saved':
-      return 'bg-gray-300/50';
+      return styles.statusAccent;
     case 'applied':
-      return 'bg-primary';
+      return styles.statusAccent2;
     case 'interviewing':
-      return 'bg-amber-400';
+      return styles.statusAccent3;
     case 'offer':
-      return 'bg-emerald-400';
+      return styles.statusAccent4;
     case 'rejected':
-      return 'bg-red-400/60';
+      return styles.statusAccent5;
     case 'withdrawn':
-      return 'bg-gray-300/30';
+      return styles.statusAccent6;
   }
 }

@@ -193,7 +193,6 @@ describe('JobSearchGroupsPage', () => {
     });
     const nameInput = within(dialog).getByRole('textbox', { name: '이름' });
 
-    expect(nameInput).toHaveClass('input-clean');
     expect(
       within(dialog).getByRole('button', { name: '대화상자 닫기' }),
     ).toBeInTheDocument();

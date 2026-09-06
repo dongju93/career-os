@@ -1,3 +1,4 @@
+import * as stylex from '@stylexjs/stylex';
 import {
   AlertCircle,
   ArrowLeft,
@@ -38,6 +39,8 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { motion } from '@/styles/motion';
+import { surfaces } from '@/styles/surfaces';
 import {
   ApiError,
   toUserFacingError,
@@ -75,31 +78,31 @@ function SectionHeading({
   title: string;
 }) {
   return (
-    <div className="inline-flex items-center gap-2 rounded-full bg-accent border px-3 py-1.5">
-      <Icon className="h-4 w-4 text-primary" />
-      <span className="text-sm font-semibold">{title}</span>
+    <div {...stylex.props(styles.sectionHeadingContainer)}>
+      <Icon {...stylex.props(styles.sectionHeadingIcon)} />
+      <span {...stylex.props(styles.sectionHeadingText)}>{title}</span>
     </div>
   );
 }
 
 function DetailLoadingSkeleton() {
   return (
-    <div className="space-y-6">
-      <Skeleton className="h-8 w-28" />
-      <div className="space-y-3">
-        <Skeleton className="h-4 w-20" />
-        <Skeleton className="h-5 w-40" />
-        <Skeleton className="h-9 w-3/4" />
-        <div className="flex gap-3">
-          <Skeleton className="h-6 w-16 rounded-full" />
-          <Skeleton className="h-6 w-14" />
-          <Skeleton className="h-9 w-32 rounded-xl" />
+    <div {...stylex.props(styles.detailLoadingSkeletonStack)} data-stack="">
+      <Skeleton xstyle={styles.detailLoadingSkeletonSkeleton} />
+      <div {...stylex.props(styles.detailLoadingSkeletonStack2)} data-stack="">
+        <Skeleton xstyle={styles.detailLoadingSkeletonSkeleton2} />
+        <Skeleton xstyle={styles.detailLoadingSkeletonSkeleton3} />
+        <Skeleton xstyle={styles.detailLoadingSkeletonSkeleton4} />
+        <div {...stylex.props(styles.detailLoadingSkeletonRow)}>
+          <Skeleton xstyle={styles.detailLoadingSkeletonSkeleton5} />
+          <Skeleton xstyle={styles.detailLoadingSkeletonSkeleton6} />
+          <Skeleton xstyle={styles.detailLoadingSkeletonSkeleton7} />
         </div>
       </div>
-      <Skeleton className="h-20 w-full rounded-2xl" />
-      <Skeleton className="h-28 w-full rounded-2xl" />
-      <Skeleton className="h-36 w-full rounded-2xl" />
-      <Skeleton className="h-36 w-full rounded-2xl" />
+      <Skeleton xstyle={styles.detailLoadingSkeletonSkeleton8} />
+      <Skeleton xstyle={styles.detailLoadingSkeletonSkeleton9} />
+      <Skeleton xstyle={styles.detailLoadingSkeletonSkeleton10} />
+      <Skeleton xstyle={styles.detailLoadingSkeletonSkeleton10} />
     </div>
   );
 }
@@ -112,21 +115,23 @@ function DetailErrorState({
   onRetry: () => void;
 }) {
   return (
-    <div className="min-h-[22rem] rounded-xl border border-red-500/20 bg-red-500/8 px-6 py-12 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 text-red-500">
-        <AlertCircle className="h-7 w-7" />
+    <div {...stylex.props(styles.detailErrorStateContainer)}>
+      <div {...stylex.props(styles.detailErrorStateRow)}>
+        <AlertCircle {...stylex.props(styles.detailErrorStateAlertCircle)} />
       </div>
-      <h2 className="mt-5 text-xl font-bold tracking-tight">
+      <h2 {...stylex.props(styles.detailErrorStateHeading)}>
         채용공고를 불러오지 못했습니다
       </h2>
-      <p className="mx-auto mt-2 max-w-xl text-sm text-gray-600">
+      <p {...stylex.props(styles.detailErrorStateDescription)}>
         {error.message}
       </p>
-      <p className="mt-3 font-mono text-xs font-semibold text-red-500">
-        {error.code}
-      </p>
-      <Button className="mt-6" variant="outline" onClick={() => onRetry()}>
-        <RefreshCw className="h-4 w-4" />
+      <p {...stylex.props(styles.detailErrorStateDescription2)}>{error.code}</p>
+      <Button
+        xstyle={styles.detailErrorStateButton}
+        variant="outline"
+        onClick={() => onRetry()}
+      >
+        <RefreshCw {...stylex.props(styles.detailErrorStateRefreshCw)} />
         다시 시도
       </Button>
     </div>
@@ -236,17 +241,23 @@ function JobPostingArtifactCard({ jobId }: { jobId: number }) {
 
   return (
     <Card>
-      <CardContent className="p-5">
+      <CardContent xstyle={styles.jobPostingArtifactCardCardContent}>
         <SectionHeading icon={Sparkles} title="AI 지원 자료" />
-        <p className="mt-3 text-sm text-gray-600">
+        <p {...stylex.props(styles.jobPostingArtifactCardDescription)}>
           저장한 공고와 프로필을 바탕으로 지원 자료 초안을 만들어드려요.
         </p>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
+        <div {...stylex.props(styles.jobPostingArtifactCardGrid)}>
+          <div
+            {...stylex.props(styles.jobPostingArtifactCardStack)}
+            data-stack=""
+          >
             <Label htmlFor="artifact-type">자료 종류</Label>
             <select
-              className="input-clean h-10 w-full rounded-xl px-3 text-sm focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+              {...stylex.props([
+                styles.jobPostingArtifactCardSelect,
+                surfaces.inputClean,
+              ])}
               disabled={isGenerating}
               id="artifact-type"
               value={artifactType}
@@ -260,7 +271,10 @@ function JobPostingArtifactCard({ jobId }: { jobId: number }) {
             </select>
           </div>
 
-          <div className="space-y-2">
+          <div
+            {...stylex.props(styles.jobPostingArtifactCardStack)}
+            data-stack=""
+          >
             <Label htmlFor="artifact-focus">집중할 방향 (선택)</Label>
             <Input
               disabled={isGenerating}
@@ -273,26 +287,40 @@ function JobPostingArtifactCard({ jobId }: { jobId: number }) {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div {...stylex.props(styles.jobPostingArtifactCardRow)}>
           <Button disabled={isGenerating} onClick={handleGenerate}>
             {isGenerating ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2
+                {...stylex.props([
+                  styles.jobPostingArtifactCardLoader2,
+                  motion.spin,
+                ])}
+              />
             ) : (
-              <Sparkles className="h-4 w-4" />
+              <Sparkles {...stylex.props(styles.detailErrorStateRefreshCw)} />
             )}
             {isGenerating ? '생성 중…' : '자료 생성'}
           </Button>
           {isGenerating && (
-            <span className="text-sm text-gray-600">
+            <span {...stylex.props(styles.jobPostingArtifactCardText)}>
               자료를 생성하고 있어요. 최대 1분 정도 걸릴 수 있어요.
             </span>
           )}
         </div>
 
         {artifactError && (
-          <Alert className="mt-4" variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="flex flex-wrap items-center gap-3">
+          <Alert
+            icon={
+              <AlertCircle
+                {...stylex.props(styles.detailErrorStateRefreshCw)}
+              />
+            }
+            xstyle={styles.jobPostingArtifactCardAlert}
+            variant="destructive"
+          >
+            <AlertDescription
+              xstyle={styles.jobPostingArtifactCardAlertDescription}
+            >
               {artifactError.message}
               {artifactError.canRetry && (
                 <Button
@@ -301,7 +329,9 @@ function JobPostingArtifactCard({ jobId }: { jobId: number }) {
                   variant="outline"
                   onClick={handleGenerate}
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw
+                    {...stylex.props(styles.detailErrorStateRefreshCw)}
+                  />
                   다시 시도
                 </Button>
               )}
@@ -310,26 +340,26 @@ function JobPostingArtifactCard({ jobId }: { jobId: number }) {
         )}
 
         {artifact && (
-          <div className="mt-4 rounded-xl border border-primary/15 bg-primary/8 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="text-sm font-bold tracking-tight">
+          <div {...stylex.props(styles.jobPostingArtifactCardContainer)}>
+            <div {...stylex.props(styles.jobPostingArtifactCardRow2)}>
+              <h3 {...stylex.props(styles.jobPostingArtifactCardHeading)}>
                 {artifact.title}
               </h3>
               <Button
-                className="shrink-0"
+                xstyle={styles.jobPostingArtifactCardButton}
                 size="sm"
                 variant="outline"
                 onClick={handleCopy}
               >
                 {isCopied ? (
-                  <Check className="h-4 w-4" />
+                  <Check {...stylex.props(styles.detailErrorStateRefreshCw)} />
                 ) : (
-                  <Copy className="h-4 w-4" />
+                  <Copy {...stylex.props(styles.detailErrorStateRefreshCw)} />
                 )}
                 {isCopied ? '복사됨' : '복사하기'}
               </Button>
             </div>
-            <p className="mt-3 text-sm leading-relaxed whitespace-pre-wrap">
+            <p {...stylex.props(styles.jobPostingArtifactCardDescription2)}>
               {artifact.content_markdown}
             </p>
           </div>
@@ -432,7 +462,7 @@ export function JobPostingDetailPage() {
   const backLink = (
     <Button variant="ghost" size="sm" asChild>
       <Link to="/job-postings">
-        <ArrowLeft className="h-4 w-4" />
+        <ArrowLeft {...stylex.props(styles.detailErrorStateRefreshCw)} />
         채용공고 목록
       </Link>
     </Button>
@@ -440,7 +470,10 @@ export function JobPostingDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="animate-fade-in space-y-6">
+      <div
+        {...stylex.props([styles.jobPostingDetailPageStack, motion.fadeIn])}
+        data-stack=""
+      >
         {backLink}
         <DetailLoadingSkeleton />
       </div>
@@ -449,7 +482,10 @@ export function JobPostingDetailPage() {
 
   if (error) {
     return (
-      <div className="animate-fade-in space-y-6">
+      <div
+        {...stylex.props([styles.jobPostingDetailPageStack, motion.fadeIn])}
+        data-stack=""
+      >
         {backLink}
         <DetailErrorState error={error} onRetry={loadDetail} />
       </div>
@@ -492,34 +528,44 @@ export function JobPostingDetailPage() {
   ].filter((f) => f.value);
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div
+      {...stylex.props([styles.jobPostingDetailPageStack, motion.fadeIn])}
+      data-stack=""
+    >
       {backLink}
 
       {/* Page header */}
-      <div className="space-y-3">
-        <p className="text-xs font-semibold tracking-[0.15em] text-primary uppercase">
+      <div {...stylex.props(styles.detailLoadingSkeletonStack2)} data-stack="">
+        <p {...stylex.props(styles.jobPostingDetailPageDescription)}>
           Job Detail
         </p>
-        <div className="flex items-center gap-1.5">
-          <Building2 className="h-4 w-4 shrink-0 text-gray-600" />
-          <span className="text-sm font-medium text-gray-600">
+        <div {...stylex.props(styles.jobPostingDetailPageRow)}>
+          <Building2 {...stylex.props(styles.jobPostingDetailPageBuilding2)} />
+          <span {...stylex.props(styles.jobPostingDetailPageText)}>
             {detail.company_name}
           </span>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+        <h1 {...stylex.props(styles.jobPostingDetailPageHeading)}>
           {detail.job_title}
         </h1>
-        <div className="flex flex-wrap items-center gap-2">
+        <div {...stylex.props(styles.jobPostingDetailPageRow2)}>
           <Badge variant={platformVariant(detail.platform)}>
             {detail.platform}
           </Badge>
-          <span className="text-sm text-gray-500">
+          <span {...stylex.props(styles.jobPostingDetailPageText2)}>
             {formatRelativeDate(detail.created_at)}
           </span>
           {safePostingUrl && (
-            <Button className="sm:ml-2" variant="outline" size="sm" asChild>
+            <Button
+              xstyle={styles.jobPostingDetailPageButton}
+              variant="outline"
+              size="sm"
+              asChild
+            >
               <a href={safePostingUrl} rel="noreferrer" target="_blank">
-                <ExternalLink className="h-4 w-4" />
+                <ExternalLink
+                  {...stylex.props(styles.detailErrorStateRefreshCw)}
+                />
                 원본 공고 보기
               </a>
             </Button>
@@ -529,19 +575,25 @@ export function JobPostingDetailPage() {
 
       {/* Application status */}
       <Card>
-        <CardContent className="p-5">
-          <div className="flex flex-wrap items-center gap-3">
+        <CardContent xstyle={styles.jobPostingArtifactCardCardContent}>
+          <div {...stylex.props(styles.jobPostingArtifactCardAlertDescription)}>
             <SectionHeading icon={ClipboardList} title="지원 상태" />
             <Badge
               variant={applicationStatusVariant(detail.application_status)}
             >
               {APPLICATION_STATUS_LABELS[detail.application_status]}
             </Badge>
-            <label className="sr-only" htmlFor="application-status">
+            <label
+              {...stylex.props(styles.jobPostingDetailPageLabel)}
+              htmlFor="application-status"
+            >
               지원 상태 변경
             </label>
             <select
-              className="input-clean h-10 rounded-xl px-3 text-sm focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+              {...stylex.props([
+                styles.jobPostingDetailPageSelect,
+                surfaces.inputClean,
+              ])}
               disabled={isUpdatingStatus}
               id="application-status"
               value={detail.application_status}
@@ -556,14 +608,21 @@ export function JobPostingDetailPage() {
               ))}
             </select>
             {detail.status_updated_at && (
-              <span className="text-xs text-gray-500">
+              <span {...stylex.props(styles.jobPostingDetailPageText3)}>
                 {formatRelativeDate(detail.status_updated_at)} 업데이트
               </span>
             )}
           </div>
           {statusError && (
-            <Alert className="mt-3" variant="destructive">
-              <AlertCircle className="h-4 w-4" />
+            <Alert
+              icon={
+                <AlertCircle
+                  {...stylex.props(styles.detailErrorStateRefreshCw)}
+                />
+              }
+              xstyle={styles.jobPostingDetailPageAlert}
+              variant="destructive"
+            >
               <AlertDescription>{statusError.message}</AlertDescription>
             </Alert>
           )}
@@ -572,16 +631,16 @@ export function JobPostingDetailPage() {
 
       {/* Memo */}
       <Card>
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between gap-3">
+        <CardContent xstyle={styles.jobPostingArtifactCardCardContent}>
+          <div {...stylex.props(styles.jobPostingDetailPageRow3)}>
             <SectionHeading icon={StickyNote} title="메모" />
-            <span className="text-xs text-gray-500">
+            <span {...stylex.props(styles.jobPostingDetailPageText3)}>
               {memoDraft.length} / {MEMO_MAX}
             </span>
           </div>
           <Textarea
             aria-label="메모"
-            className="mt-3"
+            xstyle={styles.jobPostingDetailPageAlert}
             disabled={isSavingMemo}
             maxLength={MEMO_MAX}
             placeholder="이 공고에 대한 메모를 남겨보세요."
@@ -592,23 +651,37 @@ export function JobPostingDetailPage() {
             }}
           />
           {memoError && (
-            <Alert className="mt-3" variant="destructive">
-              <AlertCircle className="h-4 w-4" />
+            <Alert
+              icon={
+                <AlertCircle
+                  {...stylex.props(styles.detailErrorStateRefreshCw)}
+                />
+              }
+              xstyle={styles.jobPostingDetailPageAlert}
+              variant="destructive"
+            >
               <AlertDescription>{memoError.message}</AlertDescription>
             </Alert>
           )}
           {memoSuccess && (
-            <Alert className="mt-3" variant="success">
-              <CheckCircle2 className="h-4 w-4" />
+            <Alert
+              icon={
+                <CheckCircle2
+                  {...stylex.props(styles.detailErrorStateRefreshCw)}
+                />
+              }
+              xstyle={styles.jobPostingDetailPageAlert}
+              variant="success"
+            >
               <AlertDescription>메모를 저장했습니다.</AlertDescription>
             </Alert>
           )}
-          <div className="mt-3 flex justify-end">
+          <div {...stylex.props(styles.jobPostingDetailPageRow4)}>
             <Button
               disabled={isSavingMemo || memoDraft === (detail.memo ?? '')}
               onClick={handleSaveMemo}
             >
-              <Save className="h-4 w-4" />
+              <Save {...stylex.props(styles.detailErrorStateRefreshCw)} />
               {isSavingMemo ? '저장 중…' : '메모 저장'}
             </Button>
           </div>
@@ -621,35 +694,37 @@ export function JobPostingDetailPage() {
       {/* Metadata */}
       {hasMetadata && (
         <Card>
-          <CardContent className="p-5">
-            <div className="flex flex-wrap gap-x-5 gap-y-3 text-sm">
+          <CardContent xstyle={styles.jobPostingArtifactCardCardContent}>
+            <div {...stylex.props(styles.jobPostingDetailPageRow5)}>
               {detail.location && (
-                <span className="flex items-center gap-1.5 text-gray-600">
-                  <MapPin className="h-4 w-4 text-primary" />
+                <span {...stylex.props(styles.jobPostingDetailPageText4)}>
+                  <MapPin {...stylex.props(styles.sectionHeadingIcon)} />
                   {detail.location}
                 </span>
               )}
               {detail.experience_req && (
-                <span className="flex items-center gap-1.5 text-gray-600">
-                  <Briefcase className="h-4 w-4 text-primary" />
+                <span {...stylex.props(styles.jobPostingDetailPageText4)}>
+                  <Briefcase {...stylex.props(styles.sectionHeadingIcon)} />
                   {detail.experience_req}
                 </span>
               )}
               {detail.employment_type && (
-                <span className="flex items-center gap-1.5 text-gray-600">
-                  <Clock className="h-4 w-4 text-primary" />
+                <span {...stylex.props(styles.jobPostingDetailPageText4)}>
+                  <Clock {...stylex.props(styles.sectionHeadingIcon)} />
                   {detail.employment_type}
                 </span>
               )}
               {detail.deadline && (
-                <span className="flex items-center gap-1.5 text-red-600">
-                  <Calendar className="h-4 w-4" />
+                <span {...stylex.props(styles.jobPostingDetailPageText5)}>
+                  <Calendar
+                    {...stylex.props(styles.detailErrorStateRefreshCw)}
+                  />
                   마감: {detail.deadline}
                 </span>
               )}
               {detail.salary && (
-                <span className="flex items-center gap-1.5 text-gray-600">
-                  <DollarSign className="h-4 w-4 text-primary" />
+                <span {...stylex.props(styles.jobPostingDetailPageText4)}>
+                  <DollarSign {...stylex.props(styles.sectionHeadingIcon)} />
                   {detail.salary}
                 </span>
               )}
@@ -661,9 +736,9 @@ export function JobPostingDetailPage() {
       {/* Tech stack */}
       {detail.tech_stack && detail.tech_stack.length > 0 && (
         <Card>
-          <CardContent className="p-5">
+          <CardContent xstyle={styles.jobPostingArtifactCardCardContent}>
             <SectionHeading icon={Code2} title="기술 스택" />
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div {...stylex.props(styles.jobPostingDetailPageRow6)}>
               {detail.tech_stack.map((tag) => (
                 <Badge key={tag} variant="secondary">
                   {tag}
@@ -679,9 +754,9 @@ export function JobPostingDetailPage() {
         .filter((s) => s.content)
         .map(({ title, icon, content }) => (
           <Card key={title}>
-            <CardContent className="p-5">
+            <CardContent xstyle={styles.jobPostingArtifactCardCardContent}>
               <SectionHeading icon={icon} title={title} />
-              <p className="mt-3 whitespace-pre-line text-sm leading-relaxed">
+              <p {...stylex.props(styles.jobPostingDetailPageDescription2)}>
                 {content}
               </p>
             </CardContent>
@@ -691,18 +766,18 @@ export function JobPostingDetailPage() {
       {/* Additional info */}
       {additionalFields.length > 0 && (
         <Card>
-          <CardContent className="p-5">
+          <CardContent xstyle={styles.jobPostingArtifactCardCardContent}>
             <SectionHeading icon={Info} title="추가 정보" />
-            <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+            <dl {...stylex.props(styles.jobPostingDetailPageDl)}>
               {additionalFields.map(({ label, value }) => (
                 <div
                   key={label}
-                  className="rounded-xl border border-white/8 bg-muted p-3"
+                  {...stylex.props(styles.jobPostingDetailPageContainer)}
                 >
-                  <dt className="text-[11px] font-medium tracking-wide text-gray-500 uppercase">
+                  <dt {...stylex.props(styles.jobPostingDetailPageDt)}>
                     {label}
                   </dt>
-                  <dd className="mt-1 text-sm font-medium text-foreground">
+                  <dd {...stylex.props(styles.jobPostingDetailPageDd)}>
                     {value}
                   </dd>
                 </div>
@@ -715,15 +790,17 @@ export function JobPostingDetailPage() {
       {/* Homepage */}
       {safeHomepage && (
         <Card>
-          <CardContent className="p-5">
+          <CardContent xstyle={styles.jobPostingArtifactCardCardContent}>
             <SectionHeading icon={Globe} title="홈페이지" />
             <a
-              className="mt-3 flex items-center gap-1.5 text-sm text-primary hover:underline"
+              {...stylex.props(styles.jobPostingDetailPageLink)}
               href={safeHomepage}
               rel="noreferrer"
               target="_blank"
             >
-              <ExternalLink className="h-3.5 w-3.5" />
+              <ExternalLink
+                {...stylex.props(styles.jobPostingDetailPageExternalLink)}
+              />
               {detail.homepage}
             </a>
           </CardContent>
@@ -732,3 +809,440 @@ export function JobPostingDetailPage() {
     </div>
   );
 }
+
+const styles = stylex.create({
+  sectionHeadingContainer: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    borderRadius: '9999px',
+    backgroundColor: 'hsl(var(--accent))',
+    borderWidth: '1px',
+    paddingLeft: '0.75rem',
+    paddingRight: '0.75rem',
+    paddingTop: '0.375rem',
+    paddingBottom: '0.375rem',
+  },
+  sectionHeadingIcon: {
+    height: '1rem',
+    width: '1rem',
+    color: 'hsl(var(--primary))',
+  },
+  sectionHeadingText: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    fontWeight: 600,
+  },
+  detailLoadingSkeletonStack: {
+    '--stack-space': '1.5rem',
+  },
+  detailLoadingSkeletonSkeleton: {
+    height: '2rem',
+    width: '7rem',
+  },
+  detailLoadingSkeletonStack2: {
+    '--stack-space': '0.75rem',
+  },
+  detailLoadingSkeletonSkeleton2: {
+    height: '1rem',
+    width: '5rem',
+  },
+  detailLoadingSkeletonSkeleton3: {
+    height: '1.25rem',
+    width: '10rem',
+  },
+  detailLoadingSkeletonSkeleton4: {
+    height: '2.25rem',
+    width: '75%',
+  },
+  detailLoadingSkeletonRow: {
+    display: 'flex',
+    gap: '0.75rem',
+  },
+  detailLoadingSkeletonSkeleton5: {
+    height: '1.5rem',
+    width: '4rem',
+    borderRadius: '9999px',
+  },
+  detailLoadingSkeletonSkeleton6: {
+    height: '1.5rem',
+    width: '3.5rem',
+  },
+  detailLoadingSkeletonSkeleton7: {
+    height: '2.25rem',
+    width: '8rem',
+    borderRadius: '.75rem',
+  },
+  detailLoadingSkeletonSkeleton8: {
+    height: '5rem',
+    width: '100%',
+    borderRadius: '1rem',
+  },
+  detailLoadingSkeletonSkeleton9: {
+    height: '7rem',
+    width: '100%',
+    borderRadius: '1rem',
+  },
+  detailLoadingSkeletonSkeleton10: {
+    height: '9rem',
+    width: '100%',
+    borderRadius: '1rem',
+  },
+  detailErrorStateContainer: {
+    minHeight: '22rem',
+    borderRadius: '.75rem',
+    borderWidth: '1px',
+    borderColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 20%, transparent)',
+    backgroundColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 8%, transparent)',
+    paddingLeft: '1.5rem',
+    paddingRight: '1.5rem',
+    paddingTop: '3rem',
+    paddingBottom: '3rem',
+    textAlign: 'center',
+  },
+  detailErrorStateRow: {
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    display: 'flex',
+    height: '3.5rem',
+    width: '3.5rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    backgroundColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 10%, transparent)',
+    color: 'oklch(63.7% .237 25.331)',
+  },
+  detailErrorStateAlertCircle: {
+    height: '1.75rem',
+    width: '1.75rem',
+  },
+  detailErrorStateHeading: {
+    marginTop: '1.25rem',
+    fontSize: '1.25rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  detailErrorStateDescription: {
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    marginTop: '0.5rem',
+    maxWidth: '36rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  detailErrorStateDescription2: {
+    marginTop: '0.75rem',
+    fontFamily:
+      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 600,
+    color: 'oklch(63.7% .237 25.331)',
+  },
+  detailErrorStateButton: {
+    marginTop: '1.5rem',
+  },
+  detailErrorStateRefreshCw: {
+    height: '1rem',
+    width: '1rem',
+  },
+  jobPostingArtifactCardCardContent: {
+    paddingTop: '1.25rem',
+    paddingRight: '1.25rem',
+    paddingBottom: '1.25rem',
+    paddingLeft: '1.25rem',
+  },
+  jobPostingArtifactCardDescription: {
+    marginTop: '0.75rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  jobPostingArtifactCardGrid: {
+    marginTop: '1rem',
+    display: 'grid',
+    gap: '1rem',
+    gridTemplateColumns: {
+      default: null,
+      '@media (min-width: 40rem)': 'repeat(2, minmax(0, 1fr))',
+    },
+  },
+  jobPostingArtifactCardStack: {
+    '--stack-space': '0.5rem',
+  },
+  jobPostingArtifactCardSelect: {
+    height: '2.5rem',
+    width: '100%',
+    borderRadius: '.75rem',
+    paddingLeft: '0.75rem',
+    paddingRight: '0.75rem',
+    fontSize: 'inherit',
+    lineHeight: 'inherit',
+    outlineStyle: {
+      default: null,
+      ':focus-visible': 'none',
+    },
+    cursor: {
+      default: null,
+      ':disabled': 'not-allowed',
+    },
+    opacity: {
+      default: null,
+      ':disabled': 0.5,
+    },
+    transitionProperty: 'all',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+  },
+  jobPostingArtifactCardRow: {
+    marginTop: '1rem',
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '0.75rem',
+  },
+  jobPostingArtifactCardLoader2: {
+    height: '1rem',
+    width: '1rem',
+  },
+  jobPostingArtifactCardText: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  jobPostingArtifactCardAlert: {
+    marginTop: '1rem',
+  },
+  jobPostingArtifactCardAlertDescription: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '0.75rem',
+  },
+  jobPostingArtifactCardContainer: {
+    marginTop: '1rem',
+    borderRadius: '.75rem',
+    borderWidth: '1px',
+    borderColor: 'color-mix(in oklab, hsl(var(--primary)) 15%, transparent)',
+    backgroundColor: 'color-mix(in oklab, hsl(var(--primary)) 8%, transparent)',
+    paddingTop: '1rem',
+    paddingRight: '1rem',
+    paddingBottom: '1rem',
+    paddingLeft: '1rem',
+  },
+  jobPostingArtifactCardRow2: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: '0.75rem',
+  },
+  jobPostingArtifactCardHeading: {
+    fontSize: '.875rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  jobPostingArtifactCardButton: {
+    flexShrink: 0,
+  },
+  jobPostingArtifactCardDescription2: {
+    marginTop: '0.75rem',
+    fontSize: '.875rem',
+    lineHeight: 1.625,
+    whiteSpace: 'pre-wrap',
+  },
+  jobPostingDetailPageStack: {
+    '--stack-space': '1.5rem',
+  },
+  jobPostingDetailPageDescription: {
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 600,
+    letterSpacing: '0.15em',
+    color: 'hsl(var(--primary))',
+    textTransform: 'uppercase',
+  },
+  jobPostingDetailPageRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+  },
+  jobPostingDetailPageBuilding2: {
+    height: '1rem',
+    width: '1rem',
+    flexShrink: 0,
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  jobPostingDetailPageText: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    fontWeight: 500,
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  jobPostingDetailPageHeading: {
+    fontSize: {
+      default: '1.5rem',
+      '@media (min-width: 40rem)': '1.875rem',
+    },
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  jobPostingDetailPageRow2: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  jobPostingDetailPageText2: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(55.1% .027 264.364)',
+  },
+  jobPostingDetailPageButton: {
+    marginLeft: {
+      default: null,
+      '@media (min-width: 40rem)': '0.5rem',
+    },
+  },
+  jobPostingDetailPageLabel: {
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    padding: 0,
+    margin: '-1px',
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    borderWidth: 0,
+  },
+  jobPostingDetailPageSelect: {
+    height: '2.5rem',
+    borderRadius: '.75rem',
+    paddingLeft: '0.75rem',
+    paddingRight: '0.75rem',
+    fontSize: 'inherit',
+    lineHeight: 'inherit',
+    outlineStyle: {
+      default: null,
+      ':focus-visible': 'none',
+    },
+    cursor: {
+      default: null,
+      ':disabled': 'not-allowed',
+    },
+    opacity: {
+      default: null,
+      ':disabled': 0.5,
+    },
+    transitionProperty: 'all',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+  },
+  jobPostingDetailPageText3: {
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    color: 'oklch(55.1% .027 264.364)',
+  },
+  jobPostingDetailPageAlert: {
+    marginTop: '0.75rem',
+  },
+  jobPostingDetailPageRow3: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '0.75rem',
+  },
+  jobPostingDetailPageRow4: {
+    marginTop: '0.75rem',
+    display: 'flex',
+    justifyContent: 'flex-end',
+  },
+  jobPostingDetailPageRow5: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    columnGap: '1.25rem',
+    rowGap: '0.75rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+  },
+  jobPostingDetailPageText4: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  jobPostingDetailPageText5: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    color: 'oklch(57.7% .245 27.325)',
+  },
+  jobPostingDetailPageRow6: {
+    marginTop: '0.75rem',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '0.5rem',
+  },
+  jobPostingDetailPageDescription2: {
+    marginTop: '0.75rem',
+    whiteSpace: 'pre-line',
+    fontSize: '.875rem',
+    lineHeight: 1.625,
+  },
+  jobPostingDetailPageDl: {
+    marginTop: '0.75rem',
+    display: 'grid',
+    gap: '0.75rem',
+    gridTemplateColumns: {
+      default: null,
+      '@media (min-width: 40rem)': 'repeat(2, minmax(0, 1fr))',
+    },
+  },
+  jobPostingDetailPageContainer: {
+    borderRadius: '.75rem',
+    borderWidth: '1px',
+    borderColor: 'color-mix(in oklab, #fff 8%, transparent)',
+    backgroundColor: 'hsl(var(--muted))',
+    paddingTop: '0.75rem',
+    paddingRight: '0.75rem',
+    paddingBottom: '0.75rem',
+    paddingLeft: '0.75rem',
+  },
+  jobPostingDetailPageDt: {
+    fontSize: '11px',
+    fontWeight: 500,
+    letterSpacing: '.025em',
+    color: 'oklch(55.1% .027 264.364)',
+    textTransform: 'uppercase',
+  },
+  jobPostingDetailPageDd: {
+    marginTop: '0.25rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    fontWeight: 500,
+    color: 'hsl(var(--foreground))',
+  },
+  jobPostingDetailPageLink: {
+    marginTop: '0.75rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'hsl(var(--primary))',
+    textDecorationLine: {
+      default: null,
+      ':hover': 'underline',
+    },
+  },
+  jobPostingDetailPageExternalLink: {
+    height: '0.875rem',
+    width: '0.875rem',
+  },
+});

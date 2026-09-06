@@ -1,17 +1,19 @@
 import * as AvatarPrimitive from '@radix-ui/react-avatar';
+import * as stylex from '@stylexjs/stylex';
 import type { ComponentPropsWithoutRef } from 'react';
-import { cn } from '@/lib/utils';
+import type { AppStyles } from '@/lib/styles';
+import { withClassName } from '@/lib/styles';
 
 export function AvatarRoot({
   className,
+  xstyle,
   ...props
-}: ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>) {
+}: ComponentPropsWithoutRef<typeof AvatarPrimitive.Root> & {
+  xstyle?: AppStyles;
+}) {
   return (
     <AvatarPrimitive.Root
-      className={cn(
-        'relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full ring-1 ring-gray-300 bg-gray-200',
-        className,
-      )}
+      {...withClassName([styles.root, xstyle], className)}
       {...props}
     />
   );
@@ -19,11 +21,14 @@ export function AvatarRoot({
 
 export function AvatarImage({
   className,
+  xstyle,
   ...props
-}: ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>) {
+}: ComponentPropsWithoutRef<typeof AvatarPrimitive.Image> & {
+  xstyle?: AppStyles;
+}) {
   return (
     <AvatarPrimitive.Image
-      className={cn('aspect-square h-full w-full object-cover', className)}
+      {...withClassName([styles.image, xstyle], className)}
       {...props}
     />
   );
@@ -31,15 +36,52 @@ export function AvatarImage({
 
 export function AvatarFallback({
   className,
+  xstyle,
   ...props
-}: ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>) {
+}: ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback> & {
+  xstyle?: AppStyles;
+}) {
   return (
     <AvatarPrimitive.Fallback
-      className={cn(
-        'flex h-full w-full items-center justify-center rounded-full bg-linear-to-br from-primary/30 to-primary/15 text-primary font-semibold text-sm',
-        className,
-      )}
+      {...withClassName([styles.fallback, xstyle], className)}
       {...props}
     />
   );
 }
+
+const styles = stylex.create({
+  root: {
+    position: 'relative',
+    display: 'flex',
+    height: '2.5rem',
+    width: '2.5rem',
+    flexShrink: 0,
+    overflow: 'hidden',
+    borderRadius: '9999px',
+    outlineWidth: '1px',
+    outlineStyle: 'solid',
+    outlineColor: 'oklch(87.2% .01 258.338)',
+    outlineOffset: '0px',
+    backgroundColor: 'oklch(92.8% .006 264.531)',
+  },
+  image: {
+    aspectRatio: '1 / 1',
+    height: '100%',
+    width: '100%',
+    objectFit: 'cover',
+  },
+  fallback: {
+    display: 'flex',
+    height: '100%',
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to bottom right in oklab, color-mix(in oklab, hsl(var(--primary)) 30%, transparent), color-mix(in oklab, hsl(var(--primary)) 15%, transparent))',
+    color: 'hsl(var(--primary))',
+    fontWeight: 600,
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+  },
+});

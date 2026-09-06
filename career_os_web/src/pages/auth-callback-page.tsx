@@ -1,8 +1,10 @@
+import * as stylex from '@stylexjs/stylex';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Card, CardContent } from '@/components/ui/card';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { motion } from '@/styles/motion';
 import { toUserFacingError } from '../services/api-error';
 import { exchangeLoginCode, fetchAuthMe } from '../services/auth';
 import { useAuthStore } from '../store/auth-store';
@@ -73,27 +75,29 @@ export function AuthCallbackPage() {
   }, [navigate, searchParams, setAuth, setError, setLoading]);
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
+    <div {...stylex.props(styles.authCallbackPageRow)}>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute right-[-8rem] top-[-8rem] h-96 w-96 rounded-full bg-linear-to-br from-cyan-400/30 via-primary/15 to-transparent blur-3xl"
+        {...stylex.props(styles.authCallbackPageContainer)}
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-[-6rem] left-[-5rem] h-72 w-72 rounded-full bg-linear-to-tr from-teal-400/25 via-primary/12 to-transparent blur-3xl"
+        {...stylex.props(styles.authCallbackPageContainer2)}
       />
 
-      <Card className="w-full max-w-sm animate-fade-in">
-        <CardContent className="flex flex-col items-center gap-5 px-8 py-10 text-center">
-          <div className="relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-primary/10 border border-primary/20">
-            <div className="absolute inset-2 rounded-full bg-linear-to-br from-primary/15 to-teal-500/12 blur-md" />
-            <Loader2 className="relative z-10 h-10 w-10 animate-spin text-primary" />
+      <Card xstyle={[styles.authCallbackPageCard, motion.fadeIn]}>
+        <CardContent xstyle={styles.authCallbackPageCardContent}>
+          <div {...stylex.props(styles.authCallbackPageRow2)}>
+            <div {...stylex.props(styles.authCallbackPageContainer3)} />
+            <Loader2
+              {...stylex.props([styles.authCallbackPageLoader2, motion.spin])}
+            />
           </div>
           <div>
-            <p className="text-lg font-semibold tracking-tight">
+            <p {...stylex.props(styles.authCallbackPageDescription)}>
               로그인 완료 중
             </p>
-            <p className="mt-1 text-sm text-gray-600">
+            <p {...stylex.props(styles.authCallbackPageDescription2)}>
               계정 정보를 확인한 뒤 작업 공간으로 이동합니다.
             </p>
           </div>
@@ -102,3 +106,98 @@ export function AuthCallbackPage() {
     </div>
   );
 }
+
+const styles = stylex.create({
+  authCallbackPageRow: {
+    position: 'relative',
+    display: 'flex',
+    minHeight: '100vh',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    paddingLeft: '1rem',
+    paddingRight: '1rem',
+  },
+  authCallbackPageContainer: {
+    pointerEvents: 'none',
+    position: 'absolute',
+    right: '-8rem',
+    top: '-8rem',
+    height: '24rem',
+    width: '24rem',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to bottom right in oklab, color-mix(in oklab, oklch(78.9% .154 211.53) 30%, transparent), color-mix(in oklab, hsl(var(--primary)) 15%, transparent), transparent)',
+    filter: 'blur(64px)',
+  },
+  authCallbackPageContainer2: {
+    pointerEvents: 'none',
+    position: 'absolute',
+    bottom: '-6rem',
+    left: '-5rem',
+    height: '18rem',
+    width: '18rem',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to top right in oklab, color-mix(in oklab, oklch(77.7% .152 181.912) 25%, transparent), color-mix(in oklab, hsl(var(--primary)) 12%, transparent), transparent)',
+    filter: 'blur(64px)',
+  },
+  authCallbackPageCard: {
+    width: '100%',
+    maxWidth: '24rem',
+  },
+  authCallbackPageCardContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '1.25rem',
+    paddingLeft: '2rem',
+    paddingRight: '2rem',
+    paddingTop: '2.5rem',
+    paddingBottom: '2.5rem',
+    textAlign: 'center',
+  },
+  authCallbackPageRow2: {
+    position: 'relative',
+    display: 'flex',
+    height: '4.5rem',
+    width: '4.5rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    backgroundColor:
+      'color-mix(in oklab, hsl(var(--primary)) 10%, transparent)',
+    borderWidth: '1px',
+    borderColor: 'color-mix(in oklab, hsl(var(--primary)) 20%, transparent)',
+  },
+  authCallbackPageContainer3: {
+    position: 'absolute',
+    top: '0.5rem',
+    bottom: '0.5rem',
+    left: '0.5rem',
+    right: '0.5rem',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to bottom right in oklab, color-mix(in oklab, hsl(var(--primary)) 15%, transparent), color-mix(in oklab, oklch(70.4% .14 182.503) 12%, transparent))',
+    filter: 'blur(12px)',
+  },
+  authCallbackPageLoader2: {
+    position: 'relative',
+    zIndex: 10,
+    height: '2.5rem',
+    width: '2.5rem',
+    color: 'hsl(var(--primary))',
+  },
+  authCallbackPageDescription: {
+    fontSize: '1.125rem',
+    lineHeight: '1.75rem',
+    fontWeight: 600,
+    letterSpacing: '-.025em',
+  },
+  authCallbackPageDescription2: {
+    marginTop: '0.25rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+});
