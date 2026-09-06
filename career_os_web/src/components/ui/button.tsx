@@ -32,7 +32,6 @@ export function Button({
         [
           baseStyle,
           sizeStyles[size ?? 'default'],
-          !asChild && styles.nativeTypography,
           variantStyles[variant ?? 'default'],
           xstyle,
         ],
@@ -71,11 +70,6 @@ export function Button({
 }
 
 const styles = stylex.create({
-  nativeTypography: {
-    fontSize: 'inherit',
-    lineHeight: 'inherit',
-    fontWeight: 'inherit',
-  },
   base: {
     display: 'inline-flex',
     alignItems: 'center',
