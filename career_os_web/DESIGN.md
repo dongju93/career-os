@@ -1,1112 +1,225 @@
 # Career OS — Frontend Design Specification
 
-This document tracks the current Career OS frontend design system. The implementation is the source of truth; keep this file aligned with the code when routes, components, or visual patterns change. It covers design tokens, glassmorphism utilities, typography, layout architecture, every UI primitive component, and each page.
-
----
-
-## Table of Contents
-
-1. [Design Philosophy](#1-design-philosophy)
-2. [Required Dependency: `@/lib/utils`](#2-required-dependency-libutils)
-3. [CSS Design Tokens](#3-css-design-tokens)
-4. [Page Background & Ambient Blobs](#4-page-background--ambient-blobs)
-5. [Glassmorphism Utility Classes](#5-glassmorphism-utility-classes)
-6. [Button & Input Utility Classes](#6-button--input-utility-classes)
-7. [Typography](#7-typography)
-8. [Scrollbar Styling](#8-scrollbar-styling)
-9. [Animations](#9-animations)
-10. [Layout Architecture](#10-layout-architecture)
-11. [Navigation](#11-navigation)
-12. [UI Component Specifications](#12-ui-component-specifications)
-13. [Recurring Visual Patterns](#13-recurring-visual-patterns)
-14. [Page Specifications](#14-page-specifications)
-15. [Responsive Breakpoints](#15-responsive-breakpoints)
-16. [Accessibility & Focus States](#16-accessibility--focus-states)
-17. [Mantine Configuration Notes](#17-mantine-configuration-notes)
-
----
-
-## 1. Design Philosophy
-
-**Glassmorphism + Cyan/Teal palette on a pure-white base.**
-
-Every surface layers translucent frosted-glass panels on a bright, light background. The primary brand color is vivid cyan-teal (`hsl(185 72% 42%)`). Surfaces breathe with `backdrop-filter: blur + saturate`, dark-channel borders (`rgba(0,0,0,0.06)`), and minimal box shadows. Ambient decorative blobs (absolutely positioned, blurred gradient circles) create depth behind glass panels. Motion is restrained — entry animations and hover lifts only.
-
-**Key rules:**
-
-- Glass surfaces use white-channel backgrounds with `backdrop-filter: blur(20px) saturate(120%)` and dark-channel borders (`rgba(0,0,0,0.06)`), not white borders.
-- Shadows use near-black with very low alpha. Tailwind `gray-*` utilities are currently used for neutral helper text, timestamps, and avatar shells.
-- Rounded corners: `rounded-2xl` on cards, `rounded-xl` on interactive elements, `rounded-full` on badges, chips, and avatars.
-- `src/components/ui/` is the public UI boundary. Mantine may back a
-  project-owned high-level overlay such as `Dialog`, but pages never import
-  Mantine controls directly; buttons, fields, errors, and dialog content use
-  the shared project primitives.
-- Primary action and body copy is Korean. Brand labels, page super-labels, platform IDs, and the login badge may use English exactly as implemented.
-- Icons come from `lucide-react`; `LoginPage` keeps an inline Google brand SVG for the OAuth button.
-
----
-
-## 2. Required Dependency: `@/lib/utils`
-
-Files that need conditional class merging import `cn()` from `@/lib/utils`. The file lives at `src/lib/utils.ts`:
-
-```ts
-import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-```
-
-Required packages: `clsx`, `tailwind-merge`.
-
----
-
-## 3. CSS Design Tokens
-
-All tokens are defined as CSS custom properties in `src/index.css` under `:root`. Tailwind v4 consumes them via `@theme inline` mappings. They are referenced with `hsl(var(--token))`.
-
-### Semantic Color Tokens
-
-| Token                      | HSL Value     | Approximate Color    | Purpose                              |
-| -------------------------- | ------------- | -------------------- | ------------------------------------ |
-| `--background`             | `0 0% 100%`   | Pure white           | Page background base                 |
-| `--foreground`             | `0 0% 9%`     | Near black           | Default body text                    |
-| `--card`                   | `210 20% 98%` | Near-white cool tint | Card background (non-glass mode)     |
-| `--card-foreground`        | `222 47% 11%` | Very dark blue-gray  | Card text                            |
-| `--popover`                | `0 0% 100%`   | Pure white           | Popover background                   |
-| `--popover-foreground`     | `222 47% 11%` | Dark text            | Popover text                         |
-| `--primary`                | `185 72% 42%` | Vivid cyan-teal      | Brand primary, buttons, icons, links |
-| `--primary-foreground`     | `0 0% 100%`   | White                | Text on primary-colored elements     |
-| `--secondary`              | `210 20% 96%` | Light cool gray      | Secondary backgrounds                |
-| `--secondary-foreground`   | `222 47% 11%` | Dark blue-gray       | Text on secondary elements           |
-| `--muted`                  | `210 20% 96%` | Same as secondary    | Subdued / disabled backgrounds       |
-| `--muted-foreground`       | `215 16% 35%` | Medium gray          | Placeholder / helper text            |
-| `--accent`                 | `185 40% 94%` | Very light teal tint | Hover backgrounds, chip fills        |
-| `--accent-foreground`      | `185 72% 32%` | Deeper teal          | Text on accent backgrounds           |
-| `--destructive`            | `0 72% 51%`   | Standard red         | Errors, delete actions               |
-| `--destructive-foreground` | `0 0% 100%`   | White                | Text on destructive elements         |
-| `--border`                 | `214 20% 88%` | Light cool-gray      | Dividers, input borders              |
-| `--input`                  | `214 20% 88%` | Same as `--border`   | Input field border                   |
-| `--ring`                   | `185 72% 42%` | Same as `--primary`  | Focus ring color                     |
-| `--radius`                 | `1rem`        | —                    | Base border radius                   |
-
-### Tailwind v4 Theme
-
-Tailwind v4 has no `tailwind.config.js`. All configuration lives in `src/index.css` via `@theme inline`. The `--font-sans` variable maps to the Inter-first body stack.
-
----
-
-## 4. Page Background & Ambient Blobs
-
-There is **no fixed CSS background gradient** on `body`. The background is plain `hsl(var(--background))` (pure white).
-
-Depth and atmosphere come from **ambient blobs** rendered as absolutely positioned elements inside each layout component or standalone page:
-
-```html
-<!-- Blob pattern (3 blobs in AppLayout / LoginPage) -->
-<div aria-hidden class="pointer-events-none absolute ...">
-  <!-- top-right: cyan/primary -->
-  <div
-    class="absolute -right-32 -top-32 h-[28rem] w-[28rem]
-              bg-linear-to-br from-cyan-400/40 via-primary/25 to-transparent
-              rounded-full blur-3xl"
-  />
-  <!-- bottom-left: teal -->
-  <div
-    class="absolute -bottom-24 -left-24 h-96 w-96
-              bg-linear-to-tr from-teal-400/35 via-primary/20 to-transparent
-              rounded-full blur-3xl"
-  />
-  <!-- mid-right: purple/pink -->
-  <div
-    class="absolute right-1/4 top-1/2 h-72 w-72
-              bg-linear-to-br from-purple-500/30 to-pink-500/20
-              rounded-full blur-3xl"
-  />
-</div>
-```
-
-All blobs are `pointer-events-none` and `aria-hidden`. They are always placed behind content. `AppLayout` and `LoginPage` use 3 blobs; `AuthCallbackPage` uses 2.
-
----
-
-## 5. Glassmorphism Utility Classes
-
-Five global utility classes are defined in `src/index.css`. Always use these class names — never replicate with inline styles.
-
-### `.glass`
-
-Primary glass for cards and floating panels.
-
-```css
-.glass {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.85),
-    rgba(255, 255, 255, 0.6)
-  );
-  backdrop-filter: blur(20px) saturate(120%);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow:
-    0 2px 16px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
-}
-```
-
-### `.glass-strong`
-
-Heavier glass for sidebars and sticky headers.
-
-```css
-.glass-strong {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.95),
-    rgba(255, 255, 255, 0.75)
-  );
-  backdrop-filter: blur(24px) saturate(120%);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-}
-```
-
-### `.glass-light`
-
-Lightest glass. Used for chips, badges, and small elements layered on top of `.glass` surfaces.
-
-```css
-.glass-light {
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(12px) saturate(120%);
-  border: 1px solid rgba(0, 0, 0, 0.04);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
-}
-```
-
-### `.glass-hover`
-
-Transition helper attached alongside `.glass` on interactive cards. Handles the hover lift animation without duplicating transition logic.
-
-```css
-.glass-hover {
-  transition:
-    transform 250ms ease,
-    box-shadow 300ms ease,
-    background 250ms ease;
-}
-.glass-hover:hover {
-  background: rgba(255, 255, 255, 0.8);
-  border-color: rgba(0, 0, 0, 0.1);
-  box-shadow:
-    0 6px 24px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  transform: translateY(-2px);
-}
-```
-
-### `.surface`
-
-Solid (non-frosted) surface. Used when `Card` is rendered with `glass={false}`.
-
-```css
-.surface {
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-```
-
----
-
-## 6. Button & Input Utility Classes
-
-These CSS utility classes are defined in `src/index.css`. `Button` consumes them through CVA variants; `Input` and `Textarea` attach `input-clean` directly.
-
-### `.btn-primary`
-
-```css
-.btn-primary {
-  background: linear-gradient(135deg, hsl(185 72% 40%), hsl(185 68% 34%));
-  color: #fff;
-  font-weight: 700;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.08),
-    0 2px 8px rgba(6, 182, 212, 0.2);
-}
-.btn-primary:hover {
-  background: linear-gradient(135deg, hsl(185 72% 44%), hsl(185 68% 38%));
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.08),
-    0 4px 12px rgba(6, 182, 212, 0.3);
-}
-```
-
-### `.btn-secondary`
-
-```css
-.btn-secondary {
-  background: rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
-}
-.btn-secondary:hover {
-  background: rgba(0, 0, 0, 0.07);
-  border-color: rgba(0, 0, 0, 0.16);
-}
-```
-
-### `.btn-ghost`
-
-```css
-.btn-ghost {
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  border: 1px solid transparent;
-}
-.btn-ghost:hover {
-  background: rgba(0, 0, 0, 0.04);
-  color: hsl(var(--foreground));
-}
-```
-
-### `.input-clean`
-
-Applied to `Input` and `Textarea`.
-
-```css
-.input-clean {
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
-}
-.input-clean:hover {
-  border-color: rgba(0, 0, 0, 0.16);
-}
-.input-clean:focus {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: hsl(var(--primary) / 0.5);
-  box-shadow:
-    0 0 0 3px hsl(var(--primary) / 0.1),
-    inset 0 1px 2px rgba(0, 0, 0, 0.04);
-}
-```
-
----
-
-## 7. Typography
-
-### Font Stacks
-
-**Body / UI text** (`--font-sans`, applied via Tailwind's `font-sans`):
-
-```
-"Inter", "IBM Plex Sans", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif
-```
-
-**Headings** (Mantine theme config — not actively rendered, but declared):
-
-```
-"Space Grotesk", "IBM Plex Sans", "Avenir Next", "Segoe UI Variable", sans-serif
-font-weight: 700
-```
-
-### Heading Base Styles
-
-All `h1`–`h6` receive:
-
-```css
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
-}
-```
-
-### Tailwind Size Scale in Use
-
-| Tailwind Class                                                   | Role                                  |
-| ---------------------------------------------------------------- | ------------------------------------- |
-| `text-2xl sm:text-3xl font-bold tracking-tight`                  | Primary page title (H1)               |
-| `text-xl font-bold`                                              | Card/section title (`CardTitle`)      |
-| `text-lg font-semibold tracking-tight`                           | Auth/callback state headers           |
-| `text-sm font-semibold`                                          | Nav item label, form section heading  |
-| `text-xs font-semibold tracking-[0.15em] uppercase text-primary` | Page super-label (above H1)           |
-| `text-xs uppercase tracking-widest`                              | Sub-labels (e.g., "Not Found" on 404) |
-| `text-xs text-muted-foreground`                                  | Helper text, timestamps, meta info    |
-| `text-[11px] font-medium tracking-wide uppercase text-gray-600`  | Summary chip labels                   |
-
----
-
-## 8. Scrollbar Styling
-
-Applied globally via `index.css`:
-
-```css
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
-}
-```
-
----
-
-## 9. Animations
-
-All keyframes and animation utility classes are defined in `src/index.css`.
-
-### `fade-in` / `.animate-fade-in`
-
-```css
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.animate-fade-in {
-  animation: fade-in 0.4s ease-out both;
-}
-```
-
-**Used on:** page-level wrappers for every page (`JobPostingsPage`, `JobPostingDetailPage`, `AddJobPostingPage`, `LoginPage`, `AuthCallbackPage`, `NotFoundPage`) and route error UI.
-
-### `slide-in-right` / `.animate-slide-in`
-
-```css
-@keyframes slide-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(-12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-.animate-slide-in {
-  animation: slide-in-right 0.3s ease-out both;
-}
-```
-
-**Used on:** elements that enter from the left (name is legacy; direction is left → center).
-
-### Hover Motion
-
-Interactive cards (via `.glass-hover`) use CSS transitions for the lift effect (see §5).
-
-Buttons use:
-
-```
-active:scale-[0.97]
-```
-
-### Reduced Motion
-
-All motion respects `prefers-reduced-motion: reduce`, softened case-by-case in `src/index.css` (never a blanket `* { animation-duration: 0.01ms }`, which can make looping animations _more_ jarring):
-
-- `.animate-fade-in` / `.animate-slide-in` → fall back to `fade-in-soft` (opacity only, no translate).
-- `.glass-hover:hover` → keeps its colour/shadow feedback but drops the `-2px` lift.
-- `.animate-indeterminate` → stops sweeping and fills the track full-width (still reads as "in progress").
-- `.animate-pulse` and `.animate-spin` (skeletons, loaders, spinners) → become static; loading state is still conveyed by adjacent copy and the app's `aria-live` announcements.
-
-The button `active:scale-[0.97]` tap feedback is left intact — it is transient and neither looping nor a large positional shift.
-
-### Render Cost — deferred card rendering
-
-The job postings grid (`.job-postings-grid`, up to 50 cards) applies `content-visibility: auto` + `contain-intrinsic-block-size: auto 220px` to cards past the first six (`:nth-child(n + 7)`). Below-the-fold cards skip layout/paint until they near the viewport; the reserved intrinsic size prevents scrollbar jump, and the first two desktop rows are excluded so first paint isn't delayed. Degrades gracefully where unsupported.
-
----
-
-## 10. Layout Architecture
-
-### Router Tree
-
-```
-/login                    → LoginPage         (no layout wrapper)
-/auth/callback            → AuthCallbackPage  (no layout wrapper)
-
-/ (ProtectedRoute)
-  └── AppLayout
-       ├── /                  → redirect to /job-postings
-       ├── /job-postings      → JobPostingsPage
-       ├── /job-postings/new  → AddJobPostingPage
-       ├── /job-postings/:id  → JobPostingDetailPage
-       └── *                  → NotFoundPage
-```
-
-`ProtectedRoute` redirects unauthenticated users to `/login?next=<current-path>`.  
-`AppLayout` is the single wrapper for all authenticated pages. Source: `src/app/router.tsx`.
-
-### `AppLayout` (`src/components/app-layout.tsx`)
-
-#### Structure
-
-```
-<div class="relative min-h-screen overflow-hidden">
-  <!-- 3 ambient blobs (aria-hidden, pointer-events-none) -->
-
-  <!-- Desktop sidebar (md+) -->
-  <aside class="fixed inset-y-0 left-0 z-50 hidden w-64 rounded-r-3xl border-r border glass-strong md:flex">
-    <SidebarContent />
-  </aside>
-
-  <!-- Mobile header (< md) -->
-  <header class="sticky top-0 z-40 h-14 flex items-center justify-between border-b border px-4 glass-strong md:hidden">
-    ...
-  </header>
-
-  <!-- Mobile sidebar: native modal <dialog> driven by showModal()/close().
-       Top layer (no z-index); ::backdrop is the dim/blur scrim. -->
-  <dialog class="fixed inset-y-0 left-0 right-auto m-0 h-dvh w-64 max-w-[80vw] rounded-r-3xl border-r border p-0 glass-strong backdrop:bg-black/20 backdrop:backdrop-blur-sm md:hidden">
-    <SidebarContent onClose={...} />  <!-- mounted only while open -->
-  </dialog>
-
-  <!-- Main content -->
-  <main class="relative md:pl-64">
-    <div class="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
-      <Outlet />
-    </div>
-  </main>
-</div>
-```
-
-#### Desktop Sidebar
-
-| Property  | Value                                             |
-| --------- | ------------------------------------------------- |
-| Position  | `fixed inset-y-0 left-0 z-50`                     |
-| Width     | `w-64` (16rem / 256px)                            |
-| Shape     | `rounded-r-3xl` (right side only)                 |
-| Surface   | `.glass-strong`                                   |
-| Padding   | `p-5`                                             |
-| Structure | Three sections: logo top, nav middle, user bottom |
-
-**Logo section:**
-
-```html
-<div class="mb-8 flex items-center gap-3">
-  <div
-    class="h-10 w-10 rounded-xl bg-linear-to-br from-primary to-teal-400
-              text-sm font-black text-slate-900 shadow-lg shadow-primary/30
-              flex items-center justify-center"
-  >
-    CO
-  </div>
-  <div>
-    <span class="text-lg font-bold tracking-tight">Career OS</span>
-    <span class="text-xs text-gray-600 block">채용 관리 시스템</span>
-  </div>
-</div>
-```
-
-**User section (bottom):**
-
-```html
-<div class="mt-auto pt-4 flex items-center gap-3 rounded-xl border-white/12 bg-muted p-3">
-  <Avatar />
-  <div class="flex-1 min-w-0">
-    <p class="text-sm font-medium truncate">{displayName}</p>
-    <p class="text-xs text-gray-500 truncate">{email}</p>
-  </div>
-  <Button size="icon" variant="ghost">  <!-- LogOut icon -->
-</div>
-```
-
-#### Mobile Header (< `md`)
-
-- `sticky top-0 z-40 h-14 flex items-center justify-between px-4 glass-strong border-b border md:hidden`
-- Left: hamburger `Button variant="ghost"` that **opens** the drawer (`Menu` icon only). Carries `aria-haspopup="dialog"`, `aria-expanded`, and `aria-controls` pointing at the drawer. It does not close the drawer — while the modal is open the header is `inert`, so the close affordance lives inside the drawer.
-- Center: same logo mark + "Career OS" text
-- Right: `Avatar` (h-8 w-8)
-
-#### Mobile Sidebar
-
-A native modal `<dialog>` (`src/components/app-layout.tsx`), driven imperatively
-via `showModal()` / `close()` (with a `dialog.open` fallback for jsdom). The
-platform supplies the **focus trap**, **inert background**, **Esc-to-close**, and
-**focus restoration to the trigger** for free; the app adds backdrop-click
-dismissal (`event.target === dialog`) and body scroll lock.
-
-- Panel: `fixed inset-y-0 left-0 right-auto m-0 h-dvh w-64 max-w-[80vw] rounded-r-3xl border-r border p-0 glass-strong`, same `SidebarContent`
-- Backdrop: the `::backdrop` pseudo-element — `backdrop:bg-black/20 backdrop:backdrop-blur-sm`
-- Close: an in-drawer `메뉴 닫기` icon button in the logo row (rendered only when `SidebarContent` receives `onClose`), since the background header toggle is `inert` while the modal is open
-- `SidebarContent` is mounted only while open, so it does not add a second nav tree to the accessibility flow
-
----
-
-## 11. Navigation
-
-### Navigation Items
-
-```ts
-const navigationItems = [
-  {
-    href: "/job-postings",
-    icon: Briefcase,
-    label: "채용공고",
-    description: "저장한 채용공고 관리",
+The implementation is the source of truth. This document describes the StyleX
+styling system, shared component contracts, and the visual patterns used by the
+frontend. Keep it aligned when those patterns change.
+
+## Visual language
+
+Career OS uses translucent glass surfaces over a white background, with teal
+accents (`hsl(185 72% 42%)`). Blurred cyan, teal, and purple gradient circles add
+depth behind the content. Dark, low-opacity borders and restrained shadows keep
+panels distinct. Cards have a 1rem radius, controls generally use 0.75rem, and
+badges and avatars are pill-shaped.
+
+Primary action labels and body copy are Korean. Brand labels, platform IDs, and
+page super-labels retain their implemented wording. Icons use `lucide-react`;
+the login button includes an inline Google brand SVG.
+
+## Styling architecture
+
+- `@stylexjs/stylex` owns component and page styles. Module-level
+  `stylex.create()` declarations compile to atomic CSS through
+  `@stylexjs/unplugin` in `vite.config.ts`.
+- Native elements and third-party icon components receive
+  `{...stylex.props(styles.base, condition && styles.active)}`.
+- Shared UI components accept an `xstyle` prop. They compose their base,
+  variant, size, and caller styles before converting them to DOM props.
+  Caller styles take precedence on conflicting properties.
+- `src/lib/styles.ts` defines `AppStyles` and `withClassName()`. The latter
+  preserves an optional opaque `className` for interoperability; it does not
+  interpret utility strings or resolve CSS conflicts between opaque classes.
+- `src/styles/surfaces.ts` contains glass, button, and input surfaces.
+  `src/styles/motion.ts` contains compiled keyframes and motion preferences.
+- `src/index.css` owns the browser reset, semantic CSS variables, document
+  defaults, focus/selection/scrollbar styling, and two structural selectors:
+  stack child spacing and deferred rendering of later posting cards.
+- Vitest uses the official StyleX Babel plugin without CSS injection. Component
+  tests check semantics and composition; browser checks cover the CSS cascade,
+  responsive breakpoints, pseudo-states, and geometry.
+
+```tsx
+import * as stylex from "@stylexjs/stylex";
+import { Button } from "@/components/ui/button";
+
+const styles = stylex.create({
+  actions: {
+    display: "flex",
+    gap: "0.75rem",
+    flexDirection: {
+      default: "column",
+      "@media (min-width: 40rem)": "row",
+    },
   },
-  {
-    href: "/job-postings/new",
-    icon: PlusCircle,
-    label: "채용공고 등록",
-    description: "새 URL 스크랩 및 저장",
-  },
-];
+  submit: { minWidth: "8rem" },
+});
+
+<div {...stylex.props(styles.actions)}>
+  <Button xstyle={styles.submit}>저장</Button>
+</div>;
 ```
 
-To add a new authenticated page, add an entry here and a route in `router.tsx`.
-
-### Nav Link Anatomy
-
-Each nav item is a React Router `<NavLink>` rendered with `isActive` from the router. Active state uses exact match only.
-
-```html
-<!-- Active state -->
-<div
-  class="flex items-center gap-3 rounded-xl border border-primary/20
-            bg-primary/15 px-3 py-2.5 text-primary"
->
-  <!-- Icon container -->
-  <div
-    class="h-9 w-9 rounded-lg bg-primary text-slate-900 shadow-sm
-              flex items-center justify-center flex-shrink-0"
-  >
-    <Icon class="h-4 w-4" />
-  </div>
-  <!-- Text -->
-  <div class="flex-1 min-w-0">
-    <div class="text-sm font-semibold">{label}</div>
-    <div class="text-xs text-primary/70">{description}</div>
-  </div>
-  <!-- Chevron — visible only when active -->
-  <ChevronRight class="h-4 w-4 translate-x-0 opacity-100 text-primary" />
-</div>
-
-<!-- Inactive state -->
-<div
-  class="flex items-center gap-3 rounded-xl border border-transparent
-            px-3 py-2.5 text-gray-600 hover:bg-muted hover:text-foreground"
->
-  <div
-    class="h-9 w-9 rounded-lg bg-muted text-gray-600
-              group-hover:bg-white/10 group-hover:text-primary
-              flex items-center justify-center flex-shrink-0"
-  >
-    <Icon class="h-4 w-4" />
-  </div>
-  <div class="flex-1 min-w-0">
-    <div class="text-sm font-semibold">{label}</div>
-    <div class="text-xs text-muted-foreground">{description}</div>
-  </div>
-  <ChevronRight class="h-4 w-4 -translate-x-1 opacity-0 transition-all" />
-</div>
-```
-
----
-
-## 12. UI Component Specifications
-
-All components live in `src/components/ui/`. They use Radix or Mantine only as
-an internal behavior layer where needed and are styled with CVA variants and/or
-direct Tailwind classes. Pages import this project-owned layer rather than the
-underlying component library. Import `cn` from `@/lib/utils` when class merging
-is needed.
-
-### `Button` (`button.tsx`)
-
-**Base classes (all variants):**
-
-```
-inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm
-font-semibold ring-offset-background transition-all duration-200
-focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
-disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97]
-```
-
-| Variant       | Classes                                                              |
-| ------------- | -------------------------------------------------------------------- |
-| `default`     | `btn-primary`                                                        |
-| `destructive` | `bg-red-500 text-white hover:bg-red-400 shadow-sm shadow-red-500/25` |
-| `outline`     | `btn-secondary`                                                      |
-| `secondary`   | `glass-light text-foreground hover:bg-white/15`                      |
-| `ghost`       | `btn-ghost`                                                          |
-| `link`        | `text-primary underline-offset-4 hover:underline`                    |
-| `glass`       | `glass text-foreground hover:bg-white/15`                            |
-
-| Size      | Classes                          |
-| --------- | -------------------------------- |
-| `default` | `h-10 px-5 py-2`                 |
-| `sm`      | `h-9 rounded-lg px-3 text-xs`    |
-| `lg`      | `h-11 rounded-xl px-8 text-base` |
-| `icon`    | `h-10 w-10`                      |
-
-**Props:** standard button attributes + `variant`, `size`, `loading?: boolean`, `asChild?: boolean`.  
-**`loading` prop:** renders an inline SVG spinner (`animate-spin`) and sets `disabled`.
-
-### `Card` (`card.tsx`)
-
-| Prop          | Default | Effect                                          |
-| ------------- | ------- | ----------------------------------------------- |
-| `glass`       | `true`  | Applies `.glass`; `false` applies `.surface`    |
-| `interactive` | `false` | Adds `.glass-hover cursor-pointer` (hover lift) |
-
-```
-glass=true:               "glass rounded-2xl"
-glass=true, interactive:  "glass glass-hover rounded-2xl cursor-pointer"
-glass=false:              "surface rounded-2xl"
-```
-
-Sub-components:
-
-| Component         | Classes                                                  |
-| ----------------- | -------------------------------------------------------- |
-| `CardHeader`      | `flex flex-col space-y-1.5 p-6`                          |
-| `CardTitle`       | `<h3>` — `text-xl font-bold leading-none tracking-tight` |
-| `CardDescription` | `<p>` — `text-sm text-muted-foreground`                  |
-| `CardContent`     | `p-6 pt-0`                                               |
-| `CardFooter`      | `flex items-center p-6 pt-0`                             |
-
-### `Badge` (`badge.tsx`)
-
-**Base:** `inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors`
-
-| Variant       | Classes                                                 |
-| ------------- | ------------------------------------------------------- |
-| `default`     | `glass-light text-primary border`                       |
-| `secondary`   | `glass-light text-gray-600 border`                      |
-| `destructive` | `bg-red-500/15 text-red-300 border-red-400/25`          |
-| `outline`     | `glass-light text-foreground border-white/15`           |
-| `saramin`     | `bg-orange-400/15 text-orange-300 border-orange-400/25` |
-| `wanted`      | `bg-teal-400/15 text-teal-300 border-teal-400/25`       |
-| `glass`       | `glass-light text-foreground`                           |
-
-Platform badges (`saramin`, `wanted`) are used exclusively for the job posting platform label.
-
-### `Input` (`input.tsx`)
-
-```
-input-clean h-10 w-full rounded-xl px-4 py-2 text-sm
-placeholder:text-muted-foreground focus-visible:outline-none
-disabled:cursor-not-allowed disabled:opacity-50 transition-all
-```
-
-**Error state** (via `error` prop): `border-red-400/60 focus-visible:ring-red-400/20`. The `error` prop also sets `aria-invalid` on the control, so the visual and semantic invalid states stay in sync without per-call-site wiring. Link the error message with `aria-describedby` (see the form-error pattern in §16).
-
-### `Textarea` (`textarea.tsx`)
-
-Same as `Input` with:
-
-```
-min-h-24 py-3 resize-none
-```
-
-### `Label` (`label.tsx`)
-
-```
-text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70
-```
-
-### `Dialog` (`dialog.tsx`)
-
-The project-owned modal-dialog boundary, backed internally by Mantine `Modal`.
-Its required string `title` prop prevents call sites from omitting the visible
-title that Mantine connects with `aria-labelledby`; non-empty copy remains a
-review convention. The wrapper keeps focus trapping, Escape-to-close, scroll
-locking, focus restoration, centering, close-button naming, and overlay/content
-styling consistent. Page code supplies only `opened`, `onClose`, `title`, and
-children, so it cannot disable those accessibility behaviors.
-
-Use `Dialog` for page-level modal forms and confirmations. Its content must use
-the project `Button`, `Input`, `Textarea`, `Label`, and `Alert` primitives. The
-native mobile navigation drawer and non-modal ChatKit assistant have different
-interaction contracts and are not interchangeable with this pattern.
-
-### `Alert` (`alert.tsx`)
-
-**Base:** `relative w-full rounded-xl border p-4 [&>svg~*]:pl-7 [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4`
-
-| Variant       | Classes                                                    |
-| ------------- | ---------------------------------------------------------- |
-| `default`     | `glass-light border-white/10 text-foreground`              |
-| `destructive` | `bg-red-500/10 border-red-400/20 text-red-300`             |
-| `success`     | `bg-emerald-500/10 border-emerald-400/20 text-emerald-300` |
-| `warning`     | `bg-amber-500/10 border-amber-400/20 text-amber-300`       |
-
-`AlertTitle`: `<h5>` — `mb-1 font-semibold leading-none tracking-tight`  
-`AlertDescription`: `<p>` — `text-sm [&_p]:leading-relaxed`
-
-**Politeness by variant:** `destructive` / `warning` render as `role="alert"` + `aria-live="assertive"` (interrupt); `default` / `success` render as `role="status"` + `aria-live="polite"` (wait for a pause). Both are overridable via explicit `role` / `aria-live` props.
-
-### `Avatar` (`avatar.tsx`)
-
-Built on `@radix-ui/react-avatar`.
-
-`AvatarRoot`: `relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full ring-1 ring-gray-300 bg-gray-200`  
-`AvatarImage`: `aspect-square h-full w-full object-cover`  
-`AvatarFallback`: `flex h-full w-full items-center justify-center rounded-full bg-linear-to-br from-primary/30 to-primary/15 text-primary font-semibold text-sm`
-
-Fallback renders the first letter(s) of the user's display name.
-
-### `Separator` (`separator.tsx`)
-
-`bg-border/60` + orientation:
-
-- Horizontal: `h-px w-full`
-- Vertical: `h-full w-px`
-
-### `Skeleton` (`skeleton.tsx`)
-
-```
-animate-pulse rounded-lg
-bg-linear-to-r from-white/8 via-white/15 to-white/8
-bg-size-[200%_100%]
-```
-
-### `TagInput` (`tag-input.tsx`)
-
-A controlled multi-tag input. Tags are displayed inline as `<Badge variant="glass">` chips with a remove button.
-
-**Wrapper div:** `input-clean flex min-h-10 w-full flex-wrap gap-1.5 rounded-xl px-3 py-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 transition-all`
-
-**Inner input:** `flex-1 min-w-32 bg-transparent text-sm outline-none placeholder:text-muted-foreground`
-
-**Behavior:**
-
-- `Enter` or `,` adds the current value as a tag
-- `Backspace` on empty input removes the last tag
-- Blur with pending content adds the tag
-
-**Props:** `value: string[]`, `onChange: (tags: string[]) => void`, `placeholder?: string`, `className?: string`, `id?: string`, `error?: boolean`, `aria-invalid?`, `aria-describedby?`
-
-**Error state** (via `error` prop): `border-red-400/60 focus-within:ring-red-400/20` on the wrapper; `aria-invalid` / `aria-describedby` are forwarded to the inner `<input>` so a wrapping `FormField` can link its error message.
-
-### `LiveRegion` (`live-region.tsx`)
-
-A visually-hidden (`sr-only`) ARIA live region for transient status that has **no visible Alert of its own** — e.g. "저장 중…" / "불러오는 중…" busy states conveyed only by a spinner. Mount it persistently and toggle its `children`; screen readers announce on content change, not on mount, so render it empty (not unmounted) when idle.
-
-`politeness="polite"` (default) → `role="status"` + `aria-live="polite"`; `politeness="assertive"` → `role="alert"` + `aria-live="assertive"`. Always `aria-atomic="true"`.
-
-**Props:** `children?: ReactNode`, `politeness?: 'polite' | 'assertive'`, `className?: string`
-
----
-
-## 13. Recurring Visual Patterns
-
-### Brand Gradient (Logo Mark)
-
-```
-bg-linear-to-br from-primary to-teal-400
-```
-
-Text: `font-black text-slate-900` — "CO"
-
-Used on: sidebar logo mark, mobile header logo mark, login page logo mark. Shape: `rounded-xl` in sidebar/mobile, `rounded-2xl` on login page.
-
-### Ambient Blobs
-
-See §4. Always 2–3 per page, always `pointer-events-none aria-hidden`, always `rounded-full blur-3xl`.
-
-### Page Header Pattern
-
-The page header floats directly on the background — no Card wrapper:
-
-```html
-<div>
-  <p class="text-xs font-semibold tracking-[0.15em] text-primary uppercase">
-    {superLabel}
-  </p>
-  <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">{title}</h1>
-  <p class="text-muted-foreground">{description}</p>
-</div>
-```
-
-Used on: `JobPostingsPage`, `AddJobPostingPage`, and `JobPostingDetailPage`.
-
-### Summary Chips
-
-Small stat chips in the page header area:
-
-```html
-<div
-  class="min-w-28 rounded-xl border-white/12 bg-accent px-4 py-2.5 backdrop-blur-md"
->
-  <p class="text-[11px] font-medium tracking-wide text-gray-600 uppercase">
-    {label}
-  </p>
-  <p class="text-lg font-semibold tracking-tight text-foreground">{value}</p>
-</div>
-```
-
-### Icon in Gradient Container
-
-```html
-<div
-  class="h-16 w-16 rounded-2xl bg-linear-to-br from-primary/20 to-teal-500/10
-            flex items-center justify-center"
->
-  <Icon class="h-8 w-8 text-primary" />
-</div>
-```
-
-Used on: empty state (`Sparkles` icon). `NotFoundPage` uses `bg-accent text-gray-600 border` instead.
-
-### Form Section Heading
-
-```html
-<div
-  class="inline-flex items-center gap-2 rounded-full bg-accent border px-3 py-1.5"
->
-  <Icon class="h-4 w-4 text-primary" />
-  <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-600">
-    {sectionTitle}
-  </h3>
-</div>
-```
-
-### Details Panel (inside JobPostingCard)
-
-```html
-<div class="rounded-xl border border-white/8 bg-muted p-3">
-  <!-- structured key-value pairs for deadline, location, salary, etc. -->
-</div>
-```
-
-### Status Chips (inside JobPostingCard)
-
-```
-deadline:  rounded-full bg-red-500/8 px-2.5 py-0.5 text-xs font-medium text-red-600 border border-red-500/15
-salary:    rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-gray-600 border
-```
-
-### Spinner with Glow (Auth Callback)
-
-```html
-<div
-  class="relative h-[4.5rem] w-[4.5rem] rounded-full bg-primary/10 border border-primary/20"
->
-  <div
-    class="absolute inset-2 rounded-full bg-linear-to-br from-primary/15
-              to-teal-500/12 blur-md"
-  />
-  <Loader2 class="relative z-10 h-10 w-10 text-primary animate-spin" />
-</div>
-```
-
----
-
-## 14. Page Specifications
-
-### `JobPostingsPage` (`src/pages/job-postings-page.tsx`)
-
-- Root: `animate-fade-in space-y-6`
-- **Header**: transparent, floating. Super-label + H1 + summary chips row + CTA `<Button asChild>` wrapping `<Link to="/job-postings/new">`
-- **Grid**: `grid gap-5 sm:grid-cols-2 lg:grid-cols-3` (same for loading skeletons and cards)
-- **Loading state**: `<LoadingCard />` × N — `<Card>` with stacked `<Skeleton>` placeholders
-- **Error state**: `min-h-[22rem] rounded-xl border border-red-500/20 bg-red-500/8 px-6 py-12 text-center` — icon circle + message + retry `<Button>`
-- **Empty state**: full-span `<Card>` centered in grid — gradient icon container with `Sparkles` + CTA
-- **`JobPostingCard`**: `<Card className="group glass-hover relative overflow-hidden ...">`, `<CardContent className="p-5">`, platform `<Badge>`, company with `Building2` icon, `<h3>` title with `line-clamp-2 group-hover:text-primary`, internal title link to `/job-postings/:id`, details panel, deadline/salary chips, tech stack `<Badge variant="secondary">` (max 5) + overflow `<Badge variant="outline">`
-
-### `JobPostingDetailPage` (`src/pages/job-posting-detail-page.tsx`)
-
-- Root: `animate-fade-in space-y-6`
-- Back link: `<Button variant="ghost" size="sm" asChild>` wrapping `<Link to="/job-postings">`
-- **Loading state**: back link + `DetailLoadingSkeleton` with stacked `<Skeleton>` placeholders
-- **Error state**: same error panel pattern as `JobPostingsPage` with retry `<Button variant="outline">`
-- **Header**: transparent, floating. Super-label "Job Detail", company row with `Building2`, H1, platform `<Badge>`, created timestamp, optional original posting `<Button variant="outline" size="sm" asChild>`
-- **Metadata card**: glass `<Card>` containing location, experience, employment type, deadline, and salary rows when present
-- **Section cards**: glass `<Card>` panels for tech stack, text sections, additional info, and homepage
-- **Section heading**: inline rounded accent pill with lucide icon and Korean title
-
-### `AddJobPostingPage` (`src/pages/add-job-posting-page.tsx`)
-
-Three phases driven by local state:
-
-**Phase 1 — URL Input:**
-
-- `<Card>` with `<CardHeader>` (border-b border-white/8), `<CardContent>`
-- Input row: `flex flex-col gap-3 rounded-xl border border-white/8 bg-muted p-3 sm:flex-row`
-- `<Input>` + `<Button loading={isExtracting}>`
-- On error: `<Alert variant="destructive">`
-
-**Phase 2 — Editable Extracted Form:**
-
-- `<Card className="overflow-hidden">` with `<CardContent className="space-y-8 pt-6">`
-- Top summary row inside `JobPostingFormFields`: platform `<Badge>`, company name, job title, and optional external link icon
-- `<FormSection>` component: renders a section heading pill (see §13)
-- `<FormField>` component: `space-y-1.5` wrapper with `<Label htmlFor>` + input + optional `text-xs text-red-400` error
-- Section layout grids: `grid-cols-1`, `sm:grid-cols-2`, `sm:grid-cols-2 lg:grid-cols-3`
-- Tag fields (tech_stack, tags): `<TagInput>`
-- `<CardFooter>`: Cancel `<Button variant="outline">` + Save `<Button loading={isSaving}>`
-
-**Phase 3 — Success:**
-
-- `animate-fade-in` centered `<Card className="py-12 text-center">`
-- Success icon: `rounded-full bg-emerald-400/10 text-emerald-400 border border-emerald-400/20`
-- Two CTAs: `<Button variant="outline">` (back to list) + `<Button>` (register another)
-
-### `JobSearchGroupsPage` (`src/pages/job-search-groups-page.tsx`)
-
-- Root: `animate-fade-in space-y-8`; active and ended groups render in separate
-  responsive card grids.
-- Create/edit and delete confirmation overlays use the shared `<Dialog>`
-  primitive. Dialog contents use only project `Button`, `Input`, `Textarea`,
-  `Label`, and `Alert` primitives.
-- The create/edit dialog is a semantic `<form>`: Enter submits, Cancel is an
-  explicit `type="button"`, and the name field receives initial focus.
-- An empty name is a field error: `Input error` sets `aria-invalid`, the message
-  is linked with `aria-describedby`, and focus returns to the name field.
-  Save/delete request failures use `<Alert variant="destructive">` instead of
-  being attached to an unrelated field.
-
-### `LoginPage` (`src/pages/login-page.tsx`)
-
-- Root: `relative isolate flex min-h-screen items-center justify-center overflow-hidden px-4 py-10`
-- 3 ambient blobs
-- `<Card className="mx-4 w-full max-w-md animate-fade-in">`
-- `<CardContent className="px-8 pb-8 pt-8">` — content centered
-- Label badge: `rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold tracking-[0.2em] text-primary uppercase border border-primary/20` — "Frosted Workspace"
-- Logo: `h-14 w-14 rounded-2xl` brand gradient mark
-- `<h1 class="text-3xl font-bold tracking-tight">`
-- Error: `<Alert variant="destructive">`
-- CTA: `<Button className="w-full justify-center" variant="glass" loading={isLoading}>` with inline Google SVG icon
-- Disclaimer: `text-xs text-gray-500 text-center text-balance`
-
-### `AuthCallbackPage` (`src/pages/auth-callback-page.tsx`)
-
-- Root: `relative flex min-h-screen items-center justify-center overflow-hidden px-4`
-- 2 ambient blobs
-- `<Card className="w-full max-w-sm animate-fade-in">`
-- `<CardContent className="flex flex-col items-center gap-5 px-8 py-10 text-center">`
-- Spinner glow pattern (see §13)
-- `<p class="text-lg font-semibold tracking-tight">` + `<p class="text-sm text-gray-600">`
-
-### `NotFoundPage` (`src/pages/not-found-page.tsx`)
-
-- Root: `flex min-h-[60vh] items-center justify-center animate-fade-in`
-- `<Card className="mx-auto w-full max-w-md text-center">`
-- Icon: `h-16 w-16 rounded-2xl bg-accent text-gray-600 border` with `<FileQuestion>`
-- Label: `text-xs tracking-widest text-gray-500 uppercase` — "Not Found"
-- `<h1 class="text-2xl font-bold tracking-tight">`
-- CTA: `<Button asChild>` + `<Link>` with `<ArrowLeft>` icon
-
----
-
-## 15. Responsive Breakpoints
-
-Tailwind defaults only. No custom breakpoints.
-
-| Breakpoint | Min Width | Key Layout Change                                                               |
-| ---------- | --------- | ------------------------------------------------------------------------------- |
-| (default)  | 0px       | Single-column card grid; stacked page header; mobile AppLayout (sticky top bar) |
-| `sm`       | 640px     | 2-column card grid; page header row; form grids 2-col; URL input row            |
-| `md`       | 768px     | Static sidebar visible (`pl-64`); mobile header hidden                          |
-| `lg`       | 1024px    | 3-column card grid; form grid 3-col                                             |
-
----
-
-## 16. Accessibility & Focus States
-
-**Global focus ring:**
-
-```css
-:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
-}
-```
-
-`--ring` is `185 72% 42%` (same as `--primary`) — teal focus rings everywhere.
-
-**Text selection:**
-
-```css
-::selection {
-  background: rgba(6, 182, 212, 0.18);
-}
-```
-
-**Disabled state:** `disabled:pointer-events-none disabled:opacity-50` on all interactive components.
-
-**Screen reader support:** Use `sr-only` for icon-only buttons (logout, hamburger). Radix UI primitives provide ARIA roles automatically.
-
-**Form error delivery:** Field-level validation errors are conveyed to screen readers with input-field context, not as free-floating text:
-
-- The invalid control sets `aria-invalid` (automatic from the `error` prop on `Input` / `Textarea` / `TagInput`).
-- The error message `<p>` gets a stable `id` (`${fieldId}-error`) and is linked to the control via `aria-describedby`. In the add-posting form, `FormField` (`job-posting-form-fields.tsx`) injects this link into its control child with `cloneElement`; other forms wire it explicitly (e.g. the 경력 연차 field in `profile-page.tsx`).
-- On submit failure, focus moves to the first invalid field (`requestAnimationFrame` → `getElementById(...).focus()`) so the label, invalid state, and description are announced.
-- Forms that own their validation in JS set `noValidate` on the `<form>` (see `profile-page.tsx`): native constraint bubbles otherwise suppress the `submit` event and are poorly announced.
-
-**Live status announcements:** Use variant-appropriate politeness (see the `Alert` and `LiveRegion` specs in §12). Result banners use `Alert` (success → polite, error → assertive); transient busy states with no visible banner ("저장 중…", "불러오는 중…") use a persistently-mounted `LiveRegion`.
-
----
-
-## 17. Mantine Configuration Notes
-
-`MantineProvider` wraps the app root. Mantine is restricted to implementation
-details of project-owned, high-level overlay primitives; currently
-`src/components/ui/dialog.tsx` uses `Modal` for its overlay lifecycle.
-Pages and feature components do not import Mantine controls directly. The
-Mantine theme in `src/app/theme.ts`:
-
-```ts
-{
-  primaryColor: 'teal',
-  defaultRadius: 'md',
-  fontFamily: 'IBM Plex Sans, Avenir Next, Segoe UI Variable, Segoe UI, sans-serif',
-  headings: {
-    fontFamily: 'Space Grotesk, IBM Plex Sans, Avenir Next, Segoe UI Variable, sans-serif',
-    fontWeight: '700',
-  },
-}
-```
-
-**Boundary:** New screens use the `src/components/ui/` primitives described in
-§12. A new direct Mantine usage is allowed only inside that layer when a
-high-level overlay behavior is not already covered; it must expose a narrowed
-project contract and keep styling/accessibility policy centralized. Mantine
-buttons, inputs, textareas, and other page-level visual primitives are not
-allowed.
-
----
-
-## Quick Checklist for New Pages
-
-When adding a new authenticated page:
-
-- [ ] Add a `navigationItems` entry in `src/components/app-layout.tsx` (§11) when the page should appear in sidebar navigation
-- [ ] Add a route inside `ProtectedRoute → AppLayout` in `src/app/router.tsx` (§10)
-- [ ] Wrap the page root element with `animate-fade-in`
-- [ ] Use the `AppLayout` `max-w-6xl mx-auto` wrapper by default; narrower focused flows may use a local wrapper such as `mx-auto max-w-4xl`
-- [ ] Use `<Card>` (default `glass={true}`) for content panels
-- [ ] Use `<Button>` variants from §12 — never raw `<button>`
-- [ ] Use `<Input>` / `<Textarea>` with `<Label htmlFor>`; connect field errors
-      with `error` + `aria-describedby`, and show request failures with `<Alert>`
-- [ ] Use `<Dialog>` for page-level modal forms and confirmations; do not import
-      Mantine components in the page
-- [ ] Korean primary UI copy, with existing English brand/super-label conventions preserved
-- [ ] Icons from `lucide-react`, except approved brand SVGs such as the Google OAuth mark
-- [ ] Import `cn` from `@/lib/utils` if conditional class merging is needed
-- [ ] Page header: floating (no Card), transparent, with super-label above `<h1>`
+Use explicit border and background properties when defining surfaces. A
+conditional property replaces that property from preceding styles, so include
+its intended default alongside hover or media-query values. Do not rely on
+stylesheet order to merge independently generated class names.
+
+## Semantic colors and typography
+
+CSS custom properties are declared in `src/index.css`. StyleX references colors
+with `hsl(var(--token))`; translucent variants use `color-mix()` or HSL alpha.
+Changing a token updates every reference.
+
+| Token                      | HSL channels  | Role                         |
+| -------------------------- | ------------- | ---------------------------- |
+| `--background`             | `0 0% 100%`   | Page background              |
+| `--foreground`             | `0 0% 9%`     | Body text                    |
+| `--card`                   | `210 20% 98%` | Card color token             |
+| `--card-foreground`        | `222 47% 11%` | Card text                    |
+| `--popover`                | `0 0% 100%`   | Popover background           |
+| `--popover-foreground`     | `222 47% 11%` | Popover text                 |
+| `--primary`                | `185 72% 42%` | Brand and primary actions    |
+| `--primary-foreground`     | `0 0% 100%`   | Primary action text          |
+| `--secondary`              | `210 20% 96%` | Secondary backgrounds        |
+| `--secondary-foreground`   | `222 47% 11%` | Secondary text               |
+| `--muted`                  | `210 20% 96%` | Subdued backgrounds          |
+| `--muted-foreground`       | `215 16% 35%` | Helper text and placeholders |
+| `--accent`                 | `185 40% 94%` | Accent fills                 |
+| `--accent-foreground`      | `185 72% 32%` | Accent text                  |
+| `--destructive`            | `0 72% 51%`   | Errors                       |
+| `--destructive-foreground` | `0 0% 100%`   | Destructive action text      |
+| `--border`, `--input`      | `214 20% 88%` | Borders and dividers         |
+| `--ring`                   | `185 72% 42%` | Focus outlines               |
+
+`--radius` is `1rem`. The document font stack is Inter, IBM Plex Sans, Segoe UI
+Variable, Segoe UI, system-ui, sans-serif. Headings retain bold weight, a 1.25
+line height, and slightly tightened tracking. Native controls inherit document
+or parent typography; slotted links retain the button's explicit size styles.
+Secondary text ranges from 0.75rem to 0.875rem; page headings grow at the small
+breakpoint. Neutral and status colors use explicit OKLCH values in StyleX.
+
+## Surfaces
+
+| Style in `surfaces` | Appearance and use                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `glass`             | White at 70% opacity, a white gradient, 20px blur with 120% saturation, a subtle dark border, and outer/inset shadows. Default cards. |
+| `glassStrong`       | White at 85% opacity with a stronger gradient and 24px blur. Sidebar, mobile header, drawer, assistant shell.                         |
+| `glassLight`        | White at 55% opacity with 12px blur and a light inset shadow. Chips and secondary controls.                                           |
+| `glassHover`        | Complete glass defaults plus a stronger hover background/shadow and a 2px upward lift. Reduced motion removes the lift.               |
+| `surface`           | White at 75% opacity, a subtle border and shadow, without blur. Non-glass cards.                                                      |
+| `btnPrimary`        | Teal gradient, white bold text, and teal shadow. Hover brightens the gradient.                                                        |
+| `btnSecondary`      | Subtle dark fill/border, strengthened on hover.                                                                                       |
+| `btnGhost`          | Transparent fill with muted text; hover adds a subtle fill and foreground text.                                                       |
+| `inputClean`        | Subtle dark fill/border and inset shadow, muted placeholder, teal focus border and shadow.                                            |
+
+## Motion and structural layout
+
+`motion.fadeIn` enters from 12px below over 0.4s. `motion.slideIn` enters from
+12px left over 0.3s. Both use an opacity-only 0.2s animation when reduced motion
+is requested. Pulse and spinner animations stop under reduced motion. The
+indeterminate progress indicator stops sweeping and fills its track instead.
+Loading and completion remain available through visible text and live regions.
+
+A container with `data-stack` uses its StyleX `--stack-space` value for the
+bottom margin of each non-last direct child. Keep the attribute and spacing
+style together. `CardHeader` supplies this relationship by default.
+
+The posting grid uses `data-postings-grid`. Cards from the seventh onward use
+`content-visibility: auto` and an intrinsic block-size estimate of 220px. The
+first six cards render immediately. Unsupported browsers render normally.
+
+## Shared UI contracts
+
+All public primitives live in `src/components/ui/`. Pages reuse these primitives
+instead of importing equivalent library controls.
+
+| Component                        | Contract                                                                                                                                                                                                                                                          |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Button`                         | Variants: default, destructive, outline, secondary, ghost, link, glass. Sizes: default, sm, lg, icon. Loading inserts a decorative spinner; native buttons default to disabled while loading. `asChild` preserves the Radix Slot/Slottable composition for links. |
+| `Badge`                          | Variants: default, secondary, destructive, success, warning, outline, saramin, wanted, glass. Compact pill with status/platform color.                                                                                                                            |
+| `Card`                           | Glass by default; `glass={false}` selects the solid surface. `interactive` enables hover feedback and pointer cursor.                                                                                                                                             |
+| Card sections                    | Header is a vertical stack with 1.5rem padding. Content/footer default to 1.5rem padding with no top padding. Caller overrides compose by property.                                                                                                               |
+| `Input`, `Textarea`              | Shared clean input surface, rounded corners, disabled state, and `error` linked to `aria-invalid`. Textarea has a 6rem minimum height and disables resizing.                                                                                                      |
+| `Label`                          | Associates with controls through caller-supplied `htmlFor`.                                                                                                                                                                                                       |
+| `TagInput`                       | Enter/comma adds trimmed, unique tags; blur commits pending text; Backspace on an empty input removes the last tag. Error and description attributes reach the inner input.                                                                                       |
+| `Alert`                          | Decorative content uses the explicit `icon` slot. Destructive/warning variants default to assertive alerts; informational variants use polite status. Callers may override role and politeness.                                                                   |
+| `AlertTitle`, `AlertDescription` | Styled heading and description content inside an alert.                                                                                                                                                                                                           |
+| `LiveRegion`                     | Persistently mounted, visually hidden announcements; polite by default, optionally assertive.                                                                                                                                                                     |
+| Avatar primitives                | Radix owns image loading/fallback behavior. StyleX owns circular sizing, clipping, colors, and image fit.                                                                                                                                                         |
+| `Skeleton`                       | Rounded gradient placeholder with reduced-motion-aware pulse.                                                                                                                                                                                                     |
+| `Separator`                      | Horizontal or vertical decorative divider, hidden from assistive technology.                                                                                                                                                                                      |
+| `Dialog`                         | Required title plus `opened`/`onClose` boundary. Mantine owns focus trap, Escape, scroll lock, and restoration; StyleX supplies overlay, panel, header, body, title, and close-control styles through `classNames`.                                               |
+
+`xstyle` accepts compiled StyleX styles and conditional arrays, including the
+app's stack spacing property. Raw style objects and utility strings are not the
+component styling contract. Runtime StyleX style functions may be used for
+values that cannot be known at build time.
+
+## Layout and navigation
+
+The desktop sidebar is fixed, 16rem wide, and fills the viewport height. Content
+has matching left padding and is constrained to 72rem, with responsive gutters.
+The sidebar contains brand identity, route links, and the user/logout area.
+Active links use teal fill/border; inactive links have hover feedback. StyleX
+markers express ancestor-hover relationships.
+
+Below 48rem, a sticky header replaces the sidebar. The mobile menu uses a native
+modal `<dialog>` with a maximum width of 80vw. The browser owns focus trapping,
+inert background, Escape handling, and restoration; the application owns body
+scroll locking and backdrop-click dismissal. A focus-revealed skip link targets
+`#main-content`.
+
+The assistant is a separate non-modal dialog. It is mounted lazily, then hidden
+on close without discarding the ChatKit session. Opening and closing restore
+focus appropriately; Escape closes history before closing the panel. On mobile
+it has 0.75rem side/bottom insets and a 4rem top inset. On desktop it sits 1.5rem
+from the right/bottom, with viewport-constrained 420px width and 680px height.
+ChatKit's embedded interior uses its own theme API.
+
+## Page patterns
+
+| Page                   | Layout and states                                                                                                                                                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JobPostingsPage`      | Floating heading, summary chips, registration link, and group filters. One/two/three-column card grid for data and skeletons. Error panel with retry, centered empty state with CTA, and pagination.                                              |
+| Posting cards          | Interactive glass, clipped status accent bar, platform/status badges, company and two-line title, stretched detail link, independent original-posting link, detail panel, deadline/salary chips, and up to five tech tags plus an overflow badge. |
+| `JobPostingDetailPage` | Back action, loading skeleton or retry panel, company/title metadata, status/group/memo controls, section cards for populated fields, and artifact generation.                                                                                    |
+| `AddJobPostingPage`    | URL extraction card followed by editable form sections and save/cancel footer. Responsive field grids, linked field errors, tag inputs, request alerts, and a centered success card with next actions.                                            |
+| `JobSearchGroupsPage`  | Separate active/ended card grids. Shared dialogs for create/edit/delete. Forms submit with Enter, focus the name field initially, and return focus to an invalid name. Request errors remain separate from field errors.                          |
+| `ProfilePage`          | Career-profile form with onboarding, loading, retry, validation, and save feedback. Shared controls, tag inputs, and live announcements.                                                                                                          |
+| `StrategistPage`       | Profile/group preconditions, plan generation, progress indicator, prioritized fit cards, and explicit proposed-action controls. Handles unavailable feature, loading, error, and empty-plan states.                                               |
+| `LoginPage`            | Centered glass card up to 28rem wide, three ambient blobs, brand mark, short introduction, Google action, capabilities list, and disclaimer.                                                                                                      |
+| `AuthCallbackPage`     | Centered glass card up to 24rem wide, two ambient blobs, spinner/glow, and status text.                                                                                                                                                           |
+| `NotFoundPage`         | Centered card with icon, explanation, and navigation action.                                                                                                                                                                                      |
+| Route failures         | Shared error boundary provides a readable recovery surface; protected-route loading uses the same visual language.                                                                                                                                |
+
+## Responsive breakpoints
+
+StyleX property conditions preserve the existing thresholds.
+
+| Minimum width    | Layout change                                                        |
+| ---------------- | -------------------------------------------------------------------- |
+| Default          | Single-column cards, stacked headers, mobile navigation              |
+| `40rem` (640px)  | Two-column grids and horizontal form/header arrangements             |
+| `48rem` (768px)  | Fixed sidebar, larger content gutters, floating assistant dimensions |
+| `64rem` (1024px) | Three-column grids and wider header arrangements                     |
+
+## Accessibility and global styling
+
+Keyboard focus uses a 2px teal outline with an offset; components can specialize
+it with StyleX pseudo-states. Posting cards expose focus when their link is
+focused. Icon-only controls have accessible names. Native disabled controls,
+field error descriptions, and live-region semantics remain part of the shared
+component boundary.
+
+Text selection uses a translucent cyan fill. The narrow scrollbar has a
+translucent dark thumb that strengthens on hover. The CSS reset preserves
+native hidden behavior, image sizing, control inheritance, and predictable
+box sizing without depending on a styling framework's preflight.
+
+## Mantine boundary
+
+`MantineProvider` remains in `src/app/providers.tsx`. Its theme is configured in
+`src/app/theme.ts` with teal primary color, medium radius, IBM Plex Sans body
+font, and Space Grotesk heading stack. Mantine is restricted to the shared modal
+behavior boundary. Pages use project primitives; StyleX owns their visual
+styling.
