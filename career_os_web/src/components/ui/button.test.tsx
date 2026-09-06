@@ -13,7 +13,7 @@ describe('Button', () => {
     const link = screen.getByRole('link', { name: '채용공고 보기' });
 
     expect(link).toHaveAttribute('href', '/job-postings');
-    expect(link).toHaveClass('inline-flex');
+    expect(link).not.toHaveAttribute('disabled');
   });
 
   it('renders loading content with a slotted child element', () => {

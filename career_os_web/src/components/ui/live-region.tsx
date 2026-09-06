@@ -1,5 +1,7 @@
+import * as stylex from '@stylexjs/stylex';
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
+import type { AppStyles } from '@/lib/styles';
+import { withClassName } from '@/lib/styles';
 
 interface LiveRegionProps {
   children?: ReactNode;
@@ -9,6 +11,7 @@ interface LiveRegionProps {
    */
   politeness?: 'polite' | 'assertive';
   className?: string;
+  xstyle?: AppStyles;
 }
 
 /**
@@ -23,15 +26,30 @@ export function LiveRegion({
   children,
   politeness = 'polite',
   className,
+  xstyle,
 }: LiveRegionProps) {
   return (
     <div
       aria-atomic="true"
       aria-live={politeness}
-      className={cn('sr-only', className)}
+      {...withClassName([styles.hidden, xstyle], className)}
       role={politeness === 'assertive' ? 'alert' : 'status'}
     >
       {children}
     </div>
   );
 }
+
+const styles = stylex.create({
+  hidden: {
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    padding: 0,
+    margin: '-1px',
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    borderWidth: 0,
+  },
+});

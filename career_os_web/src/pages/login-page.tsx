@@ -1,3 +1,4 @@
+import * as stylex from '@stylexjs/stylex';
 import { Briefcase, FolderOpen, Sparkles } from 'lucide-react';
 import { useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router';
@@ -5,6 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { motion } from '@/styles/motion';
 import {
   DATABASE_UNAVAILABLE_CODE,
   INTERNAL_SERVER_ERROR_CODE,
@@ -103,48 +105,35 @@ export function LoginPage() {
   }
 
   return (
-    <div className="relative isolate flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
+    <div {...stylex.props(styles.loginPageRow)}>
       {/* Vibrant ambient blobs behind the glass card */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute right-[-10rem] top-[-10rem] h-[28rem] w-[28rem] rounded-full bg-linear-to-br from-cyan-400/40 via-primary/25 to-transparent blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute bottom-[-8rem] left-[-6rem] h-96 w-96 rounded-full bg-linear-to-tr from-teal-400/35 via-primary/20 to-transparent blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute top-[40%] left-[20%] h-64 w-64 rounded-full bg-linear-to-br from-purple-500/30 to-pink-500/20 blur-3xl"
-      />
+      <div aria-hidden="true" {...stylex.props(styles.loginPageContainer)} />
+      <div aria-hidden="true" {...stylex.props(styles.loginPageContainer2)} />
+      <div aria-hidden="true" {...stylex.props(styles.loginPageContainer3)} />
 
       {/* Single frosted glass card */}
-      <Card className="mx-4 w-full max-w-md animate-fade-in">
-        <CardContent className="px-8 pb-8 pt-8">
-          <div className="mb-8 flex flex-col items-center gap-4">
-            <span className="rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold tracking-[0.2em] text-primary uppercase border border-primary/20">
-              구직 활동 관리
-            </span>
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-teal-400 text-lg font-black text-slate-900 shadow-lg shadow-primary/30">
-              CO
-            </div>
-            <div className="text-center">
-              <h1 className="text-3xl font-bold tracking-tight">Career OS</h1>
-              <p className="text-gray-600 mx-auto mt-1 max-w-[18rem] text-sm leading-6 text-balance">
+      <Card xstyle={[styles.loginPageCard, motion.fadeIn]}>
+        <CardContent xstyle={styles.loginPageCardContent}>
+          <div {...stylex.props(styles.loginPageRow2)}>
+            <span {...stylex.props(styles.loginPageText)}>구직 활동 관리</span>
+            <div {...stylex.props(styles.loginPageRow3)}>CO</div>
+            <div {...stylex.props(styles.loginPageContainer4)}>
+              <h1 {...stylex.props(styles.loginPageHeading)}>Career OS</h1>
+              <p {...stylex.props(styles.loginPageDescription)}>
                 여러 채용공고를 한곳에 모아 정리하는 워크스페이스
               </p>
             </div>
           </div>
 
           {error && (
-            <Alert className="mb-4" variant="destructive">
+            <Alert xstyle={styles.loginPageAlert} variant="destructive">
               <AlertTitle>로그인 실패</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
           <Button
-            className="w-full justify-center"
+            xstyle={styles.loginPageButton}
             loading={isLoading}
             variant="glass"
             onClick={handleGoogleLogin}
@@ -153,7 +142,7 @@ export function LoginPage() {
             Google로 계속하기
           </Button>
 
-          <div className="mt-5 space-y-2.5 rounded-xl bg-muted/60 px-4 py-3.5">
+          <div {...stylex.props(styles.loginPageStack)} data-stack="">
             {(
               [
                 { icon: Briefcase, text: '채용공고 URL로 자동 스크랩 & 정리' },
@@ -161,19 +150,16 @@ export function LoginPage() {
                 { icon: Sparkles, text: 'AI 기반 지원 전략 & 자료 생성' },
               ] as const
             ).map(({ icon: Icon, text }) => (
-              <div
-                key={text}
-                className="flex items-center gap-2.5 text-xs text-gray-600"
-              >
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
-                  <Icon className="h-2.5 w-2.5" />
+              <div key={text} {...stylex.props(styles.loginPageRow4)}>
+                <div {...stylex.props(styles.loginPageRow5)}>
+                  <Icon {...stylex.props(styles.loginPageIcon)} />
                 </div>
                 {text}
               </div>
             ))}
           </div>
 
-          <p className="text-gray-500 mx-auto mt-5 max-w-[16rem] text-center text-xs leading-5 text-balance">
+          <p {...stylex.props(styles.loginPageDescription2)}>
             계속하면 서비스 이용약관에 동의하게 됩니다.
           </p>
         </CardContent>
@@ -181,3 +167,177 @@ export function LoginPage() {
     </div>
   );
 }
+
+const styles = stylex.create({
+  loginPageRow: {
+    position: 'relative',
+    isolation: 'isolate',
+    display: 'flex',
+    minHeight: '100vh',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    paddingLeft: '1rem',
+    paddingRight: '1rem',
+    paddingTop: '2.5rem',
+    paddingBottom: '2.5rem',
+  },
+  loginPageContainer: {
+    pointerEvents: 'none',
+    position: 'absolute',
+    right: '-10rem',
+    top: '-10rem',
+    height: '28rem',
+    width: '28rem',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to bottom right in oklab, color-mix(in oklab, oklch(78.9% .154 211.53) 40%, transparent), color-mix(in oklab, hsl(var(--primary)) 25%, transparent), transparent)',
+    filter: 'blur(64px)',
+  },
+  loginPageContainer2: {
+    pointerEvents: 'none',
+    position: 'absolute',
+    bottom: '-8rem',
+    left: '-6rem',
+    height: '24rem',
+    width: '24rem',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to top right in oklab, color-mix(in oklab, oklch(77.7% .152 181.912) 35%, transparent), color-mix(in oklab, hsl(var(--primary)) 20%, transparent), transparent)',
+    filter: 'blur(64px)',
+  },
+  loginPageContainer3: {
+    pointerEvents: 'none',
+    position: 'absolute',
+    top: '40%',
+    left: '20%',
+    height: '16rem',
+    width: '16rem',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to bottom right in oklab, color-mix(in oklab, oklch(62.7% .265 303.9) 30%, transparent), color-mix(in oklab, oklch(65.6% .241 354.308) 20%, transparent))',
+    filter: 'blur(64px)',
+  },
+  loginPageCard: {
+    marginLeft: '1rem',
+    marginRight: '1rem',
+    width: '100%',
+    maxWidth: '28rem',
+  },
+  loginPageCardContent: {
+    paddingLeft: '2rem',
+    paddingRight: '2rem',
+    paddingBottom: '2rem',
+    paddingTop: '2rem',
+  },
+  loginPageRow2: {
+    marginBottom: '2rem',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '1rem',
+  },
+  loginPageText: {
+    borderRadius: '9999px',
+    backgroundColor:
+      'color-mix(in oklab, hsl(var(--primary)) 15%, transparent)',
+    paddingLeft: '0.75rem',
+    paddingRight: '0.75rem',
+    paddingTop: '0.25rem',
+    paddingBottom: '0.25rem',
+    fontSize: '11px',
+    fontWeight: 600,
+    letterSpacing: '0.2em',
+    color: 'hsl(var(--primary))',
+    textTransform: 'uppercase',
+    borderWidth: '1px',
+    borderColor: 'color-mix(in oklab, hsl(var(--primary)) 20%, transparent)',
+  },
+  loginPageRow3: {
+    display: 'flex',
+    height: '3.5rem',
+    width: '3.5rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '1rem',
+    backgroundImage:
+      'linear-gradient(to bottom right in oklab, hsl(var(--primary)), oklch(77.7% .152 181.912))',
+    fontSize: '1.125rem',
+    lineHeight: '1.75rem',
+    fontWeight: 900,
+    color: 'oklch(20.8% .042 265.755)',
+    boxShadow:
+      '0 10px 15px -3px color-mix(in oklab, hsl(var(--primary)) 30%, transparent), 0 4px 6px -4px color-mix(in oklab, hsl(var(--primary)) 30%, transparent)',
+  },
+  loginPageContainer4: {
+    textAlign: 'center',
+  },
+  loginPageHeading: {
+    fontSize: '1.875rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  loginPageDescription: {
+    color: 'oklch(44.6% .03 256.802)',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    marginTop: '0.25rem',
+    maxWidth: '18rem',
+    fontSize: '.875rem',
+    lineHeight: '1.5rem',
+    textWrap: 'balance',
+  },
+  loginPageAlert: {
+    marginBottom: '1rem',
+  },
+  loginPageButton: {
+    width: '100%',
+    justifyContent: 'center',
+  },
+  loginPageStack: {
+    marginTop: '1.25rem',
+    '--stack-space': '0.625rem',
+    borderRadius: '.75rem',
+    backgroundColor: 'color-mix(in oklab, hsl(var(--muted)) 60%, transparent)',
+    paddingLeft: '1rem',
+    paddingRight: '1rem',
+    paddingTop: '0.875rem',
+    paddingBottom: '0.875rem',
+  },
+  loginPageRow4: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.625rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  loginPageRow5: {
+    display: 'flex',
+    height: '1.25rem',
+    width: '1.25rem',
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    backgroundColor:
+      'color-mix(in oklab, hsl(var(--primary)) 12%, transparent)',
+    color: 'hsl(var(--primary))',
+  },
+  loginPageIcon: {
+    height: '0.625rem',
+    width: '0.625rem',
+  },
+  loginPageDescription2: {
+    color: 'oklch(55.1% .027 264.364)',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    marginTop: '1.25rem',
+    maxWidth: '16rem',
+    textAlign: 'center',
+    fontSize: '.75rem',
+    lineHeight: '1.25rem',
+    textWrap: 'balance',
+  },
+});

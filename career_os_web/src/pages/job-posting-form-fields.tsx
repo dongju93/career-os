@@ -1,3 +1,4 @@
+import * as stylex from '@stylexjs/stylex';
 import { AlertCircle, ChevronRight, ExternalLink } from 'lucide-react';
 import { cloneElement, isValidElement, type ReactNode } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -6,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TagInput } from '@/components/ui/tag-input';
 import { Textarea } from '@/components/ui/textarea';
+import type { AppStyles } from '@/lib/styles';
 import { toSafeExternalUrl } from '../utils/url';
 import type {
   JobPostingExtractedMeta,
@@ -15,22 +17,22 @@ import type {
 
 function FormSection({
   title,
-  gridClass,
+  gridStyle,
   children,
 }: {
   title: string;
-  gridClass?: string;
+  gridStyle?: AppStyles;
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-4">
-      <div className="inline-flex items-center gap-2 rounded-full bg-accent border px-3 py-1.5">
-        <ChevronRight className="h-4 w-4 text-primary" />
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-600">
-          {title}
-        </h3>
+    <div {...stylex.props(styles.formSectionStack)} data-stack="">
+      <div {...stylex.props(styles.formSectionContainer)}>
+        <ChevronRight {...stylex.props(styles.formSectionChevronRight)} />
+        <h3 {...stylex.props(styles.formSectionHeading)}>{title}</h3>
       </div>
-      <div className={gridClass ?? 'grid gap-4 grid-cols-1'}>{children}</div>
+      <div {...stylex.props(gridStyle ?? styles.formSectionGrid)}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -57,14 +59,14 @@ function FormField({
       : children;
 
   return (
-    <div className="space-y-1.5">
+    <div {...stylex.props(styles.formFieldStack)} data-stack="">
       <Label htmlFor={id}>
         {label}
-        {required && <span className="text-red-400 ml-0.5">*</span>}
+        {required && <span {...stylex.props(styles.formFieldText)}>*</span>}
       </Label>
       {control}
       {error && (
-        <p className="text-xs text-red-400" id={errorId}>
+        <p {...stylex.props(styles.formFieldDescription)} id={errorId}>
           {error}
         </p>
       )}
@@ -91,30 +93,36 @@ export function JobPostingFormFields({
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div {...stylex.props(styles.jobPostingFormFieldsRow)}>
+        <div {...stylex.props(styles.jobPostingFormFieldsRow2)}>
           <Badge variant={meta.platform === 'saramin' ? 'saramin' : 'wanted'}>
             {meta.platform}
           </Badge>
           <div>
-            <p className="font-semibold leading-none">{form.company_name}</p>
-            <p className="mt-0.5 text-sm text-gray-600">{form.job_title}</p>
+            <p {...stylex.props(styles.jobPostingFormFieldsDescription)}>
+              {form.company_name}
+            </p>
+            <p {...stylex.props(styles.jobPostingFormFieldsDescription2)}>
+              {form.job_title}
+            </p>
           </div>
         </div>
         {safePostingUrl && (
           <a
-            className="text-gray-600 hover:text-primary transition-colors"
+            {...stylex.props(styles.jobPostingFormFieldsLink)}
             href={safePostingUrl}
             rel="noopener noreferrer"
             target="_blank"
           >
-            <ExternalLink className="h-4 w-4" />
+            <ExternalLink
+              {...stylex.props(styles.jobPostingFormFieldsExternalLink)}
+            />
           </a>
         )}
       </div>
 
       <FormSection
-        gridClass="grid gap-4 grid-cols-1 sm:grid-cols-2"
+        gridStyle={styles.jobPostingFormFieldsFormSection}
         title="기본 정보"
       >
         <FormField
@@ -146,7 +154,7 @@ export function JobPostingFormFields({
       </FormSection>
 
       <FormSection
-        gridClass="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+        gridStyle={styles.jobPostingFormFieldsFormSection2}
         title="근무 조건"
       >
         <FormField id="location" label="근무지역">
@@ -241,7 +249,7 @@ export function JobPostingFormFields({
             onChange={(v) => onPatch({ tags: v })}
           />
         </FormField>
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+        <div {...stylex.props(styles.jobPostingFormFieldsFormSection)}>
           <FormField id="job_category" label="직군/직무">
             <Input
               id="job_category"
@@ -260,7 +268,7 @@ export function JobPostingFormFields({
       </FormSection>
 
       <FormSection
-        gridClass="grid gap-4 grid-cols-1 sm:grid-cols-2"
+        gridStyle={styles.jobPostingFormFieldsFormSection}
         title="지원 정보"
       >
         <FormField id="benefits" label="복리후생">
@@ -308,8 +316,14 @@ export function JobPostingFormFields({
       </FormSection>
 
       {saveError && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
+        <Alert
+          icon={
+            <AlertCircle
+              {...stylex.props(styles.jobPostingFormFieldsExternalLink)}
+            />
+          }
+          variant="destructive"
+        >
           <AlertTitle>저장 실패</AlertTitle>
           <AlertDescription>{saveError}</AlertDescription>
         </Alert>
@@ -317,3 +331,102 @@ export function JobPostingFormFields({
     </>
   );
 }
+
+const styles = stylex.create({
+  formSectionStack: {
+    '--stack-space': '1rem',
+  },
+  formSectionContainer: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    borderRadius: '9999px',
+    backgroundColor: 'hsl(var(--accent))',
+    borderWidth: '1px',
+    paddingLeft: '0.75rem',
+    paddingRight: '0.75rem',
+    paddingTop: '0.375rem',
+    paddingBottom: '0.375rem',
+  },
+  formSectionChevronRight: {
+    height: '1rem',
+    width: '1rem',
+    color: 'hsl(var(--primary))',
+  },
+  formSectionHeading: {
+    fontSize: '.75rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '-.02em',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  formSectionGrid: {
+    display: 'grid',
+    gap: '1rem',
+    gridTemplateColumns: 'repeat(1, minmax(0, 1fr))',
+  },
+  formFieldStack: {
+    '--stack-space': '0.375rem',
+  },
+  formFieldText: {
+    color: 'oklch(70.4% .191 22.216)',
+    marginLeft: '0.125rem',
+  },
+  formFieldDescription: {
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    color: 'oklch(70.4% .191 22.216)',
+  },
+  jobPostingFormFieldsRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  jobPostingFormFieldsRow2: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+  },
+  jobPostingFormFieldsDescription: {
+    fontWeight: 600,
+    lineHeight: 1,
+  },
+  jobPostingFormFieldsDescription2: {
+    marginTop: '0.125rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  jobPostingFormFieldsLink: {
+    color: {
+      default: 'oklch(44.6% .03 256.802)',
+      ':hover': 'hsl(var(--primary))',
+    },
+    transitionProperty:
+      'color, background-color, border-color, outline-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+  },
+  jobPostingFormFieldsExternalLink: {
+    height: '1rem',
+    width: '1rem',
+  },
+  jobPostingFormFieldsFormSection: {
+    display: 'grid',
+    gap: '1rem',
+    gridTemplateColumns: {
+      default: 'repeat(1, minmax(0, 1fr))',
+      '@media (min-width: 40rem)': 'repeat(2, minmax(0, 1fr))',
+    },
+  },
+  jobPostingFormFieldsFormSection2: {
+    display: 'grid',
+    gap: '1rem',
+    gridTemplateColumns: {
+      default: 'repeat(1, minmax(0, 1fr))',
+      '@media (min-width: 40rem)': 'repeat(2, minmax(0, 1fr))',
+      '@media (min-width: 64rem)': 'repeat(3, minmax(0, 1fr))',
+    },
+  },
+});

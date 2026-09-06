@@ -1,3 +1,4 @@
+import * as stylex from '@stylexjs/stylex';
 import {
   AlertCircle,
   CheckCircle2,
@@ -16,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { TagInput } from '@/components/ui/tag-input';
 import { Textarea } from '@/components/ui/textarea';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { motion } from '@/styles/motion';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { fetchUserProfile, saveUserProfile } from '../services/user-profile';
 import type { UserProfile, UserProfileUpsert } from '../types/user-profile';
@@ -83,21 +85,23 @@ function ProfileLoadError({
   onRetry: () => void;
 }) {
   return (
-    <div className="min-h-[22rem] rounded-xl border border-red-500/20 bg-red-500/8 px-6 py-12 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 text-red-500">
-        <AlertCircle className="h-7 w-7" />
+    <div {...stylex.props(styles.profileLoadErrorContainer)}>
+      <div {...stylex.props(styles.profileLoadErrorRow)}>
+        <AlertCircle {...stylex.props(styles.profileLoadErrorAlertCircle)} />
       </div>
-      <h2 className="mt-5 text-xl font-bold tracking-tight">
+      <h2 {...stylex.props(styles.profileLoadErrorHeading)}>
         프로필을 불러오지 못했습니다
       </h2>
-      <p className="mx-auto mt-2 max-w-xl text-sm text-gray-600">
+      <p {...stylex.props(styles.profileLoadErrorDescription)}>
         {error.message}
       </p>
-      <p className="mt-3 font-mono text-xs font-semibold text-red-500">
-        {error.code}
-      </p>
-      <Button className="mt-6" variant="outline" onClick={() => onRetry()}>
-        <RefreshCw className="h-4 w-4" />
+      <p {...stylex.props(styles.profileLoadErrorDescription2)}>{error.code}</p>
+      <Button
+        xstyle={styles.profileLoadErrorButton}
+        variant="outline"
+        onClick={() => onRetry()}
+      >
+        <RefreshCw {...stylex.props(styles.profileLoadErrorRefreshCw)} />
         다시 시도
       </Button>
     </div>
@@ -179,14 +183,17 @@ export function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="animate-fade-in space-y-6">
-        <Skeleton className="h-9 w-40" />
+      <div
+        {...stylex.props([styles.profilePageStack, motion.fadeIn])}
+        data-stack=""
+      >
+        <Skeleton xstyle={styles.profilePageSkeleton} />
         <Card>
-          <CardContent className="space-y-5 p-6">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-1/2" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-24 w-full" />
+          <CardContent xstyle={styles.profilePageCardContent} data-stack="">
+            <Skeleton xstyle={styles.profilePageSkeleton2} />
+            <Skeleton xstyle={styles.profilePageSkeleton3} />
+            <Skeleton xstyle={styles.profilePageSkeleton2} />
+            <Skeleton xstyle={styles.profilePageSkeleton4} />
           </CardContent>
         </Card>
       </div>
@@ -195,42 +202,51 @@ export function ProfilePage() {
 
   if (loadError) {
     return (
-      <div className="animate-fade-in space-y-6">
+      <div
+        {...stylex.props([styles.profilePageStack, motion.fadeIn])}
+        data-stack=""
+      >
         <ProfileLoadError error={loadError} onRetry={loadProfile} />
       </div>
     );
   }
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div
+      {...stylex.props([styles.profilePageStack, motion.fadeIn])}
+      data-stack=""
+    >
       <LiveRegion politeness="polite">
         {isSaving ? '프로필을 저장하는 중입니다…' : ''}
       </LiveRegion>
       <div>
-        <p className="mb-2 text-xs font-semibold tracking-[0.15em] text-primary uppercase">
-          Career Profile
-        </p>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
-          <UserCircle className="h-7 w-7 text-primary" />
+        <p {...stylex.props(styles.profilePageDescription)}>Career Profile</p>
+        <h1 {...stylex.props(styles.profilePageHeading)}>
+          <UserCircle {...stylex.props(styles.profilePageUserCircle)} />
           프로필
         </h1>
         {isNewProfile && (
-          <p className="mt-2 text-sm text-gray-600">
+          <p {...stylex.props(styles.profilePageDescription2)}>
             프로필을 저장하면 AI 지원 전략 기능이 정확해져요.
           </p>
         )}
       </div>
 
       <Card>
-        <CardContent className="p-6">
+        <CardContent xstyle={styles.profilePageCardContent2}>
           {/*
             noValidate hands validation to handleSubmit: native constraint
             bubbles would otherwise suppress the submit event (blocking our JS
             checks) and are poorly announced by screen readers. We keep the
             min/max/step attributes on the number input for spinner UX.
           */}
-          <form className="space-y-6" noValidate onSubmit={handleSubmit}>
-            <div className="space-y-2">
+          <form
+            {...stylex.props(styles.profilePageForm)}
+            data-stack=""
+            noValidate
+            onSubmit={handleSubmit}
+          >
+            <div {...stylex.props(styles.profilePageStack2)} data-stack="">
               <Label htmlFor="profile-headline">한 줄 소개</Label>
               <Input
                 id="profile-headline"
@@ -243,12 +259,12 @@ export function ProfilePage() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div {...stylex.props(styles.profilePageStack2)} data-stack="">
               <Label htmlFor={YEARS_FIELD_ID}>경력 연차</Label>
               <Input
                 id={YEARS_FIELD_ID}
                 aria-describedby={yearsError ? YEARS_ERROR_ID : undefined}
-                className="sm:max-w-40"
+                xstyle={styles.profilePageInput}
                 error={!!yearsError}
                 inputMode="numeric"
                 max={YEARS_MAX}
@@ -266,13 +282,16 @@ export function ProfilePage() {
                 }}
               />
               {yearsError && (
-                <p className="text-xs text-red-400" id={YEARS_ERROR_ID}>
+                <p
+                  {...stylex.props(styles.profilePageDescription3)}
+                  id={YEARS_ERROR_ID}
+                >
                   {yearsError}
                 </p>
               )}
             </div>
 
-            <div className="space-y-2">
+            <div {...stylex.props(styles.profilePageStack2)} data-stack="">
               <Label htmlFor="profile-target-roles">희망 직무</Label>
               <TagInput
                 id="profile-target-roles"
@@ -287,7 +306,7 @@ export function ProfilePage() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div {...stylex.props(styles.profilePageStack2)} data-stack="">
               <Label htmlFor="profile-skills">보유 기술</Label>
               <TagInput
                 id="profile-skills"
@@ -302,7 +321,7 @@ export function ProfilePage() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div {...stylex.props(styles.profilePageStack2)} data-stack="">
               <Label htmlFor="profile-locations">희망 근무지</Label>
               <TagInput
                 id="profile-locations"
@@ -317,7 +336,7 @@ export function ProfilePage() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div {...stylex.props(styles.profilePageStack2)} data-stack="">
               <Label htmlFor="profile-salary">희망 연봉</Label>
               <Input
                 id="profile-salary"
@@ -333,16 +352,16 @@ export function ProfilePage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
+            <div {...stylex.props(styles.profilePageStack2)} data-stack="">
+              <div {...stylex.props(styles.profilePageRow)}>
                 <Label htmlFor="profile-summary">경력 요약</Label>
-                <span className="text-xs text-gray-500">
+                <span {...stylex.props(styles.profilePageText)}>
                   {form.summary.length} / {SUMMARY_MAX}
                 </span>
               </div>
               <Textarea
                 id="profile-summary"
-                className="min-h-40"
+                xstyle={styles.profilePageTextarea}
                 maxLength={SUMMARY_MAX}
                 placeholder="경력, 강점, 주요 프로젝트 등을 자유롭게 작성해주세요."
                 value={form.summary}
@@ -353,22 +372,34 @@ export function ProfilePage() {
             </div>
 
             {saveSuccess && (
-              <Alert variant="success">
-                <CheckCircle2 className="h-4 w-4" />
+              <Alert
+                icon={
+                  <CheckCircle2
+                    {...stylex.props(styles.profileLoadErrorRefreshCw)}
+                  />
+                }
+                variant="success"
+              >
                 <AlertDescription>프로필을 저장했습니다.</AlertDescription>
               </Alert>
             )}
 
             {saveError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
+              <Alert
+                icon={
+                  <AlertCircle
+                    {...stylex.props(styles.profileLoadErrorRefreshCw)}
+                  />
+                }
+                variant="destructive"
+              >
                 <AlertDescription>{saveError.message}</AlertDescription>
               </Alert>
             )}
 
-            <div className="flex justify-end">
+            <div {...stylex.props(styles.profilePageRow2)}>
               <Button disabled={isSaving} type="submit">
-                <Save className="h-4 w-4" />
+                <Save {...stylex.props(styles.profileLoadErrorRefreshCw)} />
                 {isSaving ? '저장 중…' : '프로필 저장'}
               </Button>
             </div>
@@ -378,3 +409,167 @@ export function ProfilePage() {
     </div>
   );
 }
+
+const styles = stylex.create({
+  profileLoadErrorContainer: {
+    minHeight: '22rem',
+    borderRadius: '.75rem',
+    borderWidth: '1px',
+    borderColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 20%, transparent)',
+    backgroundColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 8%, transparent)',
+    paddingLeft: '1.5rem',
+    paddingRight: '1.5rem',
+    paddingTop: '3rem',
+    paddingBottom: '3rem',
+    textAlign: 'center',
+  },
+  profileLoadErrorRow: {
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    display: 'flex',
+    height: '3.5rem',
+    width: '3.5rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    backgroundColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 10%, transparent)',
+    color: 'oklch(63.7% .237 25.331)',
+  },
+  profileLoadErrorAlertCircle: {
+    height: '1.75rem',
+    width: '1.75rem',
+  },
+  profileLoadErrorHeading: {
+    marginTop: '1.25rem',
+    fontSize: '1.25rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  profileLoadErrorDescription: {
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    marginTop: '0.5rem',
+    maxWidth: '36rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  profileLoadErrorDescription2: {
+    marginTop: '0.75rem',
+    fontFamily:
+      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 600,
+    color: 'oklch(63.7% .237 25.331)',
+  },
+  profileLoadErrorButton: {
+    marginTop: '1.5rem',
+  },
+  profileLoadErrorRefreshCw: {
+    height: '1rem',
+    width: '1rem',
+  },
+  profilePageStack: {
+    '--stack-space': '1.5rem',
+  },
+  profilePageSkeleton: {
+    height: '2.25rem',
+    width: '10rem',
+  },
+  profilePageCardContent: {
+    '--stack-space': '1.25rem',
+    paddingTop: '1.5rem',
+    paddingRight: '1.5rem',
+    paddingBottom: '1.5rem',
+    paddingLeft: '1.5rem',
+  },
+  profilePageSkeleton2: {
+    height: '2.5rem',
+    width: '100%',
+  },
+  profilePageSkeleton3: {
+    height: '2.5rem',
+    width: '50%',
+  },
+  profilePageSkeleton4: {
+    height: '6rem',
+    width: '100%',
+  },
+  profilePageDescription: {
+    marginBottom: '0.5rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 600,
+    letterSpacing: '0.15em',
+    color: 'hsl(var(--primary))',
+    textTransform: 'uppercase',
+  },
+  profilePageHeading: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    fontSize: {
+      default: '1.5rem',
+      '@media (min-width: 40rem)': '1.875rem',
+    },
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  profilePageUserCircle: {
+    height: '1.75rem',
+    width: '1.75rem',
+    color: 'hsl(var(--primary))',
+  },
+  profilePageDescription2: {
+    marginTop: '0.5rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  profilePageCardContent2: {
+    paddingTop: '1.5rem',
+    paddingRight: '1.5rem',
+    paddingBottom: '1.5rem',
+    paddingLeft: '1.5rem',
+  },
+  profilePageForm: {
+    '--stack-space': '1.5rem',
+  },
+  profilePageStack2: {
+    '--stack-space': '0.5rem',
+  },
+  profilePageInput: {
+    maxWidth: {
+      default: null,
+      '@media (min-width: 40rem)': '10rem',
+    },
+  },
+  profilePageDescription3: {
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    color: 'oklch(70.4% .191 22.216)',
+  },
+  profilePageRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  profilePageText: {
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    color: 'oklch(55.1% .027 264.364)',
+  },
+  profilePageTextarea: {
+    minHeight: '10rem',
+  },
+  profilePageRow2: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+  },
+});

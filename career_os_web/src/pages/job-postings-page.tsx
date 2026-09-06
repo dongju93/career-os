@@ -1,3 +1,4 @@
+import * as stylex from '@stylexjs/stylex';
 import {
   AlertCircle,
   Briefcase,
@@ -18,7 +19,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDocumentTitle } from '@/hooks/use-document-title';
-import { cn } from '@/lib/utils';
+import { motion } from '@/styles/motion';
+import { surfaces } from '@/styles/surfaces';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import { fetchJobPostings } from '../services/job-postings';
 import { fetchJobSearchGroups } from '../services/job-search-groups';
@@ -26,7 +28,7 @@ import type { JobPostingListItem } from '../types/job-posting';
 import type { JobSearchGroupItem } from '../types/job-search-group';
 import {
   APPLICATION_STATUS_LABELS,
-  applicationStatusAccentClass,
+  applicationStatusAccentStyle,
   applicationStatusVariant,
   formatRelativeDate,
   platformVariant,
@@ -35,13 +37,9 @@ import { toSafeExternalUrl } from '../utils/url';
 
 function SummaryChip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-28 rounded-xl border-white/12 bg-accent px-4 py-2.5 backdrop-blur-md">
-      <p className="text-[11px] font-medium tracking-wide text-gray-600 uppercase">
-        {label}
-      </p>
-      <p className="mt-0.5 text-lg font-semibold tracking-tight text-foreground">
-        {value}
-      </p>
+    <div {...stylex.props(styles.summaryChipContainer)}>
+      <p {...stylex.props(styles.summaryChipDescription)}>{label}</p>
+      <p {...stylex.props(styles.summaryChipDescription2)}>{value}</p>
     </div>
   );
 }
@@ -53,17 +51,23 @@ function JobPostingCard({ item }: { item: JobPostingListItem }) {
   const safePostingUrl = toSafeExternalUrl(item.posting_url);
 
   return (
-    <Card className="group glass-hover relative overflow-hidden has-focus-visible:ring-2 has-focus-visible:ring-primary has-focus-visible:ring-offset-2">
+    <Card
+      xstyle={[
+        styles.jobPostingCardCard,
+        stylex.defaultMarker(),
+        surfaces.glassHover,
+      ]}
+    >
       <div
         aria-hidden="true"
-        className={cn(
-          'absolute inset-y-0 left-0 w-1',
-          applicationStatusAccentClass(item.application_status),
-        )}
+        {...stylex.props([
+          styles.jobPostingCardContainer,
+          applicationStatusAccentStyle(item.application_status),
+        ])}
       />
-      <CardContent className="p-5 pl-6">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+      <CardContent xstyle={styles.jobPostingCardCardContent}>
+        <div {...stylex.props(styles.jobPostingCardRow)}>
+          <div {...stylex.props(styles.jobPostingCardRow2)}>
             <Badge variant={platformVariant(item.platform)}>
               {item.platform}
             </Badge>
@@ -71,66 +75,70 @@ function JobPostingCard({ item }: { item: JobPostingListItem }) {
               {APPLICATION_STATUS_LABELS[item.application_status]}
             </Badge>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-gray-600">
+          <div {...stylex.props(styles.jobPostingCardRow3)}>
+            <span {...stylex.props(styles.jobPostingCardText)}>
               {formatRelativeDate(item.created_at)}
             </span>
             {safePostingUrl && (
               <a
-                className="relative z-10 flex h-6 w-6 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-accent hover:text-primary"
+                {...stylex.props(styles.jobPostingCardLink)}
                 href={safePostingUrl}
                 rel="noreferrer"
                 target="_blank"
                 title="원본 공고 열기"
               >
-                <ExternalLink className="h-3.5 w-3.5" />
-                <span className="sr-only">원본 공고 열기</span>
+                <ExternalLink
+                  {...stylex.props(styles.jobPostingCardExternalLink)}
+                />
+                <span {...stylex.props(styles.jobPostingCardText2)}>
+                  원본 공고 열기
+                </span>
               </a>
             )}
           </div>
         </div>
 
-        <div className="mb-1.5 flex items-center gap-1.5">
-          <Building2 className="h-3.5 w-3.5 text-gray-600 shrink-0" />
-          <span className="text-sm font-medium text-gray-600 truncate">
+        <div {...stylex.props(styles.jobPostingCardRow4)}>
+          <Building2 {...stylex.props(styles.jobPostingCardBuilding2)} />
+          <span {...stylex.props(styles.jobPostingCardText3)}>
             {item.company_name}
           </span>
         </div>
 
-        <h3 className="line-clamp-2 text-lg font-bold leading-tight tracking-tight transition-colors group-hover:text-primary">
+        <h3 {...stylex.props(styles.jobPostingCardHeading)}>
           <Link
             to={`/job-postings/${item.id}`}
-            className="focus-visible:outline-none after:absolute after:inset-0 after:content-['']"
+            {...stylex.props(styles.jobPostingCardLink2)}
           >
             {item.job_title}
           </Link>
         </h3>
 
         {hasDetails && (
-          <div className="mt-3 rounded-xl border border-white/8 bg-muted p-3">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+          <div {...stylex.props(styles.jobPostingCardContainer2)}>
+            <div {...stylex.props(styles.jobPostingCardRow5)}>
               {item.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
+                <span {...stylex.props(styles.jobPostingCardText4)}>
+                  <MapPin {...stylex.props(styles.jobPostingCardMapPin)} />
                   {item.location}
                 </span>
               )}
               {item.experience_req && (
-                <span className="flex items-center gap-1">
-                  <Briefcase className="h-3 w-3" />
+                <span {...stylex.props(styles.jobPostingCardText4)}>
+                  <Briefcase {...stylex.props(styles.jobPostingCardMapPin)} />
                   {item.experience_req}
                 </span>
               )}
             </div>
 
-            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            <div {...stylex.props(styles.jobPostingCardRow6)}>
               {item.deadline && (
-                <span className="inline-flex items-center rounded-full bg-red-500/8 px-2.5 py-0.5 text-xs font-medium text-red-600 border border-red-500/15">
+                <span {...stylex.props(styles.jobPostingCardText5)}>
                   마감: {item.deadline}
                 </span>
               )}
               {item.salary && (
-                <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-gray-600 border">
+                <span {...stylex.props(styles.jobPostingCardText6)}>
                   {item.salary}
                 </span>
               )}
@@ -139,14 +147,18 @@ function JobPostingCard({ item }: { item: JobPostingListItem }) {
         )}
 
         {item.tech_stack && item.tech_stack.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <div {...stylex.props(styles.jobPostingCardRow7)}>
             {item.tech_stack.slice(0, 5).map((tag) => (
-              <Badge key={tag} className="text-xs" variant="secondary">
+              <Badge
+                key={tag}
+                xstyle={styles.jobPostingCardBadge}
+                variant="secondary"
+              >
                 {tag}
               </Badge>
             ))}
             {item.tech_stack.length > 5 && (
-              <Badge className="text-xs" variant="outline">
+              <Badge xstyle={styles.jobPostingCardBadge} variant="outline">
                 +{item.tech_stack.length - 5}
               </Badge>
             )}
@@ -163,15 +175,15 @@ const SKELETON_KEYS = ['sk-a', 'sk-b', 'sk-c', 'sk-d', 'sk-e', 'sk-f'];
 
 function LoadingCard() {
   return (
-    <Card className="space-y-3 p-6">
-      <Skeleton className="h-4 w-24" />
-      <Skeleton className="h-6 w-3/4" />
-      <Skeleton className="h-5 w-full" />
-      <Skeleton className="h-4 w-1/2" />
-      <div className="flex gap-2 pt-2">
-        <Skeleton className="h-6 w-16" />
-        <Skeleton className="h-6 w-20" />
-        <Skeleton className="h-6 w-14" />
+    <Card xstyle={styles.loadingCardCard} data-stack="">
+      <Skeleton xstyle={styles.loadingCardSkeleton} />
+      <Skeleton xstyle={styles.loadingCardSkeleton2} />
+      <Skeleton xstyle={styles.loadingCardSkeleton3} />
+      <Skeleton xstyle={styles.loadingCardSkeleton4} />
+      <div {...stylex.props(styles.loadingCardRow)}>
+        <Skeleton xstyle={styles.loadingCardSkeleton5} />
+        <Skeleton xstyle={styles.loadingCardSkeleton6} />
+        <Skeleton xstyle={styles.loadingCardSkeleton7} />
       </div>
     </Card>
   );
@@ -185,21 +197,27 @@ function JobPostingsErrorState({
   onRetry: () => void;
 }) {
   return (
-    <div className="min-h-[22rem] rounded-xl border border-red-500/20 bg-red-500/8 px-6 py-12 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 text-red-500">
-        <AlertCircle className="h-7 w-7" />
+    <div {...stylex.props(styles.jobPostingsErrorStateContainer)}>
+      <div {...stylex.props(styles.jobPostingsErrorStateRow)}>
+        <AlertCircle
+          {...stylex.props(styles.jobPostingsErrorStateAlertCircle)}
+        />
       </div>
-      <h2 className="mt-5 text-xl font-bold tracking-tight">
+      <h2 {...stylex.props(styles.jobPostingsErrorStateHeading)}>
         채용공고를 불러오지 못했습니다
       </h2>
-      <p className="mx-auto mt-2 max-w-xl text-sm text-gray-600">
+      <p {...stylex.props(styles.jobPostingsErrorStateDescription)}>
         {error.message}
       </p>
-      <p className="mt-3 font-mono text-xs font-semibold text-red-500">
+      <p {...stylex.props(styles.jobPostingsErrorStateDescription2)}>
         {error.code}
       </p>
-      <Button className="mt-6" variant="outline" onClick={() => onRetry()}>
-        <RefreshCw className="h-4 w-4" />
+      <Button
+        xstyle={styles.jobPostingsErrorStateButton}
+        variant="outline"
+        onClick={() => onRetry()}
+      >
+        <RefreshCw {...stylex.props(styles.jobPostingsErrorStateRefreshCw)} />
         다시 시도
       </Button>
     </div>
@@ -216,41 +234,41 @@ function GroupFilterBar({
   onSelect: (value: string | 'all') => void;
 }) {
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1">
+    <div {...stylex.props(styles.groupFilterBarRow)}>
       <button
         type="button"
-        className={cn(
-          'flex items-center gap-1.5 shrink-0 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors border',
+        {...stylex.props([
+          styles.groupFilterBarButton,
           selected === 'all'
-            ? 'bg-primary/15 text-primary border-primary/20'
-            : 'text-gray-600 border-transparent hover:bg-muted',
-        )}
+            ? styles.groupFilterBarButton2
+            : styles.groupFilterBarButton3,
+        ])}
         onClick={() => onSelect('all')}
       >
-        <Layers className="h-3.5 w-3.5" />
+        <Layers {...stylex.props(styles.jobPostingCardExternalLink)} />
         모든 공고
       </button>
       {groups.map((group, index) => (
         <button
           key={group.id}
           type="button"
-          className={cn(
-            'flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors border',
+          {...stylex.props([
+            styles.groupFilterBarButton4,
             selected === group.id
-              ? 'bg-primary/15 text-primary border-primary/20'
-              : 'text-gray-600 border-transparent hover:bg-muted',
-          )}
+              ? styles.groupFilterBarButton2
+              : styles.groupFilterBarButton3,
+          ])}
           onClick={() => onSelect(group.id)}
         >
           {index === 0 ? `${group.name} (현재)` : group.name}
           {group.posting_count > 0 && (
             <span
-              className={cn(
-                'inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold',
+              {...stylex.props([
+                styles.groupFilterBarText,
                 selected === group.id
-                  ? 'bg-primary/20 text-primary'
-                  : 'bg-muted text-gray-500',
-              )}
+                  ? styles.groupFilterBarText2
+                  : styles.groupFilterBarText3,
+              ])}
             >
               {group.posting_count}
             </span>
@@ -364,23 +382,24 @@ export function JobPostingsPage() {
   }
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div
+      {...stylex.props([styles.jobPostingsPageStack, motion.fadeIn])}
+      data-stack=""
+    >
       {/* Page header — transparent, floating on background */}
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div {...stylex.props(styles.jobPostingsPageRow)}>
         <div>
-          <p className="mb-2 text-xs font-semibold tracking-[0.15em] text-primary uppercase">
+          <p {...stylex.props(styles.jobPostingsPageDescription)}>
             Job Archive
           </p>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            채용공고
-          </h1>
+          <h1 {...stylex.props(styles.jobPostingsPageHeading)}>채용공고</h1>
           {!isLoading && !error && total > 0 && (
-            <p className="text-sm text-gray-600 mt-1">
+            <p {...stylex.props(styles.jobPostingsPageDescription2)}>
               총 {total}개의 채용공고
             </p>
           )}
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div {...stylex.props(styles.jobPostingsPageRow2)}>
           <SummaryChip
             label="저장된 공고"
             value={isLoading ? '-' : total.toString()}
@@ -393,7 +412,7 @@ export function JobPostingsPage() {
                 : '-'
             }
           />
-          <Button asChild className="sm:self-stretch">
+          <Button asChild xstyle={styles.jobPostingsPageButton}>
             <Link
               to={
                 selectedGroup !== 'all'
@@ -401,7 +420,10 @@ export function JobPostingsPage() {
                   : '/job-postings/new'
               }
             >
-              <PlusCircle className="h-4 w-4" />새 채용공고 등록
+              <PlusCircle
+                {...stylex.props(styles.jobPostingsErrorStateRefreshCw)}
+              />
+              새 채용공고 등록
             </Link>
           </Button>
         </div>
@@ -417,7 +439,7 @@ export function JobPostingsPage() {
       )}
 
       {isLoading && (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div {...stylex.props(styles.jobPostingsPageGrid)}>
           {SKELETON_KEYS.map((key) => (
             <LoadingCard key={key} />
           ))}
@@ -429,19 +451,18 @@ export function JobPostingsPage() {
       )}
 
       {!isLoading && !error && items.length === 0 && (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          <Card
-            className="col-span-full flex flex-col items-center gap-4 py-16 text-center"
-            glass
-          >
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20">
-              <Sparkles className="h-7 w-7" />
+        <div {...stylex.props(styles.jobPostingsPageGrid)}>
+          <Card xstyle={styles.jobPostingsPageCard} glass>
+            <div {...stylex.props(styles.jobPostingsPageRow3)}>
+              <Sparkles
+                {...stylex.props(styles.jobPostingsErrorStateAlertCircle)}
+              />
             </div>
             <div>
-              <h3 className="text-lg font-semibold">
+              <h3 {...stylex.props(styles.jobPostingsPageHeading2)}>
                 아직 저장된 채용공고가 없어요
               </h3>
-              <p className="text-sm text-gray-600 mt-1">
+              <p {...stylex.props(styles.jobPostingsPageDescription2)}>
                 첫 번째 채용공고를 등록해 보세요
               </p>
             </div>
@@ -453,7 +474,9 @@ export function JobPostingsPage() {
                     : '/job-postings/new'
                 }
               >
-                <PlusCircle className="h-4 w-4" />
+                <PlusCircle
+                  {...stylex.props(styles.jobPostingsErrorStateRefreshCw)}
+                />
                 채용공고 등록하기
               </Link>
             </Button>
@@ -462,7 +485,10 @@ export function JobPostingsPage() {
       )}
 
       {!isLoading && !error && items.length > 0 && (
-        <div className="job-postings-grid grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div
+          {...stylex.props(styles.jobPostingsPageGrid2)}
+          data-postings-grid=""
+        >
           {items.map((item) => (
             <JobPostingCard key={item.id} item={item} />
           ))}
@@ -470,17 +496,19 @@ export function JobPostingsPage() {
       )}
 
       {!isLoading && !error && totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 pt-2">
+        <div {...stylex.props(styles.jobPostingsPageRow4)}>
           <Button
             disabled={!hasPrev}
             size="sm"
             variant="outline"
             onClick={() => goToPage(page - 1)}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft
+              {...stylex.props(styles.jobPostingsErrorStateRefreshCw)}
+            />
             이전
           </Button>
-          <span className="text-sm text-gray-600">
+          <span {...stylex.props(styles.jobPostingsPageText)}>
             {page} / {totalPages}
           </span>
           <Button
@@ -490,10 +518,576 @@ export function JobPostingsPage() {
             onClick={() => goToPage(page + 1)}
           >
             다음
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight
+              {...stylex.props(styles.jobPostingsErrorStateRefreshCw)}
+            />
           </Button>
         </div>
       )}
     </div>
   );
 }
+
+const styles = stylex.create({
+  summaryChipContainer: {
+    minWidth: '7rem',
+    borderRadius: '.75rem',
+    borderColor: 'color-mix(in oklab, #fff 12%, transparent)',
+    backgroundColor: 'hsl(var(--accent))',
+    paddingLeft: '1rem',
+    paddingRight: '1rem',
+    paddingTop: '0.625rem',
+    paddingBottom: '0.625rem',
+    backdropFilter: 'blur(12px)',
+  },
+  summaryChipDescription: {
+    fontSize: '11px',
+    fontWeight: 500,
+    letterSpacing: '.025em',
+    color: 'oklch(44.6% .03 256.802)',
+    textTransform: 'uppercase',
+  },
+  summaryChipDescription2: {
+    marginTop: '0.125rem',
+    fontSize: '1.125rem',
+    lineHeight: '1.75rem',
+    fontWeight: 600,
+    letterSpacing: '-.025em',
+    color: 'hsl(var(--foreground))',
+  },
+  jobPostingCardCard: {
+    position: 'relative',
+    overflow: 'hidden',
+    outlineWidth: {
+      default: null,
+      ':has(:focus-visible)': '2px',
+    },
+    outlineStyle: {
+      default: null,
+      ':has(:focus-visible)': 'solid',
+    },
+    outlineColor: {
+      default: null,
+      ':has(:focus-visible)': 'hsl(var(--primary))',
+    },
+    outlineOffset: {
+      default: null,
+      ':has(:focus-visible)': '2px',
+    },
+  },
+  jobPostingCardContainer: {
+    position: 'absolute',
+    top: '0rem',
+    bottom: '0rem',
+    left: '0rem',
+    width: '0.25rem',
+  },
+  jobPostingCardCardContent: {
+    paddingTop: '1.25rem',
+    paddingRight: '1.25rem',
+    paddingBottom: '1.25rem',
+    paddingLeft: '1.5rem',
+  },
+  jobPostingCardRow: {
+    marginBottom: '0.75rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '0.75rem',
+  },
+  jobPostingCardRow2: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  jobPostingCardRow3: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  jobPostingCardText: {
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 500,
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  jobPostingCardLink: {
+    position: 'relative',
+    zIndex: 10,
+    display: 'flex',
+    height: '1.5rem',
+    width: '1.5rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '.5rem',
+    color: {
+      default: 'oklch(70.7% .022 261.325)',
+      ':hover': 'hsl(var(--primary))',
+    },
+    transitionProperty:
+      'color, background-color, border-color, outline-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+    backgroundColor: {
+      default: null,
+      ':hover': 'hsl(var(--accent))',
+    },
+  },
+  jobPostingCardExternalLink: {
+    height: '0.875rem',
+    width: '0.875rem',
+  },
+  jobPostingCardText2: {
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    padding: 0,
+    margin: '-1px',
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    borderWidth: 0,
+  },
+  jobPostingCardRow4: {
+    marginBottom: '0.375rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+  },
+  jobPostingCardBuilding2: {
+    height: '0.875rem',
+    width: '0.875rem',
+    color: 'oklch(44.6% .03 256.802)',
+    flexShrink: 0,
+  },
+  jobPostingCardText3: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    fontWeight: 500,
+    color: 'oklch(44.6% .03 256.802)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  jobPostingCardHeading: {
+    overflow: 'hidden',
+    display: '-webkit-box',
+    WebkitBoxOrient: 'vertical',
+    WebkitLineClamp: 2,
+    fontSize: '1.125rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+    transitionProperty:
+      'color, background-color, border-color, outline-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+    color: {
+      default: null,
+      [stylex.when.ancestor(':hover')]: 'hsl(var(--primary))',
+    },
+  },
+  jobPostingCardLink2: {
+    outlineStyle: {
+      default: null,
+      ':focus-visible': 'none',
+    },
+    '::after': {
+      position: 'absolute',
+      top: '0rem',
+      bottom: '0rem',
+      left: '0rem',
+      right: '0rem',
+      content: "''",
+    },
+  },
+  jobPostingCardContainer2: {
+    marginTop: '0.75rem',
+    borderRadius: '.75rem',
+    borderWidth: '1px',
+    borderColor: 'color-mix(in oklab, #fff 8%, transparent)',
+    backgroundColor: 'hsl(var(--muted))',
+    paddingTop: '0.75rem',
+    paddingRight: '0.75rem',
+    paddingBottom: '0.75rem',
+    paddingLeft: '0.75rem',
+  },
+  jobPostingCardRow5: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: '0.75rem',
+    rowGap: '0.25rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  jobPostingCardText4: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.25rem',
+  },
+  jobPostingCardMapPin: {
+    height: '0.75rem',
+    width: '0.75rem',
+  },
+  jobPostingCardRow6: {
+    marginTop: '0.5rem',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '0.5rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+  },
+  jobPostingCardText5: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    borderRadius: '9999px',
+    backgroundColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 8%, transparent)',
+    paddingLeft: '0.625rem',
+    paddingRight: '0.625rem',
+    paddingTop: '0.125rem',
+    paddingBottom: '0.125rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 500,
+    color: 'oklch(57.7% .245 27.325)',
+    borderWidth: '1px',
+    borderColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 15%, transparent)',
+  },
+  jobPostingCardText6: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    borderRadius: '9999px',
+    backgroundColor: 'hsl(var(--muted))',
+    paddingLeft: '0.625rem',
+    paddingRight: '0.625rem',
+    paddingTop: '0.125rem',
+    paddingBottom: '0.125rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 500,
+    color: 'oklch(44.6% .03 256.802)',
+    borderWidth: '1px',
+  },
+  jobPostingCardRow7: {
+    marginTop: '0.75rem',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '0.375rem',
+  },
+  jobPostingCardBadge: {
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+  },
+  loadingCardCard: {
+    '--stack-space': '0.75rem',
+    paddingTop: '1.5rem',
+    paddingRight: '1.5rem',
+    paddingBottom: '1.5rem',
+    paddingLeft: '1.5rem',
+  },
+  loadingCardSkeleton: {
+    height: '1rem',
+    width: '6rem',
+  },
+  loadingCardSkeleton2: {
+    height: '1.5rem',
+    width: '75%',
+  },
+  loadingCardSkeleton3: {
+    height: '1.25rem',
+    width: '100%',
+  },
+  loadingCardSkeleton4: {
+    height: '1rem',
+    width: '50%',
+  },
+  loadingCardRow: {
+    display: 'flex',
+    gap: '0.5rem',
+    paddingTop: '0.5rem',
+  },
+  loadingCardSkeleton5: {
+    height: '1.5rem',
+    width: '4rem',
+  },
+  loadingCardSkeleton6: {
+    height: '1.5rem',
+    width: '5rem',
+  },
+  loadingCardSkeleton7: {
+    height: '1.5rem',
+    width: '3.5rem',
+  },
+  jobPostingsErrorStateContainer: {
+    minHeight: '22rem',
+    borderRadius: '.75rem',
+    borderWidth: '1px',
+    borderColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 20%, transparent)',
+    backgroundColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 8%, transparent)',
+    paddingLeft: '1.5rem',
+    paddingRight: '1.5rem',
+    paddingTop: '3rem',
+    paddingBottom: '3rem',
+    textAlign: 'center',
+  },
+  jobPostingsErrorStateRow: {
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    display: 'flex',
+    height: '3.5rem',
+    width: '3.5rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    backgroundColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 10%, transparent)',
+    color: 'oklch(63.7% .237 25.331)',
+  },
+  jobPostingsErrorStateAlertCircle: {
+    height: '1.75rem',
+    width: '1.75rem',
+  },
+  jobPostingsErrorStateHeading: {
+    marginTop: '1.25rem',
+    fontSize: '1.25rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  jobPostingsErrorStateDescription: {
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    marginTop: '0.5rem',
+    maxWidth: '36rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  jobPostingsErrorStateDescription2: {
+    marginTop: '0.75rem',
+    fontFamily:
+      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 600,
+    color: 'oklch(63.7% .237 25.331)',
+  },
+  jobPostingsErrorStateButton: {
+    marginTop: '1.5rem',
+  },
+  jobPostingsErrorStateRefreshCw: {
+    height: '1rem',
+    width: '1rem',
+  },
+  groupFilterBarRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    overflowX: 'auto',
+    paddingBottom: '0.25rem',
+    marginBottom: '-0.25rem',
+  },
+  groupFilterBarButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    flexShrink: 0,
+    borderRadius: '.75rem',
+    paddingLeft: '0.75rem',
+    paddingRight: '0.75rem',
+    paddingTop: '0.375rem',
+    paddingBottom: '0.375rem',
+    fontSize: 'inherit',
+    lineHeight: 'inherit',
+    fontWeight: 'inherit',
+    transitionProperty:
+      'color, background-color, border-color, outline-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+    borderWidth: '1px',
+  },
+  groupFilterBarButton2: {
+    backgroundColor:
+      'color-mix(in oklab, hsl(var(--primary)) 15%, transparent)',
+    color: 'hsl(var(--primary))',
+    borderColor: 'color-mix(in oklab, hsl(var(--primary)) 20%, transparent)',
+  },
+  groupFilterBarButton3: {
+    color: 'oklch(44.6% .03 256.802)',
+    borderColor: 'transparent',
+    backgroundColor: {
+      default: null,
+      ':hover': 'hsl(var(--muted))',
+    },
+  },
+  groupFilterBarButton4: {
+    display: 'flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    gap: '0.375rem',
+    borderRadius: '.75rem',
+    paddingLeft: '0.75rem',
+    paddingRight: '0.75rem',
+    paddingTop: '0.375rem',
+    paddingBottom: '0.375rem',
+    fontSize: 'inherit',
+    lineHeight: 'inherit',
+    fontWeight: 'inherit',
+    transitionProperty:
+      'color, background-color, border-color, outline-color, fill, stroke',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+    borderWidth: '1px',
+  },
+  groupFilterBarText: {
+    display: 'inline-flex',
+    height: '1rem',
+    minWidth: '1rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    paddingLeft: '0.25rem',
+    paddingRight: '0.25rem',
+    fontSize: '10px',
+    fontWeight: 700,
+  },
+  groupFilterBarText2: {
+    backgroundColor:
+      'color-mix(in oklab, hsl(var(--primary)) 20%, transparent)',
+    color: 'hsl(var(--primary))',
+  },
+  groupFilterBarText3: {
+    backgroundColor: 'hsl(var(--muted))',
+    color: 'oklch(55.1% .027 264.364)',
+  },
+  jobPostingsPageStack: {
+    '--stack-space': '1.5rem',
+  },
+  jobPostingsPageRow: {
+    display: 'flex',
+    flexDirection: {
+      default: 'column',
+      '@media (min-width: 64rem)': 'row',
+    },
+    gap: '1.25rem',
+    alignItems: {
+      default: null,
+      '@media (min-width: 64rem)': 'flex-end',
+    },
+    justifyContent: {
+      default: null,
+      '@media (min-width: 64rem)': 'space-between',
+    },
+  },
+  jobPostingsPageDescription: {
+    marginBottom: '0.5rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 600,
+    letterSpacing: '0.15em',
+    color: 'hsl(var(--primary))',
+    textTransform: 'uppercase',
+  },
+  jobPostingsPageHeading: {
+    fontSize: {
+      default: '1.5rem',
+      '@media (min-width: 40rem)': '1.875rem',
+    },
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  jobPostingsPageDescription2: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+    marginTop: '0.25rem',
+  },
+  jobPostingsPageRow2: {
+    display: 'flex',
+    flexDirection: {
+      default: 'column',
+      '@media (min-width: 40rem)': 'row',
+    },
+    gap: '0.75rem',
+    flexWrap: {
+      default: null,
+      '@media (min-width: 40rem)': 'wrap',
+    },
+    alignItems: {
+      default: null,
+      '@media (min-width: 40rem)': 'center',
+    },
+  },
+  jobPostingsPageButton: {
+    alignSelf: {
+      default: null,
+      '@media (min-width: 40rem)': 'stretch',
+    },
+  },
+  jobPostingsPageGrid: {
+    display: 'grid',
+    gap: '1.25rem',
+    gridTemplateColumns: {
+      default: null,
+      '@media (min-width: 40rem)': 'repeat(2, minmax(0, 1fr))',
+      '@media (min-width: 64rem)': 'repeat(3, minmax(0, 1fr))',
+    },
+  },
+  jobPostingsPageCard: {
+    gridColumn: '1 / -1',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '1rem',
+    paddingTop: '4rem',
+    paddingBottom: '4rem',
+    textAlign: 'center',
+  },
+  jobPostingsPageRow3: {
+    display: 'flex',
+    height: '4rem',
+    width: '4rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '1rem',
+    backgroundColor:
+      'color-mix(in oklab, hsl(var(--primary)) 10%, transparent)',
+    color: 'hsl(var(--primary))',
+    borderWidth: '1px',
+    borderColor: 'color-mix(in oklab, hsl(var(--primary)) 20%, transparent)',
+  },
+  jobPostingsPageHeading2: {
+    fontSize: '1.125rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+  },
+  jobPostingsPageGrid2: {
+    display: 'grid',
+    gap: '1.25rem',
+    gridTemplateColumns: {
+      default: null,
+      '@media (min-width: 40rem)': 'repeat(2, minmax(0, 1fr))',
+      '@media (min-width: 64rem)': 'repeat(3, minmax(0, 1fr))',
+    },
+  },
+  jobPostingsPageRow4: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.75rem',
+    paddingTop: '0.5rem',
+  },
+  jobPostingsPageText: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+});

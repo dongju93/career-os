@@ -1,3 +1,4 @@
+import * as stylex from '@stylexjs/stylex';
 import {
   AlertCircle,
   Briefcase,
@@ -19,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { motion } from '@/styles/motion';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
 import {
   createJobSearchGroup,
@@ -63,13 +65,13 @@ const GROUP_MEMO_INPUT_ID = 'job-search-group-memo';
 
 function GroupCardSkeleton() {
   return (
-    <Card className="p-5 space-y-3">
-      <Skeleton className="h-5 w-1/2" />
-      <Skeleton className="h-4 w-1/3" />
-      <div className="flex gap-2 pt-1">
-        <Skeleton className="h-8 w-20" />
-        <Skeleton className="h-8 w-16" />
-        <Skeleton className="h-8 w-16" />
+    <Card xstyle={styles.groupCardSkeletonCard} data-stack="">
+      <Skeleton xstyle={styles.groupCardSkeletonSkeleton} />
+      <Skeleton xstyle={styles.groupCardSkeletonSkeleton2} />
+      <div {...stylex.props(styles.groupCardSkeletonRow)}>
+        <Skeleton xstyle={styles.groupCardSkeletonSkeleton3} />
+        <Skeleton xstyle={styles.groupCardSkeletonSkeleton4} />
+        <Skeleton xstyle={styles.groupCardSkeletonSkeleton4} />
       </div>
     </Card>
   );
@@ -103,35 +105,29 @@ function GroupCard({
   const isConfirmingEnd = endingId === group.id;
 
   return (
-    <Card
-      className={
-        isEnded ? 'opacity-70 transition-opacity hover:opacity-90' : undefined
-      }
-    >
-      <CardContent className="p-5 space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-base font-semibold leading-snug">
-              {group.name}
-            </h3>
+    <Card xstyle={isEnded ? styles.groupCardCard : undefined}>
+      <CardContent xstyle={styles.groupCardSkeletonCard} data-stack="">
+        <div {...stylex.props(styles.groupCardRow)}>
+          <div {...stylex.props(styles.groupCardRow2)}>
+            <h3 {...stylex.props(styles.groupCardHeading)}>{group.name}</h3>
             {isCurrent && (
-              <Badge variant="default" className="text-xs shrink-0">
+              <Badge variant="default" xstyle={styles.groupCardBadge}>
                 현재
               </Badge>
             )}
             {isEnded && (
-              <Badge variant="outline" className="text-xs shrink-0">
+              <Badge variant="outline" xstyle={styles.groupCardBadge}>
                 종료
               </Badge>
             )}
           </div>
-          <Badge variant="secondary" className="text-xs shrink-0">
+          <Badge variant="secondary" xstyle={styles.groupCardBadge}>
             {group.posting_count}개 공고
           </Badge>
         </div>
 
-        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-          <Calendar className="h-3.5 w-3.5 shrink-0" />
+        <div {...stylex.props(styles.groupCardRow3)}>
+          <Calendar {...stylex.props(styles.groupCardCalendar)} />
           <span>
             {formatDate(group.started_at)} ~{' '}
             {group.ended_at ? formatDate(group.ended_at) : '진행 중'}
@@ -139,12 +135,14 @@ function GroupCard({
         </div>
 
         {group.memo && (
-          <p className="text-sm text-gray-600 line-clamp-2">{group.memo}</p>
+          <p {...stylex.props(styles.groupCardDescription)}>{group.memo}</p>
         )}
 
         {isConfirmingEnd ? (
-          <div className="flex items-center gap-2 pt-1">
-            <span className="text-sm text-gray-700">종료하시겠습니까?</span>
+          <div {...stylex.props(styles.groupCardRow4)}>
+            <span {...stylex.props(styles.groupCardText)}>
+              종료하시겠습니까?
+            </span>
             <Button size="sm" variant="destructive" onClick={onConfirmEnd}>
               확인
             </Button>
@@ -153,9 +151,9 @@ function GroupCard({
             </Button>
           </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-2 pt-1">
+          <div {...stylex.props(styles.groupCardRow5)}>
             <Button size="sm" variant="outline" onClick={onViewPostings}>
-              <Briefcase className="h-3.5 w-3.5" />
+              <Briefcase {...stylex.props(styles.groupCardBriefcase)} />
               공고 보기
             </Button>
             <Button size="sm" variant="outline" onClick={onEdit}>
@@ -169,10 +167,10 @@ function GroupCard({
             <Button
               size="sm"
               variant="ghost"
-              className="text-red-500 hover:text-red-600 hover:bg-red-500/8"
+              xstyle={styles.groupCardButton}
               onClick={onDelete}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 {...stylex.props(styles.groupCardBriefcase)} />
               삭제
             </Button>
           </div>
@@ -328,39 +326,51 @@ export function JobSearchGroupsPage() {
   const isEditMode = modal.type === 'edit';
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div
+      {...stylex.props([styles.jobSearchGroupsPageStack, motion.fadeIn])}
+      data-stack=""
+    >
       {/* Page header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div {...stylex.props(styles.jobSearchGroupsPageRow)}>
         <div>
-          <p className="mb-2 text-xs font-semibold tracking-[0.15em] text-primary uppercase">
+          <p {...stylex.props(styles.jobSearchGroupsPageDescription)}>
             Job Search
           </p>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+          <h1 {...stylex.props(styles.jobSearchGroupsPageHeading)}>
             구직 활동
           </h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <p {...stylex.props(styles.jobSearchGroupsPageDescription2)}>
             구직 라운드별로 채용공고를 관리합니다
           </p>
         </div>
         <Button onClick={openCreateModal}>
-          <PlusCircle className="h-4 w-4" />새 구직 활동
+          <PlusCircle {...stylex.props(styles.jobSearchGroupsPagePlusCircle)} />
+          새 구직 활동
         </Button>
       </div>
 
       {/* Error state */}
       {!isLoading && error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
+        <Alert
+          icon={
+            <AlertCircle
+              {...stylex.props(styles.jobSearchGroupsPagePlusCircle)}
+            />
+          }
+          variant="destructive"
+        >
           <AlertTitle>오류</AlertTitle>
           <AlertDescription>
-            <span className="block">{error.message}</span>
+            <span {...stylex.props(styles.jobSearchGroupsPageText)}>
+              {error.message}
+            </span>
             <Button
-              className="mt-3"
+              xstyle={styles.jobSearchGroupsPageButton}
               size="sm"
               variant="outline"
               onClick={() => loadGroups()}
             >
-              <RefreshCw className="h-3.5 w-3.5" />
+              <RefreshCw {...stylex.props(styles.groupCardBriefcase)} />
               다시 시도
             </Button>
           </AlertDescription>
@@ -369,7 +379,7 @@ export function JobSearchGroupsPage() {
 
       {/* Loading state */}
       {isLoading && (
-        <div className="space-y-4">
+        <div {...stylex.props(styles.jobSearchGroupsPageStack2)} data-stack="">
           {SKELETON_KEYS.map((key) => (
             <GroupCardSkeleton key={key} />
           ))}
@@ -378,29 +388,39 @@ export function JobSearchGroupsPage() {
 
       {/* Active groups */}
       {!isLoading && !error && (
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold">진행 중인 구직 활동</h2>
+        <section
+          {...stylex.props(styles.jobSearchGroupsPageStack2)}
+          data-stack=""
+        >
+          <h2 {...stylex.props(styles.jobSearchGroupsPageHeading2)}>
+            진행 중인 구직 활동
+          </h2>
           {activeGroups.length === 0 ? (
-            <Card className="py-12 text-center">
-              <CardContent className="flex flex-col items-center gap-3 px-6 py-0">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20">
-                  <FolderOpen className="h-6 w-6" />
+            <Card xstyle={styles.jobSearchGroupsPageCard}>
+              <CardContent xstyle={styles.jobSearchGroupsPageCardContent}>
+                <div {...stylex.props(styles.jobSearchGroupsPageRow2)}>
+                  <FolderOpen
+                    {...stylex.props(styles.jobSearchGroupsPageFolderOpen)}
+                  />
                 </div>
                 <div>
-                  <p className="font-semibold">
+                  <p {...stylex.props(styles.jobSearchGroupsPageDescription3)}>
                     진행 중인 구직 활동이 없습니다
                   </p>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p {...stylex.props(styles.jobSearchGroupsPageDescription2)}>
                     새 구직 활동을 만들어 채용공고를 저장해보세요
                   </p>
                 </div>
                 <Button onClick={openCreateModal}>
-                  <PlusCircle className="h-4 w-4" />새 구직 활동
+                  <PlusCircle
+                    {...stylex.props(styles.jobSearchGroupsPagePlusCircle)}
+                  />
+                  새 구직 활동
                 </Button>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div {...stylex.props(styles.jobSearchGroupsPageGrid)}>
               {activeGroups.map((group, index) => (
                 <GroupCard
                   key={group.id}
@@ -425,11 +445,14 @@ export function JobSearchGroupsPage() {
 
       {/* Ended groups — only shown when there are some */}
       {!isLoading && !error && endedGroups.length > 0 && (
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-600">
+        <section
+          {...stylex.props(styles.jobSearchGroupsPageStack2)}
+          data-stack=""
+        >
+          <h2 {...stylex.props(styles.jobSearchGroupsPageHeading3)}>
             지난 구직 활동
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div {...stylex.props(styles.jobSearchGroupsPageGrid)}>
             {endedGroups.map((group) => (
               <GroupCard
                 key={group.id}
@@ -454,8 +477,16 @@ export function JobSearchGroupsPage() {
         onClose={closeModal}
         title={isEditMode ? '구직 활동 수정' : '새 구직 활동'}
       >
-        <form className="space-y-4" noValidate onSubmit={handleFormSubmit}>
-          <div className="space-y-1.5">
+        <form
+          {...stylex.props(styles.jobSearchGroupsPageStack2)}
+          data-stack=""
+          noValidate
+          onSubmit={handleFormSubmit}
+        >
+          <div
+            {...stylex.props(styles.jobSearchGroupsPageStack3)}
+            data-stack=""
+          >
             <Label htmlFor={GROUP_NAME_INPUT_ID}>이름</Label>
             <Input
               aria-describedby={
@@ -473,12 +504,18 @@ export function JobSearchGroupsPage() {
               }}
             />
             {formError?.type === 'name' && (
-              <p className="text-xs text-red-500" id={GROUP_NAME_ERROR_ID}>
+              <p
+                {...stylex.props(styles.jobSearchGroupsPageDescription4)}
+                id={GROUP_NAME_ERROR_ID}
+              >
                 {formError.message}
               </p>
             )}
           </div>
-          <div className="space-y-1.5">
+          <div
+            {...stylex.props(styles.jobSearchGroupsPageStack3)}
+            data-stack=""
+          >
             <Label htmlFor={GROUP_STARTED_AT_INPUT_ID}>시작일</Label>
             <Input
               id={GROUP_STARTED_AT_INPUT_ID}
@@ -487,10 +524,13 @@ export function JobSearchGroupsPage() {
               onChange={(event) => setFormStartedAt(event.currentTarget.value)}
             />
           </div>
-          <div className="space-y-1.5">
+          <div
+            {...stylex.props(styles.jobSearchGroupsPageStack3)}
+            data-stack=""
+          >
             <Label htmlFor={GROUP_ENDED_AT_INPUT_ID}>종료일</Label>
             <p
-              className="text-xs text-muted-foreground"
+              {...stylex.props(styles.jobSearchGroupsPageDescription5)}
               id={GROUP_ENDED_AT_DESCRIPTION_ID}
             >
               비워두면 진행 중으로 유지됩니다
@@ -503,7 +543,10 @@ export function JobSearchGroupsPage() {
               onChange={(event) => setFormEndedAt(event.currentTarget.value)}
             />
           </div>
-          <div className="space-y-1.5">
+          <div
+            {...stylex.props(styles.jobSearchGroupsPageStack3)}
+            data-stack=""
+          >
             <Label htmlFor={GROUP_MEMO_INPUT_ID}>메모</Label>
             <Textarea
               id={GROUP_MEMO_INPUT_ID}
@@ -514,13 +557,19 @@ export function JobSearchGroupsPage() {
             />
           </div>
           {formError?.type === 'submit' && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
+            <Alert
+              icon={
+                <AlertCircle
+                  {...stylex.props(styles.jobSearchGroupsPagePlusCircle)}
+                />
+              }
+              variant="destructive"
+            >
               <AlertTitle>저장 오류</AlertTitle>
               <AlertDescription>{formError.message}</AlertDescription>
             </Alert>
           )}
-          <div className="flex justify-end gap-3 pt-2">
+          <div {...stylex.props(styles.jobSearchGroupsPageRow3)}>
             <Button type="button" variant="outline" onClick={closeModal}>
               취소
             </Button>
@@ -538,24 +587,35 @@ export function JobSearchGroupsPage() {
         title="구직 활동 삭제"
       >
         {modal.type === 'delete' && (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-red-500/20 bg-red-500/8 p-4">
-              <p className="font-semibold text-red-700">{modal.group.name}</p>
-              <p className="mt-1 text-sm text-red-600">
+          <div
+            {...stylex.props(styles.jobSearchGroupsPageStack2)}
+            data-stack=""
+          >
+            <div {...stylex.props(styles.jobSearchGroupsPageContainer)}>
+              <p {...stylex.props(styles.jobSearchGroupsPageDescription6)}>
+                {modal.group.name}
+              </p>
+              <p {...stylex.props(styles.jobSearchGroupsPageDescription7)}>
                 저장된 채용공고 {modal.group.posting_count}개가 함께 삭제됩니다.
               </p>
-              <p className="mt-2 text-xs font-semibold text-red-500">
+              <p {...stylex.props(styles.jobSearchGroupsPageDescription8)}>
                 이 작업은 되돌릴 수 없습니다.
               </p>
             </div>
             {deleteError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
+              <Alert
+                icon={
+                  <AlertCircle
+                    {...stylex.props(styles.jobSearchGroupsPagePlusCircle)}
+                  />
+                }
+                variant="destructive"
+              >
                 <AlertTitle>삭제 오류</AlertTitle>
                 <AlertDescription>{deleteError}</AlertDescription>
               </Alert>
             )}
-            <div className="flex justify-end gap-3">
+            <div {...stylex.props(styles.jobSearchGroupsPageRow4)}>
               <Button variant="outline" onClick={closeModal}>
                 취소
               </Button>
@@ -564,7 +624,9 @@ export function JobSearchGroupsPage() {
                 loading={isDeleting}
                 onClick={handleDelete}
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2
+                  {...stylex.props(styles.jobSearchGroupsPagePlusCircle)}
+                />
                 삭제
               </Button>
             </div>
@@ -574,3 +636,283 @@ export function JobSearchGroupsPage() {
     </div>
   );
 }
+
+const styles = stylex.create({
+  groupCardSkeletonCard: {
+    paddingTop: '1.25rem',
+    paddingRight: '1.25rem',
+    paddingBottom: '1.25rem',
+    paddingLeft: '1.25rem',
+    '--stack-space': '0.75rem',
+  },
+  groupCardSkeletonSkeleton: {
+    height: '1.25rem',
+    width: '50%',
+  },
+  groupCardSkeletonSkeleton2: {
+    height: '1rem',
+    width: '33.333333333333336%',
+  },
+  groupCardSkeletonRow: {
+    display: 'flex',
+    gap: '0.5rem',
+    paddingTop: '0.25rem',
+  },
+  groupCardSkeletonSkeleton3: {
+    height: '2rem',
+    width: '5rem',
+  },
+  groupCardSkeletonSkeleton4: {
+    height: '2rem',
+    width: '4rem',
+  },
+  groupCardCard: {
+    opacity: {
+      default: 0.7,
+      ':hover': 0.9,
+    },
+    transitionProperty: 'opacity',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+  },
+  groupCardRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: '0.75rem',
+  },
+  groupCardRow2: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    flexWrap: 'wrap',
+  },
+  groupCardHeading: {
+    fontSize: '1rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+  },
+  groupCardBadge: {
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    flexShrink: 0,
+  },
+  groupCardRow3: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    color: 'oklch(55.1% .027 264.364)',
+  },
+  groupCardCalendar: {
+    height: '0.875rem',
+    width: '0.875rem',
+    flexShrink: 0,
+  },
+  groupCardDescription: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+    overflow: 'hidden',
+    display: '-webkit-box',
+    WebkitBoxOrient: 'vertical',
+    WebkitLineClamp: 2,
+  },
+  groupCardRow4: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    paddingTop: '0.25rem',
+  },
+  groupCardText: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(37.3% .034 259.733)',
+  },
+  groupCardRow5: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '0.5rem',
+    paddingTop: '0.25rem',
+  },
+  groupCardBriefcase: {
+    height: '0.875rem',
+    width: '0.875rem',
+  },
+  groupCardButton: {
+    color: {
+      default: 'oklch(63.7% .237 25.331)',
+      ':hover': 'oklch(57.7% .245 27.325)',
+    },
+    backgroundColor: {
+      default: null,
+      ':hover': 'color-mix(in oklab, oklch(63.7% .237 25.331) 8%, transparent)',
+    },
+  },
+  jobSearchGroupsPageStack: {
+    '--stack-space': '2rem',
+  },
+  jobSearchGroupsPageRow: {
+    display: 'flex',
+    flexDirection: {
+      default: 'column',
+      '@media (min-width: 40rem)': 'row',
+    },
+    gap: '1rem',
+    alignItems: {
+      default: null,
+      '@media (min-width: 40rem)': 'flex-end',
+    },
+    justifyContent: {
+      default: null,
+      '@media (min-width: 40rem)': 'space-between',
+    },
+  },
+  jobSearchGroupsPageDescription: {
+    marginBottom: '0.5rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 600,
+    letterSpacing: '0.15em',
+    color: 'hsl(var(--primary))',
+    textTransform: 'uppercase',
+  },
+  jobSearchGroupsPageHeading: {
+    fontSize: {
+      default: '1.5rem',
+      '@media (min-width: 40rem)': '1.875rem',
+    },
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  jobSearchGroupsPageDescription2: {
+    marginTop: '0.25rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  jobSearchGroupsPagePlusCircle: {
+    height: '1rem',
+    width: '1rem',
+  },
+  jobSearchGroupsPageText: {
+    display: 'block',
+  },
+  jobSearchGroupsPageButton: {
+    marginTop: '0.75rem',
+  },
+  jobSearchGroupsPageStack2: {
+    '--stack-space': '1rem',
+  },
+  jobSearchGroupsPageHeading2: {
+    fontSize: '1.125rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+  },
+  jobSearchGroupsPageCard: {
+    paddingTop: '3rem',
+    paddingBottom: '3rem',
+    textAlign: 'center',
+  },
+  jobSearchGroupsPageCardContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.75rem',
+    paddingLeft: '1.5rem',
+    paddingRight: '1.5rem',
+    paddingTop: '0rem',
+    paddingBottom: '0rem',
+  },
+  jobSearchGroupsPageRow2: {
+    display: 'flex',
+    height: '3.5rem',
+    width: '3.5rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '1rem',
+    backgroundColor:
+      'color-mix(in oklab, hsl(var(--primary)) 10%, transparent)',
+    color: 'hsl(var(--primary))',
+    borderWidth: '1px',
+    borderColor: 'color-mix(in oklab, hsl(var(--primary)) 20%, transparent)',
+  },
+  jobSearchGroupsPageFolderOpen: {
+    height: '1.5rem',
+    width: '1.5rem',
+  },
+  jobSearchGroupsPageDescription3: {
+    fontWeight: 600,
+  },
+  jobSearchGroupsPageGrid: {
+    display: 'grid',
+    gap: '1rem',
+    gridTemplateColumns: {
+      default: null,
+      '@media (min-width: 40rem)': 'repeat(2, minmax(0, 1fr))',
+      '@media (min-width: 64rem)': 'repeat(3, minmax(0, 1fr))',
+    },
+  },
+  jobSearchGroupsPageHeading3: {
+    fontSize: '1.125rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  jobSearchGroupsPageStack3: {
+    '--stack-space': '0.375rem',
+  },
+  jobSearchGroupsPageDescription4: {
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    color: 'oklch(63.7% .237 25.331)',
+  },
+  jobSearchGroupsPageDescription5: {
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    color: 'hsl(var(--muted-foreground))',
+  },
+  jobSearchGroupsPageRow3: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '0.75rem',
+    paddingTop: '0.5rem',
+  },
+  jobSearchGroupsPageContainer: {
+    borderRadius: '.75rem',
+    borderWidth: '1px',
+    borderColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 20%, transparent)',
+    backgroundColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 8%, transparent)',
+    paddingTop: '1rem',
+    paddingRight: '1rem',
+    paddingBottom: '1rem',
+    paddingLeft: '1rem',
+  },
+  jobSearchGroupsPageDescription6: {
+    fontWeight: 600,
+    color: 'oklch(50.5% .213 27.518)',
+  },
+  jobSearchGroupsPageDescription7: {
+    marginTop: '0.25rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(57.7% .245 27.325)',
+  },
+  jobSearchGroupsPageDescription8: {
+    marginTop: '0.5rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 600,
+    color: 'oklch(63.7% .237 25.331)',
+  },
+  jobSearchGroupsPageRow4: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '0.75rem',
+  },
+});

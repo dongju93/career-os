@@ -1,7 +1,9 @@
+import * as stylex from '@stylexjs/stylex';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { Card, CardContent } from '@/components/ui/card';
+import { motion } from '@/styles/motion';
 import { fetchAuthMe } from '../services/auth';
 import { resetAuthStore, useAuthStore } from '../store/auth-store';
 import {
@@ -14,34 +16,34 @@ function SessionCheckShell() {
     <main
       aria-busy="true"
       aria-labelledby="session-check-title"
-      className="relative flex min-h-screen items-center justify-center overflow-hidden px-4"
+      {...stylex.props(styles.sessionCheckShellMain)}
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute right-[-8rem] top-[-8rem] h-96 w-96 rounded-full bg-linear-to-br from-cyan-400/30 via-primary/15 to-transparent blur-3xl"
+        {...stylex.props(styles.sessionCheckShellContainer)}
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-[-6rem] left-[-5rem] h-72 w-72 rounded-full bg-linear-to-tr from-teal-400/25 via-primary/12 to-transparent blur-3xl"
+        {...stylex.props(styles.sessionCheckShellContainer2)}
       />
 
-      <Card className="w-full max-w-sm animate-fade-in motion-reduce:animate-none">
-        <CardContent className="flex flex-col items-center gap-5 px-8 py-10 text-center">
-          <div className="relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border border-primary/20 bg-primary/10">
-            <div className="absolute inset-2 rounded-full bg-linear-to-br from-primary/15 to-teal-500/12 blur-md" />
+      <Card xstyle={[styles.sessionCheckShellCard, motion.fadeIn]}>
+        <CardContent xstyle={styles.sessionCheckShellCardContent}>
+          <div {...stylex.props(styles.sessionCheckShellRow)}>
+            <div {...stylex.props(styles.sessionCheckShellContainer3)} />
             <Loader2
               aria-hidden="true"
-              className="relative z-10 h-10 w-10 animate-spin text-primary motion-reduce:animate-none"
+              {...stylex.props([styles.sessionCheckShellLoader2, motion.spin])}
             />
           </div>
           <div>
             <h1
-              className="text-lg font-semibold tracking-tight"
+              {...stylex.props(styles.sessionCheckShellHeading)}
               id="session-check-title"
             >
               인증 확인 중
             </h1>
-            <p className="mt-1 text-sm text-gray-600">
+            <p {...stylex.props(styles.sessionCheckShellDescription)}>
               안전하게 계정 정보를 확인하고 있습니다.
             </p>
           </div>
@@ -97,3 +99,106 @@ export function ProtectedRoute() {
 
   return <Outlet />;
 }
+
+const styles = stylex.create({
+  sessionCheckShellMain: {
+    position: 'relative',
+    display: 'flex',
+    minHeight: '100vh',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    paddingLeft: '1rem',
+    paddingRight: '1rem',
+  },
+  sessionCheckShellContainer: {
+    pointerEvents: 'none',
+    position: 'absolute',
+    right: '-8rem',
+    top: '-8rem',
+    height: '24rem',
+    width: '24rem',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to bottom right in oklab, color-mix(in oklab, oklch(78.9% .154 211.53) 30%, transparent), color-mix(in oklab, hsl(var(--primary)) 15%, transparent), transparent)',
+    filter: 'blur(64px)',
+  },
+  sessionCheckShellContainer2: {
+    pointerEvents: 'none',
+    position: 'absolute',
+    bottom: '-6rem',
+    left: '-5rem',
+    height: '18rem',
+    width: '18rem',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to top right in oklab, color-mix(in oklab, oklch(77.7% .152 181.912) 25%, transparent), color-mix(in oklab, hsl(var(--primary)) 12%, transparent), transparent)',
+    filter: 'blur(64px)',
+  },
+  sessionCheckShellCard: {
+    width: '100%',
+    maxWidth: '24rem',
+    animationName: {
+      default: null,
+      '@media (prefers-reduced-motion: reduce)': 'none',
+    },
+  },
+  sessionCheckShellCardContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '1.25rem',
+    paddingLeft: '2rem',
+    paddingRight: '2rem',
+    paddingTop: '2.5rem',
+    paddingBottom: '2.5rem',
+    textAlign: 'center',
+  },
+  sessionCheckShellRow: {
+    position: 'relative',
+    display: 'flex',
+    height: '4.5rem',
+    width: '4.5rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    borderWidth: '1px',
+    borderColor: 'color-mix(in oklab, hsl(var(--primary)) 20%, transparent)',
+    backgroundColor:
+      'color-mix(in oklab, hsl(var(--primary)) 10%, transparent)',
+  },
+  sessionCheckShellContainer3: {
+    position: 'absolute',
+    top: '0.5rem',
+    bottom: '0.5rem',
+    left: '0.5rem',
+    right: '0.5rem',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to bottom right in oklab, color-mix(in oklab, hsl(var(--primary)) 15%, transparent), color-mix(in oklab, oklch(70.4% .14 182.503) 12%, transparent))',
+    filter: 'blur(12px)',
+  },
+  sessionCheckShellLoader2: {
+    position: 'relative',
+    zIndex: 10,
+    height: '2.5rem',
+    width: '2.5rem',
+    color: 'hsl(var(--primary))',
+    animationName: {
+      default: null,
+      '@media (prefers-reduced-motion: reduce)': 'none',
+    },
+  },
+  sessionCheckShellHeading: {
+    fontSize: '1.125rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  sessionCheckShellDescription: {
+    marginTop: '0.25rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+});

@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import babel from '@rolldown/plugin-babel';
-import tailwindcss from '@tailwindcss/vite';
+import stylex from '@stylexjs/unplugin';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
@@ -18,11 +18,19 @@ export default defineConfig({
     },
   },
   plugins: [
+    // Vitest has no HTTP server to own the unplugin's CSS/HMR lifecycle.
+    !process.env.VITEST && stylex.vite(),
     react(),
-    tailwindcss(),
-    babel({ presets: [reactCompilerPreset()] }),
+    babel({
+      presets: [reactCompilerPreset()],
+      plugins: process.env.VITEST
+        ? [['@stylexjs/babel-plugin', { runtimeInjection: false }]]
+        : [],
+    }),
   ],
   test: {
+    // Bound parallel StyleX transforms so cold lazy-route imports remain responsive.
+    maxWorkers: 4,
     css: true,
     environment: 'jsdom',
     globals: false,

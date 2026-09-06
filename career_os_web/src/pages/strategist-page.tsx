@@ -1,3 +1,4 @@
+import * as stylex from '@stylexjs/stylex';
 import {
   AlertCircle,
   ArrowRight,
@@ -26,6 +27,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { motion } from '@/styles/motion';
+import { surfaces } from '@/styles/surfaces';
 import {
   ApiError,
   toUserFacingError,
@@ -60,14 +63,14 @@ function clampFitScore(value: number): number {
 function PageHeader() {
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold tracking-[0.15em] text-primary uppercase">
+      <p {...stylex.props(styles.pageHeaderDescription)}>
         Application Strategist
       </p>
-      <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
-        <Sparkles className="h-7 w-7 text-primary" />
+      <h1 {...stylex.props(styles.pageHeaderHeading)}>
+        <Sparkles {...stylex.props(styles.pageHeaderSparkles)} />
         지원 전략
       </h1>
-      <p className="mt-2 text-sm text-gray-600">
+      <p {...stylex.props(styles.pageHeaderDescription2)}>
         저장한 공고를 분석해 적합도와 우선순위, 다음 액션을 제안해드려요.
       </p>
     </div>
@@ -77,10 +80,10 @@ function PageHeader() {
 function BootstrapSkeleton() {
   return (
     <Card>
-      <CardContent className="space-y-5 p-6">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-40" />
+      <CardContent xstyle={styles.bootstrapSkeletonCardContent} data-stack="">
+        <Skeleton xstyle={styles.bootstrapSkeletonSkeleton} />
+        <Skeleton xstyle={styles.bootstrapSkeletonSkeleton} />
+        <Skeleton xstyle={styles.bootstrapSkeletonSkeleton2} />
       </CardContent>
     </Card>
   );
@@ -94,21 +97,27 @@ function StrategistErrorState({
   onRetry: () => void;
 }) {
   return (
-    <div className="min-h-[18rem] rounded-xl border border-red-500/20 bg-red-500/8 px-6 py-12 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 text-red-500">
-        <AlertCircle className="h-7 w-7" />
+    <div {...stylex.props(styles.strategistErrorStateContainer)}>
+      <div {...stylex.props(styles.strategistErrorStateRow)}>
+        <AlertCircle
+          {...stylex.props(styles.strategistErrorStateAlertCircle)}
+        />
       </div>
-      <h2 className="mt-5 text-xl font-bold tracking-tight">
+      <h2 {...stylex.props(styles.strategistErrorStateHeading)}>
         데이터를 불러오지 못했습니다
       </h2>
-      <p className="mx-auto mt-2 max-w-xl text-sm text-gray-600">
+      <p {...stylex.props(styles.strategistErrorStateDescription)}>
         {error.message}
       </p>
-      <p className="mt-3 font-mono text-xs font-semibold text-red-500">
+      <p {...stylex.props(styles.strategistErrorStateDescription2)}>
         {error.code}
       </p>
-      <Button className="mt-6" variant="outline" onClick={() => onRetry()}>
-        <RefreshCw className="h-4 w-4" />
+      <Button
+        xstyle={styles.strategistErrorStateButton}
+        variant="outline"
+        onClick={() => onRetry()}
+      >
+        <RefreshCw {...stylex.props(styles.strategistErrorStateRefreshCw)} />
         다시 시도
       </Button>
     </div>
@@ -118,22 +127,24 @@ function StrategistErrorState({
 function NoProfileCta() {
   return (
     <Card>
-      <CardContent className="flex flex-col items-start gap-4 p-6">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/12 text-primary">
-          <Sparkles className="h-6 w-6" />
+      <CardContent xstyle={styles.noProfileCtaCardContent}>
+        <div {...stylex.props(styles.noProfileCtaRow)}>
+          <Sparkles {...stylex.props(styles.noProfileCtaSparkles)} />
         </div>
         <div>
-          <h2 className="text-lg font-bold tracking-tight">
+          <h2 {...stylex.props(styles.noProfileCtaHeading)}>
             먼저 프로필을 작성해주세요
           </h2>
-          <p className="mt-1 text-sm text-gray-600">
+          <p {...stylex.props(styles.noProfileCtaDescription)}>
             지원 전략 플랜을 만들려면 먼저 프로필을 작성해주세요.
           </p>
         </div>
         <Button asChild>
           <Link to="/profile">
             프로필 작성하기
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight
+              {...stylex.props(styles.strategistErrorStateRefreshCw)}
+            />
           </Link>
         </Button>
       </CardContent>
@@ -144,14 +155,14 @@ function NoProfileCta() {
 function FeatureUnavailable() {
   return (
     <Card>
-      <CardContent className="flex flex-col items-center gap-3 px-6 py-12 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-gray-500">
-          <Clock className="h-6 w-6" />
+      <CardContent xstyle={styles.featureUnavailableCardContent}>
+        <div {...stylex.props(styles.featureUnavailableRow)}>
+          <Clock {...stylex.props(styles.noProfileCtaSparkles)} />
         </div>
-        <h2 className="text-lg font-bold tracking-tight">
+        <h2 {...stylex.props(styles.noProfileCtaHeading)}>
           아직 준비 중인 기능이에요.
         </h2>
-        <p className="max-w-md text-sm text-gray-600">
+        <p {...stylex.props(styles.featureUnavailableDescription)}>
           지원 전략 플랜은 곧 사용하실 수 있어요. 조금만 기다려주세요.
         </p>
       </CardContent>
@@ -170,11 +181,9 @@ function SkillBadges({
 }) {
   if (skills.length === 0) return null;
   return (
-    <div className="space-y-1.5">
-      <span className="text-[11px] font-semibold tracking-wide text-gray-500 uppercase">
-        {label}
-      </span>
-      <div className="flex flex-wrap gap-1.5">
+    <div {...stylex.props(styles.skillBadgesStack)} data-stack="">
+      <span {...stylex.props(styles.skillBadgesText)}>{label}</span>
+      <div {...stylex.props(styles.skillBadgesRow)}>
         {skills.map((skill) => (
           <Badge key={skill} variant={variant}>
             {skill}
@@ -190,42 +199,40 @@ function PlanItemCard({ item, rank }: { item: PlanItem; rank: number }) {
 
   return (
     <Card>
-      <CardContent className="space-y-4 p-5">
-        <div className="flex items-start gap-3">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">
-            {rank}
-          </span>
-          <div className="min-w-0 flex-1">
+      <CardContent xstyle={styles.planItemCardCardContent} data-stack="">
+        <div {...stylex.props(styles.planItemCardRow)}>
+          <span {...stylex.props(styles.planItemCardText)}>{rank}</span>
+          <div {...stylex.props(styles.planItemCardContainer)}>
             <Link
-              className="text-base font-bold tracking-tight hover:underline"
+              {...stylex.props(styles.planItemCardLink)}
               to={`/job-postings/${item.job_id}`}
             >
               {item.job_title}
             </Link>
-            <div className="text-sm text-gray-600">{item.company_name}</div>
+            <div {...stylex.props(styles.planItemCardContainer2)}>
+              {item.company_name}
+            </div>
           </div>
           <Badge variant={deadlineUrgencyVariant(item.deadline_urgency)}>
             {DEADLINE_URGENCY_LABELS[item.deadline_urgency]}
           </Badge>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="w-12 shrink-0 text-xs font-semibold text-gray-500">
-            적합도
-          </span>
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+        <div {...stylex.props(styles.planItemCardRow2)}>
+          <span {...stylex.props(styles.planItemCardText2)}>적합도</span>
+          <div {...stylex.props(styles.planItemCardContainer3)}>
             <div
-              className="h-full rounded-full bg-linear-to-r from-primary to-teal-400"
-              style={{ width: `${score}%` }}
+              {...stylex.props(
+                styles.planItemCardContainer4,
+                styles.fitScore(score),
+              )}
             />
           </div>
-          <span className="w-10 shrink-0 text-right text-sm font-bold text-primary">
-            {score}
-          </span>
+          <span {...stylex.props(styles.planItemCardText3)}>{score}</span>
         </div>
 
         {(item.matched_skills.length > 0 || item.missing_skills.length > 0) && (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div {...stylex.props(styles.planItemCardGrid)}>
             <SkillBadges
               label="보유 역량"
               skills={item.matched_skills}
@@ -239,18 +246,18 @@ function PlanItemCard({ item, rank }: { item: PlanItem; rank: number }) {
           </div>
         )}
 
-        <div className="rounded-xl border border-primary/15 bg-primary/8 p-3">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-            <Lightbulb className="h-3.5 w-3.5" />
+        <div {...stylex.props(styles.planItemCardContainer5)}>
+          <div {...stylex.props(styles.planItemCardRow3)}>
+            <Lightbulb {...stylex.props(styles.planItemCardLightbulb)} />
             추천 액션
           </div>
-          <p className="mt-1 text-sm font-medium text-foreground">
+          <p {...stylex.props(styles.planItemCardDescription)}>
             {item.recommended_action}
           </p>
         </div>
 
         {item.rationale && (
-          <p className="text-sm leading-relaxed text-gray-600">
+          <p {...stylex.props(styles.planItemCardDescription2)}>
             {item.rationale}
           </p>
         )}
@@ -261,22 +268,20 @@ function PlanItemCard({ item, rank }: { item: PlanItem; rank: number }) {
 
 function PlanResult({ plan }: { plan: ApplicationPlan }) {
   return (
-    <div className="space-y-4">
+    <div {...stylex.props(styles.planResultStack)} data-stack="">
       <Card>
-        <CardContent className="p-5">
-          <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-primary uppercase">
-            <Sparkles className="h-3.5 w-3.5" />
+        <CardContent xstyle={styles.planResultCardContent}>
+          <div {...stylex.props(styles.planResultRow)}>
+            <Sparkles {...stylex.props(styles.planItemCardLightbulb)} />
             플랜 요약
           </div>
-          <p className="mt-2 text-sm leading-relaxed whitespace-pre-line">
-            {plan.summary}
-          </p>
+          <p {...stylex.props(styles.planResultDescription)}>{plan.summary}</p>
         </CardContent>
       </Card>
 
       {plan.items.length === 0 ? (
         <Card>
-          <CardContent className="px-6 py-12 text-center text-sm text-gray-600">
+          <CardContent xstyle={styles.planResultCardContent2}>
             분석할 저장 공고가 없습니다. 먼저 채용 공고를 저장해주세요.
           </CardContent>
         </Card>
@@ -343,37 +348,54 @@ function ProposedActionCard({
 
   return (
     <Card>
-      <CardContent className="space-y-3 p-4">
+      <CardContent xstyle={styles.proposedActionCardCardContent} data-stack="">
         <div>
-          <p className="text-sm font-semibold text-foreground">{description}</p>
+          <p {...stylex.props(styles.proposedActionCardDescription)}>
+            {description}
+          </p>
           {action.reason && (
-            <p className="mt-1 text-sm text-gray-600">{action.reason}</p>
+            <p {...stylex.props(styles.noProfileCtaDescription)}>
+              {action.reason}
+            </p>
           )}
         </div>
 
         {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
+          <Alert
+            icon={
+              <AlertCircle
+                {...stylex.props(styles.strategistErrorStateRefreshCw)}
+              />
+            }
+            variant="destructive"
+          >
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
         {phase === 'applied' ? (
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-primary">
-            <Check className="h-4 w-4" />
+          <div {...stylex.props(styles.proposedActionCardRow)}>
+            <Check {...stylex.props(styles.strategistErrorStateRefreshCw)} />
             적용됨
           </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-2">
+          <div {...stylex.props(styles.proposedActionCardRow2)}>
             <Button
               disabled={phase === 'applying' || patch === null}
               size="sm"
               onClick={handleApply}
             >
               {phase === 'applying' ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2
+                  {...stylex.props([
+                    styles.proposedActionCardLoader2,
+                    motion.spin,
+                  ])}
+                />
               ) : (
-                <Check className="h-4 w-4" />
+                <Check
+                  {...stylex.props(styles.strategistErrorStateRefreshCw)}
+                />
               )}
               적용
             </Button>
@@ -383,7 +405,7 @@ function ProposedActionCard({
               variant="ghost"
               onClick={() => setIsDismissed(true)}
             >
-              <X className="h-4 w-4" />
+              <X {...stylex.props(styles.strategistErrorStateRefreshCw)} />
               무시
             </Button>
           </div>
@@ -410,9 +432,9 @@ function ProposedActionList({
   const groupNameById = new Map(groups.map((g) => [g.id, g.name]));
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-primary uppercase">
-        <ListChecks className="h-3.5 w-3.5" />
+    <div {...stylex.props(styles.proposedActionListStack)} data-stack="">
+      <div {...stylex.props(styles.planResultRow)}>
+        <ListChecks {...stylex.props(styles.planItemCardLightbulb)} />
         제안된 액션
       </div>
       {actions.map((action) => {
@@ -544,13 +566,19 @@ export function StrategistPage() {
     body = <FeatureUnavailable />;
   } else {
     body = (
-      <div className="space-y-6">
+      <div {...stylex.props(styles.strategistPageStack)} data-stack="">
         <Card>
-          <CardContent className="space-y-5 p-6">
-            <div className="space-y-2">
+          <CardContent
+            xstyle={styles.bootstrapSkeletonCardContent}
+            data-stack=""
+          >
+            <div {...stylex.props(styles.strategistPageStack2)} data-stack="">
               <Label htmlFor="strategist-group">분석할 구직 활동</Label>
               <select
-                className="input-clean h-10 w-full rounded-xl px-3 text-sm focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                {...stylex.props([
+                  styles.strategistPageSelect,
+                  surfaces.inputClean,
+                ])}
                 disabled={isGenerating}
                 id="strategist-group"
                 value={selectedGroupId}
@@ -565,7 +593,7 @@ export function StrategistPage() {
               </select>
             </div>
 
-            <div className="space-y-2">
+            <div {...stylex.props(styles.strategistPageStack2)} data-stack="">
               <Label htmlFor="strategist-focus">집중할 방향 (선택)</Label>
               <Input
                 disabled={isGenerating}
@@ -577,12 +605,19 @@ export function StrategistPage() {
               />
             </div>
 
-            <div className="flex items-center gap-3">
+            <div {...stylex.props(styles.planItemCardRow2)}>
               <Button disabled={isGenerating} onClick={handleGenerate}>
                 {isGenerating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2
+                    {...stylex.props([
+                      styles.proposedActionCardLoader2,
+                      motion.spin,
+                    ])}
+                  />
                 ) : (
-                  <Sparkles className="h-4 w-4" />
+                  <Sparkles
+                    {...stylex.props(styles.strategistErrorStateRefreshCw)}
+                  />
                 )}
                 {isGenerating ? '생성 중…' : '플랜 생성'}
               </Button>
@@ -591,19 +626,31 @@ export function StrategistPage() {
         </Card>
 
         {isGenerating && (
-          <div className="animate-fade-in rounded-xl border border-primary/20 bg-primary/5 p-5">
-            <div className="relative mb-4 h-1 overflow-hidden rounded-full bg-primary/15">
-              <div className="absolute inset-y-0 left-0 w-2/5 rounded-full bg-linear-to-r from-primary to-teal-400 animate-indeterminate" />
+          <div
+            {...stylex.props([styles.strategistPageContainer, motion.fadeIn])}
+          >
+            <div {...stylex.props(styles.strategistPageContainer2)}>
+              <div
+                {...stylex.props([
+                  styles.strategistPageContainer3,
+                  motion.indeterminate,
+                ])}
+              />
             </div>
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Sparkles className="h-5 w-5 animate-pulse" />
+            <div {...stylex.props(styles.planItemCardRow)}>
+              <div {...stylex.props(styles.strategistPageRow)}>
+                <Sparkles
+                  {...stylex.props([
+                    styles.strategistPageSparkles,
+                    motion.pulse,
+                  ])}
+                />
               </div>
               <div>
-                <p className="text-sm font-semibold text-foreground">
+                <p {...stylex.props(styles.proposedActionCardDescription)}>
                   AI가 채용공고를 분석 중이에요
                 </p>
-                <p className="mt-0.5 text-xs text-gray-600">
+                <p {...stylex.props(styles.strategistPageDescription)}>
                   저장된 공고와 프로필을 비교해 지원 전략 플랜을 만들고 있어요.
                   최대 1분 정도 걸릴 수 있어요.
                 </p>
@@ -613,9 +660,15 @@ export function StrategistPage() {
         )}
 
         {generateError && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="flex flex-wrap items-center gap-3">
+          <Alert
+            icon={
+              <AlertCircle
+                {...stylex.props(styles.strategistErrorStateRefreshCw)}
+              />
+            }
+            variant="destructive"
+          >
+            <AlertDescription xstyle={styles.strategistPageAlertDescription}>
               {generateError.message}
               {generateError.canRetry && (
                 <Button
@@ -624,7 +677,9 @@ export function StrategistPage() {
                   variant="outline"
                   onClick={handleGenerate}
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw
+                    {...stylex.props(styles.strategistErrorStateRefreshCw)}
+                  />
                   다시 시도
                 </Button>
               )}
@@ -643,9 +698,490 @@ export function StrategistPage() {
   }
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div
+      {...stylex.props([styles.strategistPageStack3, motion.fadeIn])}
+      data-stack=""
+    >
       <PageHeader />
       {body}
     </div>
   );
 }
+
+const styles = stylex.create({
+  fitScore: (score: number) => ({ width: `${score}%` }),
+  pageHeaderDescription: {
+    marginBottom: '0.5rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 600,
+    letterSpacing: '0.15em',
+    color: 'hsl(var(--primary))',
+    textTransform: 'uppercase',
+  },
+  pageHeaderHeading: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    fontSize: {
+      default: '1.5rem',
+      '@media (min-width: 40rem)': '1.875rem',
+    },
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  pageHeaderSparkles: {
+    height: '1.75rem',
+    width: '1.75rem',
+    color: 'hsl(var(--primary))',
+  },
+  pageHeaderDescription2: {
+    marginTop: '0.5rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  bootstrapSkeletonCardContent: {
+    '--stack-space': '1.25rem',
+    paddingTop: '1.5rem',
+    paddingRight: '1.5rem',
+    paddingBottom: '1.5rem',
+    paddingLeft: '1.5rem',
+  },
+  bootstrapSkeletonSkeleton: {
+    height: '2.5rem',
+    width: '100%',
+  },
+  bootstrapSkeletonSkeleton2: {
+    height: '2.5rem',
+    width: '10rem',
+  },
+  strategistErrorStateContainer: {
+    minHeight: '18rem',
+    borderRadius: '.75rem',
+    borderWidth: '1px',
+    borderColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 20%, transparent)',
+    backgroundColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 8%, transparent)',
+    paddingLeft: '1.5rem',
+    paddingRight: '1.5rem',
+    paddingTop: '3rem',
+    paddingBottom: '3rem',
+    textAlign: 'center',
+  },
+  strategistErrorStateRow: {
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    display: 'flex',
+    height: '3.5rem',
+    width: '3.5rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    backgroundColor:
+      'color-mix(in oklab, oklch(63.7% .237 25.331) 10%, transparent)',
+    color: 'oklch(63.7% .237 25.331)',
+  },
+  strategistErrorStateAlertCircle: {
+    height: '1.75rem',
+    width: '1.75rem',
+  },
+  strategistErrorStateHeading: {
+    marginTop: '1.25rem',
+    fontSize: '1.25rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  strategistErrorStateDescription: {
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    marginTop: '0.5rem',
+    maxWidth: '36rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  strategistErrorStateDescription2: {
+    marginTop: '0.75rem',
+    fontFamily:
+      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 600,
+    color: 'oklch(63.7% .237 25.331)',
+  },
+  strategistErrorStateButton: {
+    marginTop: '1.5rem',
+  },
+  strategistErrorStateRefreshCw: {
+    height: '1rem',
+    width: '1rem',
+  },
+  noProfileCtaCardContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: '1rem',
+    paddingTop: '1.5rem',
+    paddingRight: '1.5rem',
+    paddingBottom: '1.5rem',
+    paddingLeft: '1.5rem',
+  },
+  noProfileCtaRow: {
+    display: 'flex',
+    height: '3rem',
+    width: '3rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    backgroundColor:
+      'color-mix(in oklab, hsl(var(--primary)) 12%, transparent)',
+    color: 'hsl(var(--primary))',
+  },
+  noProfileCtaSparkles: {
+    height: '1.5rem',
+    width: '1.5rem',
+  },
+  noProfileCtaHeading: {
+    fontSize: '1.125rem',
+    lineHeight: 1.25,
+    fontWeight: 700,
+    letterSpacing: '-.02em',
+  },
+  noProfileCtaDescription: {
+    marginTop: '0.25rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  featureUnavailableCardContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.75rem',
+    paddingLeft: '1.5rem',
+    paddingRight: '1.5rem',
+    paddingTop: '3rem',
+    paddingBottom: '3rem',
+    textAlign: 'center',
+  },
+  featureUnavailableRow: {
+    display: 'flex',
+    height: '3rem',
+    width: '3rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    backgroundColor: 'hsl(var(--muted))',
+    color: 'oklch(55.1% .027 264.364)',
+  },
+  featureUnavailableDescription: {
+    maxWidth: '28rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  skillBadgesStack: {
+    '--stack-space': '0.375rem',
+  },
+  skillBadgesText: {
+    fontSize: '11px',
+    fontWeight: 600,
+    letterSpacing: '.025em',
+    color: 'oklch(55.1% .027 264.364)',
+    textTransform: 'uppercase',
+  },
+  skillBadgesRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '0.375rem',
+  },
+  planItemCardCardContent: {
+    '--stack-space': '1rem',
+    paddingTop: '1.25rem',
+    paddingRight: '1.25rem',
+    paddingBottom: '1.25rem',
+    paddingLeft: '1.25rem',
+  },
+  planItemCardRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '0.75rem',
+  },
+  planItemCardText: {
+    display: 'flex',
+    height: '1.75rem',
+    width: '1.75rem',
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    backgroundColor:
+      'color-mix(in oklab, hsl(var(--primary)) 15%, transparent)',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    fontWeight: 700,
+    color: 'hsl(var(--primary))',
+  },
+  planItemCardContainer: {
+    minWidth: '0rem',
+    flex: '1',
+  },
+  planItemCardLink: {
+    fontSize: '1rem',
+    lineHeight: '1.5rem',
+    fontWeight: 700,
+    letterSpacing: '-.025em',
+    textDecorationLine: {
+      default: null,
+      ':hover': 'underline',
+    },
+  },
+  planItemCardContainer2: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  planItemCardRow2: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+  },
+  planItemCardText2: {
+    width: '3rem',
+    flexShrink: 0,
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 600,
+    color: 'oklch(55.1% .027 264.364)',
+  },
+  planItemCardContainer3: {
+    height: '0.5rem',
+    flex: '1',
+    overflow: 'hidden',
+    borderRadius: '9999px',
+    backgroundColor: 'hsl(var(--muted))',
+  },
+  planItemCardContainer4: {
+    height: '100%',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to right in oklab, hsl(var(--primary)), oklch(77.7% .152 181.912))',
+  },
+  planItemCardText3: {
+    width: '2.5rem',
+    flexShrink: 0,
+    textAlign: 'right',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    fontWeight: 700,
+    color: 'hsl(var(--primary))',
+  },
+  planItemCardGrid: {
+    display: 'grid',
+    gap: '0.75rem',
+    gridTemplateColumns: {
+      default: null,
+      '@media (min-width: 40rem)': 'repeat(2, minmax(0, 1fr))',
+    },
+  },
+  planItemCardContainer5: {
+    borderRadius: '.75rem',
+    borderWidth: '1px',
+    borderColor: 'color-mix(in oklab, hsl(var(--primary)) 15%, transparent)',
+    backgroundColor: 'color-mix(in oklab, hsl(var(--primary)) 8%, transparent)',
+    paddingTop: '0.75rem',
+    paddingRight: '0.75rem',
+    paddingBottom: '0.75rem',
+    paddingLeft: '0.75rem',
+  },
+  planItemCardRow3: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 600,
+    color: 'hsl(var(--primary))',
+  },
+  planItemCardLightbulb: {
+    height: '0.875rem',
+    width: '0.875rem',
+  },
+  planItemCardDescription: {
+    marginTop: '0.25rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    fontWeight: 500,
+    color: 'hsl(var(--foreground))',
+  },
+  planItemCardDescription2: {
+    fontSize: '.875rem',
+    lineHeight: 1.625,
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  planResultStack: {
+    '--stack-space': '1rem',
+  },
+  planResultCardContent: {
+    paddingTop: '1.25rem',
+    paddingRight: '1.25rem',
+    paddingBottom: '1.25rem',
+    paddingLeft: '1.25rem',
+  },
+  planResultRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    fontWeight: 600,
+    letterSpacing: '.025em',
+    color: 'hsl(var(--primary))',
+    textTransform: 'uppercase',
+  },
+  planResultDescription: {
+    marginTop: '0.5rem',
+    fontSize: '.875rem',
+    lineHeight: 1.625,
+    whiteSpace: 'pre-line',
+  },
+  planResultCardContent2: {
+    paddingLeft: '1.5rem',
+    paddingRight: '1.5rem',
+    paddingTop: '3rem',
+    paddingBottom: '3rem',
+    textAlign: 'center',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  proposedActionCardCardContent: {
+    '--stack-space': '0.75rem',
+    paddingTop: '1rem',
+    paddingRight: '1rem',
+    paddingBottom: '1rem',
+    paddingLeft: '1rem',
+  },
+  proposedActionCardDescription: {
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    fontWeight: 600,
+    color: 'hsl(var(--foreground))',
+  },
+  proposedActionCardRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    fontSize: '.875rem',
+    lineHeight: '1.25rem',
+    fontWeight: 600,
+    color: 'hsl(var(--primary))',
+  },
+  proposedActionCardRow2: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  proposedActionCardLoader2: {
+    height: '1rem',
+    width: '1rem',
+  },
+  proposedActionListStack: {
+    '--stack-space': '0.75rem',
+  },
+  strategistPageStack: {
+    '--stack-space': '1.5rem',
+  },
+  strategistPageStack2: {
+    '--stack-space': '0.5rem',
+  },
+  strategistPageSelect: {
+    height: '2.5rem',
+    width: '100%',
+    borderRadius: '.75rem',
+    paddingLeft: '0.75rem',
+    paddingRight: '0.75rem',
+    fontSize: 'inherit',
+    lineHeight: 'inherit',
+    outlineStyle: {
+      default: null,
+      ':focus-visible': 'none',
+    },
+    cursor: {
+      default: null,
+      ':disabled': 'not-allowed',
+    },
+    opacity: {
+      default: null,
+      ':disabled': 0.5,
+    },
+    transitionProperty: 'all',
+    transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    transitionDuration: '150ms',
+  },
+  strategistPageContainer: {
+    borderRadius: '.75rem',
+    borderWidth: '1px',
+    borderColor: 'color-mix(in oklab, hsl(var(--primary)) 20%, transparent)',
+    backgroundColor: 'color-mix(in oklab, hsl(var(--primary)) 5%, transparent)',
+    paddingTop: '1.25rem',
+    paddingRight: '1.25rem',
+    paddingBottom: '1.25rem',
+    paddingLeft: '1.25rem',
+  },
+  strategistPageContainer2: {
+    position: 'relative',
+    marginBottom: '1rem',
+    height: '0.25rem',
+    overflow: 'hidden',
+    borderRadius: '9999px',
+    backgroundColor:
+      'color-mix(in oklab, hsl(var(--primary)) 15%, transparent)',
+  },
+  strategistPageContainer3: {
+    position: 'absolute',
+    top: '0rem',
+    bottom: '0rem',
+    left: '0rem',
+    width: '40%',
+    borderRadius: '9999px',
+    backgroundImage:
+      'linear-gradient(to right in oklab, hsl(var(--primary)), oklch(77.7% .152 181.912))',
+  },
+  strategistPageRow: {
+    display: 'flex',
+    height: '2.5rem',
+    width: '2.5rem',
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '9999px',
+    backgroundColor:
+      'color-mix(in oklab, hsl(var(--primary)) 10%, transparent)',
+    color: 'hsl(var(--primary))',
+  },
+  strategistPageSparkles: {
+    height: '1.25rem',
+    width: '1.25rem',
+  },
+  strategistPageDescription: {
+    marginTop: '0.125rem',
+    fontSize: '.75rem',
+    lineHeight: '1rem',
+    color: 'oklch(44.6% .03 256.802)',
+  },
+  strategistPageAlertDescription: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '0.75rem',
+  },
+  strategistPageStack3: {
+    '--stack-space': '1.5rem',
+  },
+});
