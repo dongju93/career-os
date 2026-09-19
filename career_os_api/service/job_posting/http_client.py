@@ -9,7 +9,7 @@ import asyncio
 import ipaddress
 import re
 import socket
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from types import TracebackType
 from typing import Any, Self
@@ -158,7 +158,7 @@ class JobPostingHttpClient:
     @asynccontextmanager
     async def stream(
         self, method: str, url: str, **kwargs: Any
-    ) -> AsyncIterator[httpx2.Response]:
+    ) -> AsyncGenerator[httpx2.Response]:
         request: httpx2.Request | None = None
         response: httpx2.Response | None = None
         try:
