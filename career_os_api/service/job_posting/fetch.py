@@ -21,8 +21,8 @@ if _missing_handlers:
 async def fetch_url_content(
     url: str, http_client: AsyncHttpClient
 ) -> tuple[bytes, str]:
-    # detect_platform raises HTTPException 400 for unrecognised hosts, which
-    # prevents SSRF against internal services or cloud metadata endpoints.
+    # Classify user input here; JobPostingHttpClient enforces the outbound
+    # destination policy, including DNS and redirects, at the network boundary.
     platform = detect_platform(url)
     content = await _FETCH_DISPATCH[platform](url, http_client)
     return content, "text/html; charset=utf-8"

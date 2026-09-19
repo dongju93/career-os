@@ -32,6 +32,7 @@ from career_os_api.middleware import (
 from career_os_api.rate_limit.client import create_redis_client
 from career_os_api.responses import api_error_response, api_validation_error_response
 from career_os_api.router import v1_router
+from career_os_api.service.job_posting.http_client import JobPostingHttpClient
 
 
 def _before_send_sentry_event(event: Event, hint: Hint) -> Event | None:
@@ -83,11 +84,9 @@ async def lifespan(app: FastAPI):
     try:
         async with (
             create_postgres_pool() as pool,
-            httpx2.AsyncClient(
-                follow_redirects=True, timeout=settings.http_fetch_timeout
-            ) as http_client,
-            httpx2.AsyncClient(
-                follow_redirects=True, timeout=settings.http_image_timeout
+            JobPostingHttpClient(timeout=settings.http_fetch_timeout) as http_client,
+            JobPostingHttpClient(
+                timeout=settings.http_image_timeout
             ) as image_http_client,
             httpx2.AsyncClient(
                 timeout=settings.google_risc_http_timeout_seconds
