@@ -342,11 +342,11 @@ const styles = stylex.create({
     },
     height: {
       default: null,
-      '@media (min-width: 48rem)': 'min(680px,calc(100vh-6rem))',
+      '@media (min-width: 48rem)': 'min(680px, calc(100vh - 6rem))',
     },
     width: {
       default: null,
-      '@media (min-width: 48rem)': 'min(420px,calc(100vw-2rem))',
+      '@media (min-width: 48rem)': 'min(420px, calc(100vw - 2rem))',
     },
   },
   hidden: {
