@@ -34,7 +34,7 @@ class FakeConnection:
         self._cursor = cursor
         self.cursor_row_factories: list[object] = []
 
-    def cursor(self, *, row_factory):
+    def cursor(self, *, row_factory=None):
         self.cursor_row_factories.append(row_factory)
         return self._cursor
 
@@ -224,3 +224,17 @@ async def test_upsert_user_executes_sql_and_returns_row() -> None:
     assert params is not None
     assert isinstance(params[0], uuid.UUID)
     assert params[1:] == ("google-user-1", "user@example.com", "Career OS User", None)
+
+
+@pytest.mark.asyncio
+async def test_revoke_user_sessions_moves_boundary_for_user_id() -> None:
+    cursor = FakeCursor()
+    conn = FakeConnection(cursor=cursor)
+    user_id = uuid.uuid7()
+
+    await users_module.revoke_user_sessions(cast(AsyncConnection, conn), user_id)
+
+    assert cursor.execute_calls == [
+        (users_module._REVOKE_SESSIONS_BY_ID_SQL, (user_id,)),
+    ]
+    assert "auth_session_revoked_at = NOW()" in users_module._REVOKE_SESSIONS_BY_ID_SQL

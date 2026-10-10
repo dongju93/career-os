@@ -84,6 +84,12 @@ WHERE google_id = %s
 RETURNING id, google_id, email, name, picture, is_active, auth_session_revoked_at
 """
 
+_REVOKE_SESSIONS_BY_ID_SQL = """
+UPDATE users
+SET auth_session_revoked_at = NOW(), updated_at = NOW()
+WHERE id = %s
+"""
+
 
 async def find_user_by_google_id(
     conn: AsyncConnection, google_id: str
@@ -153,3 +159,13 @@ async def revoke_user_sessions_by_google_id(
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_REVOKE_SESSIONS_BY_GOOGLE_ID_SQL, (google_id,))
         return cast("UserRow | None", await cur.fetchone())
+
+
+async def revoke_user_sessions(conn: AsyncConnection, user_id: UUID) -> None:
+    """Invalidate every session cookie issued to the user before now.
+
+    Session cookies are stateless signed values, so clearing one client-side
+    does not stop a copied cookie; moving the per-user boundary does.
+    """
+    async with conn.cursor() as cur:
+        await cur.execute(_REVOKE_SESSIONS_BY_ID_SQL, (user_id,))

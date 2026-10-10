@@ -51,7 +51,11 @@ from career_os_api.database.job_search_groups import (
 )
 from career_os_api.database.retry import run_database_operation
 from career_os_api.database.user_profiles import get_user_profile, upsert_user_profile
-from career_os_api.database.users import update_user_name, upsert_user
+from career_os_api.database.users import (
+    revoke_user_sessions,
+    update_user_name,
+    upsert_user,
+)
 from career_os_api.rate_limit import quota, rate_limit
 from career_os_api.responses import (
     AUTHENTICATION_ERROR_RESPONSE,
@@ -393,7 +397,10 @@ async def update_current_user(
     "/auth/logout",
     tags=["auth"],
     summary="현재 세션 종료",
-    description="서버 세션 쿠키를 삭제합니다.",
+    description=(
+        "현재 사용자에게 이전에 발급된 모든 세션을 서버에서 폐기하고 "
+        "세션 쿠키를 삭제합니다."
+    ),
     operation_id="logout_current_user",
     response_description="세션 종료 결과",
     dependencies=[rate_limit(20, per="minute")],
@@ -402,6 +409,14 @@ async def update_current_user(
 async def logout_current_user(
     request: Request, current_user: _CurrentUser
 ) -> ApiResponse[None]:
+    # Clearing the signed cookie alone leaves any copy of it valid until
+    # max_age, so persist the revocation boundary first; get_current_user
+    # rejects sessions issued before it. A DB failure surfaces as 503 rather
+    # than reporting a logout that did not take effect.
+    async def operation(conn):
+        await revoke_user_sessions(conn, current_user["id"])
+
+    await run_database_operation(request.app.state.pool, operation)
     request.session.clear()
     return ApiResponse(
         status=status.HTTP_200_OK,

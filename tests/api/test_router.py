@@ -22,7 +22,11 @@ from career_os_api.auth.risc import (
     RiscVerificationUnavailableError,
 )
 from career_os_api.constants import API_V1
-from tests.session_auth import make_session_auth_headers
+from tests.session_auth import (
+    SESSION_CLIENT_HEADERS,
+    forge_session_cookie,
+    make_session_auth_headers,
+)
 
 API_PREFIX = f"/{API_V1}"
 
@@ -883,6 +887,52 @@ def test_logout_returns_200_with_message(
         "message": "세션이 종료되었습니다.",
         "data": None,
     }
+
+
+def test_logout_revokes_previously_issued_session_cookie(
+    client: TestClient,
+    fake_pool: FakePool,
+    current_user: dict,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A copy of the cookie (e.g. stolen) issued before logout must stop working
+    # even though the client-side cookie clear never reaches the copy.
+    async def revoke(_conn, _user_id) -> None:
+        current_user["auth_session_revoked_at"] = datetime.now(UTC)
+
+    revoke_mock = AsyncMock(side_effect=revoke)
+    monkeypatch.setattr(app_module, "revoke_user_sessions", revoke_mock)
+    issued_at = int(time.time()) - 60
+    headers = {
+        "Cookie": f"session={forge_session_cookie(current_user['id'], issued_at=issued_at)}",
+        **SESSION_CLIENT_HEADERS,
+    }
+
+    assert client.get(f"{API_PREFIX}/auth/me", headers=headers).status_code == 200
+
+    logout = client.post(f"{API_PREFIX}/auth/logout", headers=headers)
+
+    assert logout.status_code == 200
+    revoke_mock.assert_awaited_once_with(fake_pool.connection_obj, current_user["id"])
+    assert client.get(f"{API_PREFIX}/auth/me", headers=headers).status_code == 401
+
+
+def test_logout_returns_503_without_clearing_session_when_revocation_fails(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(retry_module.asyncio, "sleep", AsyncMock())
+    revoke_mock = AsyncMock(side_effect=OperationalError("db down"))
+    monkeypatch.setattr(app_module, "revoke_user_sessions", revoke_mock)
+
+    response = client.post(f"{API_PREFIX}/auth/logout", headers=auth_headers)
+
+    # Reporting success here would tell the user they are logged out while the
+    # old cookie still authenticates; a 503 keeps the logout retryable.
+    assert response.status_code == 503
+    assert "set-cookie" not in response.headers
+    assert revoke_mock.await_count == 5
 
 
 def test_logout_requires_auth(client: TestClient) -> None:

@@ -185,11 +185,11 @@ OAuth 로그인으로 저장되는 사용자 계정 정보와 Google Cross-Accou
 | `GET`    | `/`                             |      | 헬스체크                                                                                                                                        |
 | `GET`    | `/health/db`                    |      | DB 연결 확인                                                                                                                                    |
 | `GET`    | `/auth/google`                  |      | Google 로그인 시작 (`?callback_url=` 지원)                                                                                                      |
-| `GET`    | `/auth/google/callback`         |      | OAuth 콜백, HttpOnly 세션 쿠키 발급 후 프론트엔드로 리다이렉트                                                                                          |
+| `GET`    | `/auth/google/callback`         |      | OAuth 콜백, HttpOnly 세션 쿠키 발급 후 프론트엔드로 리다이렉트                                                                                  |
 | `POST`   | `/auth/google/risc`             |      | Google RISC 보안 이벤트 수신                                                                                                                    |
 | `GET`    | `/auth/me`                      |  ✓   | 현재 사용자 조회                                                                                                                                |
 | `PATCH`  | `/auth/me`                      |  ✓   | 사용자 이름 수정                                                                                                                                |
-| `POST`   | `/auth/logout`                  |  ✓   | 로그아웃                                                                                                                                        |
+| `POST`   | `/auth/logout`                  |  ✓   | 로그아웃 — 해당 사용자의 기존 세션을 서버에서 모두 폐기(모든 기기 로그아웃)                                                                     |
 | `POST`   | `/chatkit`                      |  ✓   | AI 어시스턴트 채팅; 스트리밍 SSE 또는 JSON; 분당 30회·일별 500회 제한; `CHATKIT_ENABLED=false` 시 404                                           |
 | `GET`    | `/job-postings`                 |  ✓   | 저장된 공고 목록 (`offset`, `limit`, 선택 `group_id`)                                                                                           |
 | `GET`    | `/job-postings/extraction?url=` |  ✓   | URL에서 공고 추출 (저장 안 함)                                                                                                                  |

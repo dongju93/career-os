@@ -243,7 +243,7 @@ COMMENT ON COLUMN user_profiles.summary            IS '자유 형식 커리어 �
 COMMENT ON TABLE  users          IS 'Google OAuth로 가입한 사용자 계정';
 COMMENT ON COLUMN users.google_id IS 'Google sub claim (고유 사용자 식별자)';
 COMMENT ON COLUMN users.email     IS 'Google 계정 이메일';
-COMMENT ON COLUMN users.auth_session_revoked_at IS '이 시각 이전에 발급된 앱 세션/JWT를 거부하는 RISC 세션 폐기 경계';
+COMMENT ON COLUMN users.auth_session_revoked_at IS '이 시각 이전에 발급된 앱 세션을 거부하는 세션 폐기 경계 (RISC 이벤트 또는 로그아웃 시 갱신)';
 COMMENT ON COLUMN users.risc_account_state IS '마지막으로 적용된 RISC 계정 상태 (enabled | disabled | purged, purged는 종결 상태)';
 COMMENT ON COLUMN users.risc_account_state_at IS 'risc_account_state를 만든 RISC 이벤트의 iat — 이보다 오래된 이벤트는 상태를 바꾸지 못함';
 
