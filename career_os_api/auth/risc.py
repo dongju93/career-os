@@ -78,7 +78,6 @@ class RiscEvent:
     google_id: str | None
     reason: str | None
     state: str | None
-    raw_payload: dict[str, Any]
 
 
 # Module-level JWKS cache. Mutated by `get_jwks`; tests may seed directly.
@@ -222,5 +221,4 @@ async def verify_risc_set(
         google_id=google_id,
         reason=reason,
         state=state,
-        raw_payload=payload,
     )

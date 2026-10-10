@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     # Accept SETs whose `iat` is at most this far in the future (clock skew).
     google_risc_max_iat_skew_seconds: int = 60 * 5  # 5 minutes
     google_risc_http_timeout_seconds: float = 10.0
+    # `risc_events` audit rows older than this are deleted (M-07). Must exceed
+    # Google's redelivery window, since a swept row no longer dedupes its `jti`.
+    risc_event_retention_days: int = Field(default=90, ge=1)
 
     # Redis — optional; rate limiting is silently disabled (fail-open) when unset.
     redis_url: str | None = None

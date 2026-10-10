@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS users (
     CONSTRAINT uq_users_google_id UNIQUE (google_id),
     CONSTRAINT uq_users_email     UNIQUE (email),
     CONSTRAINT chk_users_risc_account_state
-        CHECK (risc_account_state IN ('enabled', 'disabled', 'purged')),
+        CHECK (risc_account_state IN ('enabled', 'disabled')),
     CONSTRAINT chk_users_risc_account_state_pair
         CHECK ((risc_account_state IS NULL) = (risc_account_state_at IS NULL))
 );
@@ -140,7 +140,6 @@ CREATE TABLE IF NOT EXISTS risc_events (
     google_id   TEXT,
     reason      TEXT,
     issued_at   TIMESTAMPTZ  NOT NULL,
-    payload     JSONB        NOT NULL,
     received_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
     CONSTRAINT uq_risc_events_jti UNIQUE (jti)
@@ -244,15 +243,14 @@ COMMENT ON TABLE  users          IS 'Google OAuth로 가입한 사용자 계정'
 COMMENT ON COLUMN users.google_id IS 'Google sub claim (고유 사용자 식별자)';
 COMMENT ON COLUMN users.email     IS 'Google 계정 이메일';
 COMMENT ON COLUMN users.auth_session_revoked_at IS '이 시각 이전에 발급된 앱 세션을 거부하는 세션 폐기 경계 (RISC 이벤트 또는 로그아웃 시 갱신)';
-COMMENT ON COLUMN users.risc_account_state IS '마지막으로 적용된 RISC 계정 상태 (enabled | disabled | purged, purged는 종결 상태)';
+COMMENT ON COLUMN users.risc_account_state IS '마지막으로 적용된 RISC 계정 상태 (enabled | disabled). account-purged는 상태가 아니라 사용자 행과 소유 데이터를 삭제함';
 COMMENT ON COLUMN users.risc_account_state_at IS 'risc_account_state를 만든 RISC 이벤트의 iat — 이보다 오래된 이벤트는 상태를 바꾸지 못함';
 
-COMMENT ON TABLE  risc_events            IS 'Google RISC(Cross-Account Protection) Security Event Token 수신 이력';
+COMMENT ON TABLE  risc_events            IS 'Google RISC(Cross-Account Protection) Security Event Token 수신 이력 (처리에 필요한 클레임만 저장, RISC_EVENT_RETENTION_DAYS 경과 시 삭제)';
 COMMENT ON COLUMN risc_events.jti        IS 'SET JWT의 jti 클레임 (중복 전송 방지용 고유 ID)';
 COMMENT ON COLUMN risc_events.event_type IS 'RISC 이벤트 타입 URI';
-COMMENT ON COLUMN risc_events.google_id  IS '대상 Google 사용자 ID (subject.sub, verification 이벤트는 NULL)';
+COMMENT ON COLUMN risc_events.google_id  IS '대상 Google 사용자 ID (subject.sub, verification 이벤트 또는 purge로 익명화된 행은 NULL)';
 COMMENT ON COLUMN risc_events.issued_at  IS 'SET JWT의 iat (발급 시각)';
-COMMENT ON COLUMN risc_events.payload    IS '검증을 통과한 SET JWT의 원본 클레임 전체';
 
 COMMENT ON TABLE  job_search_groups          IS '사용자의 구직 활동 라운드 그룹';
 COMMENT ON COLUMN job_search_groups.ended_at IS 'NULL = 진행 중; NOT NULL = 종료된 구직 활동';

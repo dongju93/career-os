@@ -393,6 +393,7 @@ async def test_lifespan_wires_both_fetch_clients_to_security_boundary(
 
     monkeypatch.setattr(main, "create_postgres_pool", lambda: AsyncMock())
     monkeypatch.setattr(main, "init_schema", AsyncMock())
+    monkeypatch.setattr(main, "run_database_operation", AsyncMock())
     monkeypatch.setattr(main, "create_redis_client", lambda: None)
     monkeypatch.setattr(main, "AsyncOpenAI", lambda **kwargs: AsyncMock())
     monkeypatch.setattr(main, "set_default_openai_client", MagicMock())

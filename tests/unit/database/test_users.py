@@ -127,7 +127,6 @@ async def test_lock_user_risc_account_state_by_google_id_selects_for_update() ->
     [
         (users_module.RiscAccountState.ENABLED, True),
         (users_module.RiscAccountState.DISABLED, False),
-        (users_module.RiscAccountState.PURGED, False),
     ],
 )
 async def test_set_user_risc_account_state_derives_is_active_from_state(
@@ -201,6 +200,36 @@ async def test_revoke_user_sessions_by_google_id_returns_none_when_unknown() -> 
     )
 
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_delete_user_by_google_id_returns_true_when_row_deleted() -> None:
+    user_id = uuid.uuid7()
+    cursor = FakeCursor(fetchone_results=[(user_id,)])
+    conn = FakeConnection(cursor=cursor)
+
+    deleted = await users_module.delete_user_by_google_id(
+        cast(AsyncConnection, conn),
+        "google-user-1",
+    )
+
+    assert deleted is True
+    assert cursor.execute_calls == [
+        (users_module._DELETE_BY_GOOGLE_ID_SQL, ("google-user-1",)),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_delete_user_by_google_id_returns_false_when_unknown() -> None:
+    cursor = FakeCursor(fetchone_results=[None])
+    conn = FakeConnection(cursor=cursor)
+
+    deleted = await users_module.delete_user_by_google_id(
+        cast(AsyncConnection, conn),
+        "missing-id",
+    )
+
+    assert deleted is False
 
 
 @pytest.mark.asyncio

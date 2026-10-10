@@ -20,6 +20,7 @@ from career_os_api.auth.risc import (
     EVENT_VERIFICATION,
     RiscEvent,
 )
+from career_os_api.config import settings
 from career_os_api.database.users import (
     RiscAccountState,
     RiscAccountStateRow,
@@ -46,7 +47,6 @@ def _event(
         google_id=google_id,
         reason=reason,
         state=state,
-        raw_payload={"jti": jti, "events": {event_type: {}}},
     )
 
 
@@ -83,6 +83,13 @@ class _FakeUserStore:
             "risc_account_state": None,
             "risc_account_state_at": None,
         }
+        self.deleted = False
+        self.delete_calls: list[str] = []
+        self.anonymized_google_ids: list[str] = []
+        self.retention_days_swept: list[int] = []
+
+    def _has_user(self, google_id: str) -> bool:
+        return google_id == _GOOGLE_ID and not self.deleted
 
     async def record(self, _conn, *, jti: str, **_kwargs) -> bool:
         if jti in self.seen_jtis:
@@ -90,11 +97,24 @@ class _FakeUserStore:
         self.seen_jtis.add(jti)
         return True
 
+    async def delete_user(self, _conn, google_id: str) -> bool:
+        self.delete_calls.append(google_id)
+        if not self._has_user(google_id):
+            return False
+        self.deleted = True
+        return True
+
+    async def anonymize(self, _conn, google_id: str) -> None:
+        self.anonymized_google_ids.append(google_id)
+
+    async def sweep(self, _conn, *, retention_days: int) -> None:
+        self.retention_days_swept.append(retention_days)
+
     async def lock(self, _conn, google_id: str) -> RiscAccountStateRow | None:
-        return self.state.copy() if google_id == _GOOGLE_ID else None
+        return self.state.copy() if self._has_user(google_id) else None
 
     async def revoke(self, _conn, google_id: str) -> UserRow | None:
-        if google_id != _GOOGLE_ID:
+        if not self._has_user(google_id):
             return None
         self.user["auth_session_revoked_at"] = datetime.now(UTC)
         return self.user
@@ -107,7 +127,7 @@ class _FakeUserStore:
         state: RiscAccountState,
         issued_at: datetime,
     ) -> UserRow | None:
-        if google_id != _GOOGLE_ID:
+        if not self._has_user(google_id):
             return None
         self.user["is_active"] = state is RiscAccountState.ENABLED
         self.state = {
@@ -121,6 +141,11 @@ class _FakeUserStore:
 def store(monkeypatch: pytest.MonkeyPatch) -> _FakeUserStore:
     fake = _FakeUserStore()
     monkeypatch.setattr(handlers_module, "record_risc_event", fake.record)
+    monkeypatch.setattr(handlers_module, "delete_expired_risc_events", fake.sweep)
+    monkeypatch.setattr(handlers_module, "delete_user_by_google_id", fake.delete_user)
+    monkeypatch.setattr(
+        handlers_module, "anonymize_risc_events_by_google_id", fake.anonymize
+    )
     monkeypatch.setattr(
         handlers_module, "lock_user_risc_account_state_by_google_id", fake.lock
     )
@@ -141,26 +166,19 @@ def _stale_token_iat() -> int:
 # ── Account-state events ─────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize(
-    ("event_type", "expected_state"),
-    [
-        (EVENT_ACCOUNT_DISABLED, RiscAccountState.DISABLED),
-        (EVENT_ACCOUNT_PURGED, RiscAccountState.PURGED),
-    ],
-)
-async def test_deactivating_event_deactivates_and_revokes_atomically(
-    event_type: str,
-    expected_state: RiscAccountState,
+async def test_disable_event_deactivates_and_revokes_atomically(
     fake_conn: AsyncConnection,
     store: _FakeUserStore,
 ) -> None:
-    await handlers_module.apply_risc_event(fake_conn, _event(event_type=event_type))
+    await handlers_module.apply_risc_event(
+        fake_conn, _event(event_type=EVENT_ACCOUNT_DISABLED)
+    )
 
     assert cast(_FakeConnection, fake_conn).transactions == 1
     assert store.user["is_active"] is False
     assert store.user["auth_session_revoked_at"] is not None
     assert store.state == {
-        "risc_account_state": expected_state.value,
+        "risc_account_state": RiscAccountState.DISABLED.value,
         "risc_account_state_at": datetime.fromtimestamp(_T0, UTC),
     }
 
@@ -222,7 +240,22 @@ async def test_late_disable_older_than_enable_keeps_account_but_revokes(
     assert not _is_current_user_session(store.user, stale_iat)
 
 
-async def test_enable_after_purge_is_ignored(
+async def test_account_purged_deletes_user_and_anonymizes_audit_rows(
+    fake_conn: AsyncConnection,
+    store: _FakeUserStore,
+) -> None:
+    await handlers_module.apply_risc_event(
+        fake_conn, _event(event_type=EVENT_ACCOUNT_PURGED, jti="p", issued_at=_T0)
+    )
+
+    assert cast(_FakeConnection, fake_conn).transactions == 1
+    assert store.deleted is True
+    assert store.anonymized_google_ids == [_GOOGLE_ID]
+    assert store.seen_jtis == {"p"}
+    assert store.state == {"risc_account_state": None, "risc_account_state_at": None}
+
+
+async def test_enable_after_purge_does_not_recreate_or_reactivate_user(
     fake_conn: AsyncConnection,
     store: _FakeUserStore,
 ) -> None:
@@ -234,8 +267,41 @@ async def test_enable_after_purge_is_ignored(
         _event(event_type=EVENT_ACCOUNT_ENABLED, jti="e", issued_at=_T0 + 60),
     )
 
-    assert store.user["is_active"] is False
-    assert store.state["risc_account_state"] == RiscAccountState.PURGED
+    assert store.deleted is True
+    assert store.state == {"risc_account_state": None, "risc_account_state_at": None}
+    assert store.user["auth_session_revoked_at"] is None
+
+
+async def test_purge_for_unknown_google_id_still_anonymizes_and_does_not_raise(
+    fake_conn: AsyncConnection,
+    store: _FakeUserStore,
+) -> None:
+    await handlers_module.apply_risc_event(
+        fake_conn,
+        _event(event_type=EVENT_ACCOUNT_PURGED, google_id="someone-else"),
+    )
+
+    assert cast(_FakeConnection, fake_conn).transactions == 1
+    assert store.deleted is False
+    assert store.delete_calls == ["someone-else"]
+    assert store.anonymized_google_ids == ["someone-else"]
+    assert store.user["is_active"] is True
+
+
+async def test_duplicate_purge_jti_does_nothing(
+    fake_conn: AsyncConnection,
+    store: _FakeUserStore,
+) -> None:
+    await handlers_module.apply_risc_event(
+        fake_conn, _event(event_type=EVENT_ACCOUNT_PURGED, jti="p")
+    )
+    # Google retries the same purge delivery with the same jti.
+    await handlers_module.apply_risc_event(
+        fake_conn, _event(event_type=EVENT_ACCOUNT_PURGED, jti="p")
+    )
+
+    assert store.delete_calls == [_GOOGLE_ID]
+    assert store.anonymized_google_ids == [_GOOGLE_ID]
 
 
 async def test_duplicate_enable_jti_is_not_reapplied(
@@ -287,9 +353,6 @@ _EARLIER = datetime.fromtimestamp(_T0 - 1, UTC)
         (RiscAccountState.DISABLED, RiscAccountState.ENABLED, _EARLIER, False),
         (RiscAccountState.ENABLED, RiscAccountState.DISABLED, _AT, True),
         (RiscAccountState.ENABLED, RiscAccountState.DISABLED, _EARLIER, False),
-        (RiscAccountState.ENABLED, RiscAccountState.PURGED, _EARLIER, True),
-        (RiscAccountState.PURGED, RiscAccountState.ENABLED, _LATER, False),
-        (RiscAccountState.PURGED, RiscAccountState.DISABLED, _LATER, False),
     ],
 )
 def test_supersedes_account_state(
@@ -310,6 +373,24 @@ def test_supersedes_account_state(
 
 
 # ── Other events ─────────────────────────────────────────────────────────────
+
+
+async def test_every_risc_event_runs_retention_sweep(
+    fake_conn: AsyncConnection,
+    store: _FakeUserStore,
+) -> None:
+    await handlers_module.apply_risc_event(
+        fake_conn, _event(event_type=EVENT_VERIFICATION, google_id=None)
+    )
+    # A duplicate jti still goes through the sweep before being ignored.
+    await handlers_module.apply_risc_event(
+        fake_conn, _event(event_type=EVENT_VERIFICATION, google_id=None)
+    )
+
+    assert store.retention_days_swept == [
+        settings.risc_event_retention_days,
+        settings.risc_event_retention_days,
+    ]
 
 
 async def test_apply_verification_event_is_audit_only(
@@ -336,9 +417,11 @@ async def test_apply_session_token_revocations_revoke_user_sessions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     record = AsyncMock(return_value=True)
+    sweep = AsyncMock()
     set_state = AsyncMock()
     revoke_sessions = AsyncMock(return_value=None)
     monkeypatch.setattr(handlers_module, "record_risc_event", record)
+    monkeypatch.setattr(handlers_module, "delete_expired_risc_events", sweep)
     monkeypatch.setattr(
         handlers_module, "set_user_risc_account_state_by_google_id", set_state
     )

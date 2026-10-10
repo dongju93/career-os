@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from functools import partial
 
 import httpx2
 import sentry_sdk
@@ -23,7 +24,11 @@ from career_os_api.config import settings
 from career_os_api.constants import API_V1
 from career_os_api.database.ddl import init_schema
 from career_os_api.database.pool import create_postgres_pool
-from career_os_api.database.retry import DatabaseUnavailableError
+from career_os_api.database.retry import (
+    DatabaseUnavailableError,
+    run_database_operation,
+)
+from career_os_api.database.risc_events import delete_expired_risc_events
 from career_os_api.middleware import (
     RequestIdFilter,
     RequestIdMiddleware,
@@ -94,6 +99,14 @@ async def lifespan(app: FastAPI):
             AsyncOpenAI(api_key=settings.openai_api_key) as openai_client,
         ):
             await init_schema(pool)
+            await run_database_operation(
+                pool,
+                partial(
+                    delete_expired_risc_events,
+                    retention_days=settings.risc_event_retention_days,
+                ),
+                label="delete_expired_risc_events",
+            )
             app.state.pool = pool
             app.state.redis = redis_client
             app.state.http_client = http_client

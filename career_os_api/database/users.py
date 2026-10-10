@@ -23,7 +23,6 @@ class RiscAccountState(StrEnum):
 
     ENABLED = "enabled"
     DISABLED = "disabled"
-    PURGED = "purged"
 
 
 class RiscAccountStateRow(TypedDict):
@@ -82,6 +81,12 @@ UPDATE users
 SET auth_session_revoked_at = NOW(), updated_at = NOW()
 WHERE google_id = %s
 RETURNING id, google_id, email, name, picture, is_active, auth_session_revoked_at
+"""
+
+_DELETE_BY_GOOGLE_ID_SQL = """
+DELETE FROM users
+WHERE google_id = %s
+RETURNING id
 """
 
 _REVOKE_SESSIONS_BY_ID_SQL = """
@@ -159,6 +164,18 @@ async def revoke_user_sessions_by_google_id(
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(_REVOKE_SESSIONS_BY_GOOGLE_ID_SQL, (google_id,))
         return cast("UserRow | None", await cur.fetchone())
+
+
+async def delete_user_by_google_id(conn: AsyncConnection, google_id: str) -> bool:
+    """Delete the user and, via ON DELETE CASCADE, every row they own.
+
+    Profile, job search groups, postings, and ChatKit threads/items all
+    reference `users(id)` with ON DELETE CASCADE, so this one statement is the
+    complete account erasure. Returns False when no user matched.
+    """
+    async with conn.cursor() as cur:
+        await cur.execute(_DELETE_BY_GOOGLE_ID_SQL, (google_id,))
+        return await cur.fetchone() is not None
 
 
 async def revoke_user_sessions(conn: AsyncConnection, user_id: UUID) -> None:

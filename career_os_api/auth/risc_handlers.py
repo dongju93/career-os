@@ -16,10 +16,16 @@ from career_os_api.auth.risc import (
     EVENT_VERIFICATION,
     RiscEvent,
 )
-from career_os_api.database.risc_events import record_risc_event
+from career_os_api.config import settings
+from career_os_api.database.risc_events import (
+    anonymize_risc_events_by_google_id,
+    delete_expired_risc_events,
+    record_risc_event,
+)
 from career_os_api.database.users import (
     RiscAccountState,
     RiscAccountStateRow,
+    delete_user_by_google_id,
     lock_user_risc_account_state_by_google_id,
     revoke_user_sessions_by_google_id,
     set_user_risc_account_state_by_google_id,
@@ -29,7 +35,6 @@ logger = logging.getLogger(__name__)
 
 _ACCOUNT_STATE_EVENTS: dict[str, RiscAccountState] = {
     EVENT_ACCOUNT_DISABLED: RiscAccountState.DISABLED,
-    EVENT_ACCOUNT_PURGED: RiscAccountState.PURGED,
     EVENT_ACCOUNT_ENABLED: RiscAccountState.ENABLED,
 }
 
@@ -52,9 +57,9 @@ def _supersedes_account_state(
     """Decide whether an account-state event may overwrite the stored state.
 
     Google may deliver events late or out of order, so the stored state only
-    moves forward by `iat`. Purge is terminal: nothing reactivates a purged
-    account, and a purge applies regardless of ordering. An `iat` tie goes to
-    `disabled` so ambiguity fails closed.
+    moves forward by `iat`. An `iat` tie goes to `disabled` so ambiguity fails
+    closed. Purge is not a state here: `_purge_account` deletes the user, so
+    later events for that `google_id` find no row and change nothing.
 
     A disabled account comes back only through a newer `account-enabled`
     event. If that event is lost (Google retries failed deliveries, so this
@@ -67,13 +72,10 @@ def _supersedes_account_state(
             risc_account_state = 'enabled',
             risc_account_state_at = NOW(),
             updated_at = NOW()
-        WHERE id = '<user_id>'
-          AND risc_account_state IS DISTINCT FROM 'purged';
+        WHERE id = '<user_id>';
     """
-    if current["risc_account_state"] == RiscAccountState.PURGED:
-        return False
     current_at = current["risc_account_state_at"]
-    if new_state is RiscAccountState.PURGED or current_at is None:
+    if current_at is None:
         return True
     if new_state is RiscAccountState.DISABLED:
         return issued_at >= current_at
@@ -122,6 +124,19 @@ async def _apply_account_state_event(
     )
 
 
+async def _purge_account(conn: AsyncConnection, google_id: str) -> None:
+    """Erase local data for an account Google has permanently deleted.
+
+    Google never reissues a purged `sub`, so nothing can sign in as this user
+    again; keeping their profile, postings, and chat history would only extend
+    exposure. The audit rows stay, unlinked from the account, so `jti` dedupe
+    and event counts survive until retention removes them.
+    """
+    deleted = await delete_user_by_google_id(conn, google_id)
+    await anonymize_risc_events_by_google_id(conn, google_id)
+    logger.info("RISC account-purged erased local account (matched=%s)", deleted)
+
+
 async def apply_risc_event(conn: AsyncConnection, event: RiscEvent) -> None:
     """Persist the event and apply user state changes atomically.
 
@@ -130,8 +145,14 @@ async def apply_risc_event(conn: AsyncConnection, event: RiscEvent) -> None:
     row and the user mutation share one transaction so a failed mutation also
     rolls back the `jti`, letting a retry apply it instead of skipping it as a
     duplicate.
+
+    Expired audit rows are swept in the same transaction. RISC traffic is
+    sparse, so `main.py` also sweeps once at startup.
     """
     async with conn.transaction():
+        await delete_expired_risc_events(
+            conn, retention_days=settings.risc_event_retention_days
+        )
         await _dispatch_risc_event(conn, event)
 
 
@@ -143,7 +164,6 @@ async def _dispatch_risc_event(conn: AsyncConnection, event: RiscEvent) -> None:
         google_id=event.google_id,
         reason=event.reason,
         issued_at=event.issued_at,
-        payload=event.raw_payload,
     )
 
     if not inserted:
@@ -169,6 +189,10 @@ async def _dispatch_risc_event(conn: AsyncConnection, event: RiscEvent) -> None:
             "RISC %s has no subject.sub; audit row stored, no user mutation",
             event.event_type,
         )
+        return
+
+    if event.event_type == EVENT_ACCOUNT_PURGED:
+        await _purge_account(conn, event.google_id)
         return
 
     new_state = _ACCOUNT_STATE_EVENTS.get(event.event_type)

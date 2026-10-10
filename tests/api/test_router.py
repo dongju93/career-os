@@ -995,7 +995,6 @@ def _risc_event(
         google_id=google_id,
         reason=None,
         state=None,
-        raw_payload={"jti": "jti-1", "events": {event_type: {}}},
     )
 
 
