@@ -103,11 +103,17 @@ CREATE TABLE IF NOT EXISTS users (
     picture     TEXT,
     is_active   BOOLEAN  NOT NULL DEFAULT TRUE,
     auth_session_revoked_at TIMESTAMPTZ,
+    risc_account_state      TEXT,
+    risc_account_state_at   TIMESTAMPTZ,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
     CONSTRAINT uq_users_google_id UNIQUE (google_id),
-    CONSTRAINT uq_users_email     UNIQUE (email)
+    CONSTRAINT uq_users_email     UNIQUE (email),
+    CONSTRAINT chk_users_risc_account_state
+        CHECK (risc_account_state IN ('enabled', 'disabled', 'purged')),
+    CONSTRAINT chk_users_risc_account_state_pair
+        CHECK ((risc_account_state IS NULL) = (risc_account_state_at IS NULL))
 );
 """
 
@@ -255,6 +261,8 @@ COMMENT ON TABLE  users          IS 'Google OAuth로 가입한 사용자 계정'
 COMMENT ON COLUMN users.google_id IS 'Google sub claim (고유 사용자 식별자)';
 COMMENT ON COLUMN users.email     IS 'Google 계정 이메일';
 COMMENT ON COLUMN users.auth_session_revoked_at IS '이 시각 이전에 발급된 앱 세션/JWT를 거부하는 RISC 세션 폐기 경계';
+COMMENT ON COLUMN users.risc_account_state IS '마지막으로 적용된 RISC 계정 상태 (enabled | disabled | purged, purged는 종결 상태)';
+COMMENT ON COLUMN users.risc_account_state_at IS 'risc_account_state를 만든 RISC 이벤트의 iat — 이보다 오래된 이벤트는 상태를 바꾸지 못함';
 
 COMMENT ON TABLE  auth_exchange_codes            IS 'OAuth 콜백 직후 발급되는 1회용 단기 코드 (세션 쿠키가 차단된 브라우저를 위한 Bearer 토큰 교환용)';
 COMMENT ON COLUMN auth_exchange_codes.code       IS '무작위 생성된 1회용 교환 코드';

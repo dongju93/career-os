@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from enum import StrEnum
 from typing import TypedDict, cast
 from uuid import UUID
 
@@ -15,6 +16,19 @@ class UserRow(TypedDict):
     picture: str | None
     is_active: bool
     auth_session_revoked_at: datetime | None
+
+
+class RiscAccountState(StrEnum):
+    """Last Google RISC account-state event applied to a user."""
+
+    ENABLED = "enabled"
+    DISABLED = "disabled"
+    PURGED = "purged"
+
+
+class RiscAccountStateRow(TypedDict):
+    risc_account_state: str | None
+    risc_account_state_at: datetime | None
 
 
 _FIND_BY_GOOGLE_ID_SQL = """
@@ -46,9 +60,19 @@ WHERE id = %s
 RETURNING id, google_id, email, name, picture, is_active, auth_session_revoked_at
 """
 
-_SET_ACTIVE_BY_GOOGLE_ID_SQL = """
+_LOCK_RISC_ACCOUNT_STATE_BY_GOOGLE_ID_SQL = """
+SELECT risc_account_state, risc_account_state_at
+FROM users
+WHERE google_id = %s
+FOR UPDATE
+"""
+
+_SET_RISC_ACCOUNT_STATE_BY_GOOGLE_ID_SQL = """
 UPDATE users
-SET is_active = %s, updated_at = NOW()
+SET is_active = %s,
+    risc_account_state = %s,
+    risc_account_state_at = %s,
+    updated_at = NOW()
 WHERE google_id = %s
 RETURNING id, google_id, email, name, picture, is_active, auth_session_revoked_at
 """
@@ -97,11 +121,29 @@ async def upsert_user(
     return cast(UserRow, row)
 
 
-async def set_user_active_by_google_id(
-    conn: AsyncConnection, google_id: str, *, is_active: bool
-) -> UserRow | None:
+async def lock_user_risc_account_state_by_google_id(
+    conn: AsyncConnection, google_id: str
+) -> RiscAccountStateRow | None:
+    """Row-lock the user's RISC account state; must run inside a transaction."""
     async with conn.cursor(row_factory=dict_row) as cur:
-        await cur.execute(_SET_ACTIVE_BY_GOOGLE_ID_SQL, (is_active, google_id))
+        await cur.execute(_LOCK_RISC_ACCOUNT_STATE_BY_GOOGLE_ID_SQL, (google_id,))
+        return cast("RiscAccountStateRow | None", await cur.fetchone())
+
+
+async def set_user_risc_account_state_by_google_id(
+    conn: AsyncConnection,
+    google_id: str,
+    *,
+    state: RiscAccountState,
+    issued_at: datetime,
+) -> UserRow | None:
+    # is_active is derived from the state so the two columns cannot disagree.
+    is_active = state is RiscAccountState.ENABLED
+    async with conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            _SET_RISC_ACCOUNT_STATE_BY_GOOGLE_ID_SQL,
+            (is_active, state.value, issued_at, google_id),
+        )
         return cast("UserRow | None", await cur.fetchone())
 
 

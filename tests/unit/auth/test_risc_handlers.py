@@ -1,10 +1,14 @@
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import cast
 from unittest.mock import AsyncMock
+from uuid import UUID
 
 import pytest
 from psycopg import AsyncConnection
 
 import career_os_api.auth.risc_handlers as handlers_module
+from career_os_api.auth.dependencies import _is_current_user_session
 from career_os_api.auth.risc import (
     EVENT_ACCOUNT_DISABLED,
     EVENT_ACCOUNT_ENABLED,
@@ -16,20 +20,29 @@ from career_os_api.auth.risc import (
     EVENT_VERIFICATION,
     RiscEvent,
 )
+from career_os_api.database.users import (
+    RiscAccountState,
+    RiscAccountStateRow,
+    UserRow,
+)
+
+_GOOGLE_ID = "google-user-1"
+_T0 = 1_700_000_000
 
 
 def _event(
     *,
     event_type: str,
     jti: str = "jti-1",
-    google_id: str | None = "google-user-1",
+    google_id: str | None = _GOOGLE_ID,
     reason: str | None = None,
     state: str | None = None,
+    issued_at: int = _T0,
 ) -> RiscEvent:
     return RiscEvent(
         jti=jti,
         event_type=event_type,
-        issued_at=1_700_000_000,
+        issued_at=issued_at,
         google_id=google_id,
         reason=reason,
         state=state,
@@ -37,90 +50,280 @@ def _event(
     )
 
 
+class _FakeConnection:
+    def __init__(self) -> None:
+        self.transactions = 0
+
+    @asynccontextmanager
+    async def transaction(self):
+        self.transactions += 1
+        yield
+
+
 @pytest.fixture
 def fake_conn() -> AsyncConnection:
-    return cast(AsyncConnection, object())
+    return cast(AsyncConnection, _FakeConnection())
 
 
-@pytest.mark.parametrize(
-    "event_type",
-    [
-        EVENT_ACCOUNT_DISABLED,
-        EVENT_ACCOUNT_PURGED,
-    ],
-)
-async def test_apply_deactivating_events_set_user_inactive(
-    event_type: str,
-    fake_conn: AsyncConnection,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    record = AsyncMock(return_value=True)
-    set_active = AsyncMock(
-        return_value={
-            "id": "00000000-0000-0000-0000-000000000001",
-            "google_id": "google-user-1",
+class _FakeUserStore:
+    """In-memory stand-in for the users/risc_events tables touched by RISC."""
+
+    def __init__(self) -> None:
+        self.seen_jtis: set[str] = set()
+        self.user: UserRow = {
+            "id": UUID("00000000-0000-0000-0000-000000000001"),
+            "google_id": _GOOGLE_ID,
             "email": "x@example.com",
             "name": None,
             "picture": None,
-            "is_active": False,
+            "is_active": True,
+            "auth_session_revoked_at": None,
         }
-    )
-    revoke_sessions = AsyncMock()
-    monkeypatch.setattr(handlers_module, "record_risc_event", record)
-    monkeypatch.setattr(handlers_module, "set_user_active_by_google_id", set_active)
-    monkeypatch.setattr(
-        handlers_module, "revoke_user_sessions_by_google_id", revoke_sessions
-    )
+        self.state: RiscAccountStateRow = {
+            "risc_account_state": None,
+            "risc_account_state_at": None,
+        }
 
+    async def record(self, _conn, *, jti: str, **_kwargs) -> bool:
+        if jti in self.seen_jtis:
+            return False
+        self.seen_jtis.add(jti)
+        return True
+
+    async def lock(self, _conn, google_id: str) -> RiscAccountStateRow | None:
+        return self.state.copy() if google_id == _GOOGLE_ID else None
+
+    async def revoke(self, _conn, google_id: str) -> UserRow | None:
+        if google_id != _GOOGLE_ID:
+            return None
+        self.user["auth_session_revoked_at"] = datetime.now(UTC)
+        return self.user
+
+    async def set_state(
+        self,
+        _conn,
+        google_id: str,
+        *,
+        state: RiscAccountState,
+        issued_at: datetime,
+    ) -> UserRow | None:
+        if google_id != _GOOGLE_ID:
+            return None
+        self.user["is_active"] = state is RiscAccountState.ENABLED
+        self.state = {
+            "risc_account_state": state.value,
+            "risc_account_state_at": issued_at,
+        }
+        return self.user
+
+
+@pytest.fixture
+def store(monkeypatch: pytest.MonkeyPatch) -> _FakeUserStore:
+    fake = _FakeUserStore()
+    monkeypatch.setattr(handlers_module, "record_risc_event", fake.record)
+    monkeypatch.setattr(
+        handlers_module, "lock_user_risc_account_state_by_google_id", fake.lock
+    )
+    monkeypatch.setattr(
+        handlers_module, "revoke_user_sessions_by_google_id", fake.revoke
+    )
+    monkeypatch.setattr(
+        handlers_module, "set_user_risc_account_state_by_google_id", fake.set_state
+    )
+    return fake
+
+
+def _stale_token_iat() -> int:
+    # A credential minted well before any RISC event in these tests is handled.
+    return int(datetime.now(UTC).timestamp()) - 3600
+
+
+# ── Account-state events ─────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("event_type", "expected_state"),
+    [
+        (EVENT_ACCOUNT_DISABLED, RiscAccountState.DISABLED),
+        (EVENT_ACCOUNT_PURGED, RiscAccountState.PURGED),
+    ],
+)
+async def test_deactivating_event_deactivates_and_revokes_atomically(
+    event_type: str,
+    expected_state: RiscAccountState,
+    fake_conn: AsyncConnection,
+    store: _FakeUserStore,
+) -> None:
     await handlers_module.apply_risc_event(fake_conn, _event(event_type=event_type))
 
-    record.assert_awaited_once()
-    set_active.assert_awaited_once_with(fake_conn, "google-user-1", is_active=False)
-    revoke_sessions.assert_not_awaited()
+    assert cast(_FakeConnection, fake_conn).transactions == 1
+    assert store.user["is_active"] is False
+    assert store.user["auth_session_revoked_at"] is not None
+    assert store.state == {
+        "risc_account_state": expected_state.value,
+        "risc_account_state_at": datetime.fromtimestamp(_T0, UTC),
+    }
 
 
-async def test_apply_account_enabled_sets_user_active(
+async def test_enable_after_disable_does_not_revive_pre_disable_credential(
     fake_conn: AsyncConnection,
-    monkeypatch: pytest.MonkeyPatch,
+    store: _FakeUserStore,
 ) -> None:
-    record = AsyncMock(return_value=True)
-    set_active = AsyncMock(return_value=None)
-    revoke_sessions = AsyncMock()
-    monkeypatch.setattr(handlers_module, "record_risc_event", record)
-    monkeypatch.setattr(handlers_module, "set_user_active_by_google_id", set_active)
-    monkeypatch.setattr(
-        handlers_module, "revoke_user_sessions_by_google_id", revoke_sessions
-    )
+    stale_iat = _stale_token_iat()
+    assert _is_current_user_session(store.user, stale_iat)
 
     await handlers_module.apply_risc_event(
-        fake_conn, _event(event_type=EVENT_ACCOUNT_ENABLED)
+        fake_conn, _event(event_type=EVENT_ACCOUNT_DISABLED, jti="d", issued_at=_T0)
+    )
+    await handlers_module.apply_risc_event(
+        fake_conn,
+        _event(event_type=EVENT_ACCOUNT_ENABLED, jti="e", issued_at=_T0 + 60),
     )
 
-    set_active.assert_awaited_once_with(fake_conn, "google-user-1", is_active=True)
-    revoke_sessions.assert_not_awaited()
+    assert store.user["is_active"] is True
+    assert store.state["risc_account_state"] == RiscAccountState.ENABLED
+    assert not _is_current_user_session(store.user, stale_iat)
+    assert _is_current_user_session(store.user, int(datetime.now(UTC).timestamp()) + 1)
+
+
+async def test_out_of_order_enable_older_than_disable_is_ignored(
+    fake_conn: AsyncConnection,
+    store: _FakeUserStore,
+) -> None:
+    await handlers_module.apply_risc_event(
+        fake_conn,
+        _event(event_type=EVENT_ACCOUNT_DISABLED, jti="d", issued_at=_T0 + 60),
+    )
+    await handlers_module.apply_risc_event(
+        fake_conn, _event(event_type=EVENT_ACCOUNT_ENABLED, jti="e", issued_at=_T0)
+    )
+
+    assert store.user["is_active"] is False
+    assert store.state["risc_account_state"] == RiscAccountState.DISABLED
+
+
+async def test_late_disable_older_than_enable_keeps_account_but_revokes(
+    fake_conn: AsyncConnection,
+    store: _FakeUserStore,
+) -> None:
+    stale_iat = _stale_token_iat()
+
+    await handlers_module.apply_risc_event(
+        fake_conn,
+        _event(event_type=EVENT_ACCOUNT_ENABLED, jti="e", issued_at=_T0 + 60),
+    )
+    store.user["auth_session_revoked_at"] = None
+    await handlers_module.apply_risc_event(
+        fake_conn, _event(event_type=EVENT_ACCOUNT_DISABLED, jti="d", issued_at=_T0)
+    )
+
+    assert store.user["is_active"] is True
+    assert store.state["risc_account_state"] == RiscAccountState.ENABLED
+    assert not _is_current_user_session(store.user, stale_iat)
+
+
+async def test_enable_after_purge_is_ignored(
+    fake_conn: AsyncConnection,
+    store: _FakeUserStore,
+) -> None:
+    await handlers_module.apply_risc_event(
+        fake_conn, _event(event_type=EVENT_ACCOUNT_PURGED, jti="p", issued_at=_T0)
+    )
+    await handlers_module.apply_risc_event(
+        fake_conn,
+        _event(event_type=EVENT_ACCOUNT_ENABLED, jti="e", issued_at=_T0 + 60),
+    )
+
+    assert store.user["is_active"] is False
+    assert store.state["risc_account_state"] == RiscAccountState.PURGED
+
+
+async def test_duplicate_enable_jti_is_not_reapplied(
+    fake_conn: AsyncConnection,
+    store: _FakeUserStore,
+) -> None:
+    await handlers_module.apply_risc_event(
+        fake_conn, _event(event_type=EVENT_ACCOUNT_ENABLED, jti="e", issued_at=_T0)
+    )
+    await handlers_module.apply_risc_event(
+        fake_conn,
+        _event(event_type=EVENT_ACCOUNT_DISABLED, jti="d", issued_at=_T0 + 60),
+    )
+    # Google retries the original enable with the same jti.
+    await handlers_module.apply_risc_event(
+        fake_conn, _event(event_type=EVENT_ACCOUNT_ENABLED, jti="e", issued_at=_T0)
+    )
+
+    assert store.user["is_active"] is False
+    assert store.state["risc_account_state"] == RiscAccountState.DISABLED
+
+
+async def test_account_state_event_for_unknown_user_is_noop(
+    fake_conn: AsyncConnection,
+    store: _FakeUserStore,
+) -> None:
+    await handlers_module.apply_risc_event(
+        fake_conn,
+        _event(event_type=EVENT_ACCOUNT_DISABLED, google_id="someone-else"),
+    )
+
+    assert store.user["is_active"] is True
+    assert store.user["auth_session_revoked_at"] is None
+    assert store.state["risc_account_state"] is None
+
+
+_AT = datetime.fromtimestamp(_T0, UTC)
+_LATER = datetime.fromtimestamp(_T0 + 1, UTC)
+_EARLIER = datetime.fromtimestamp(_T0 - 1, UTC)
+
+
+@pytest.mark.parametrize(
+    ("current_state", "new_state", "issued_at", "expected"),
+    [
+        (None, RiscAccountState.ENABLED, _EARLIER, True),
+        (None, RiscAccountState.DISABLED, _EARLIER, True),
+        (RiscAccountState.DISABLED, RiscAccountState.ENABLED, _LATER, True),
+        (RiscAccountState.DISABLED, RiscAccountState.ENABLED, _AT, False),
+        (RiscAccountState.DISABLED, RiscAccountState.ENABLED, _EARLIER, False),
+        (RiscAccountState.ENABLED, RiscAccountState.DISABLED, _AT, True),
+        (RiscAccountState.ENABLED, RiscAccountState.DISABLED, _EARLIER, False),
+        (RiscAccountState.ENABLED, RiscAccountState.PURGED, _EARLIER, True),
+        (RiscAccountState.PURGED, RiscAccountState.ENABLED, _LATER, False),
+        (RiscAccountState.PURGED, RiscAccountState.DISABLED, _LATER, False),
+    ],
+)
+def test_supersedes_account_state(
+    current_state: RiscAccountState | None,
+    new_state: RiscAccountState,
+    issued_at: datetime,
+    expected: bool,
+) -> None:
+    current: RiscAccountStateRow = {
+        "risc_account_state": current_state.value if current_state else None,
+        "risc_account_state_at": _AT if current_state else None,
+    }
+
+    assert (
+        handlers_module._supersedes_account_state(current, new_state, issued_at)
+        is expected
+    )
+
+
+# ── Other events ─────────────────────────────────────────────────────────────
 
 
 async def test_apply_verification_event_is_audit_only(
     fake_conn: AsyncConnection,
-    monkeypatch: pytest.MonkeyPatch,
+    store: _FakeUserStore,
 ) -> None:
-    record = AsyncMock(return_value=True)
-    set_active = AsyncMock()
-    revoke_sessions = AsyncMock()
-    monkeypatch.setattr(handlers_module, "record_risc_event", record)
-    monkeypatch.setattr(handlers_module, "set_user_active_by_google_id", set_active)
-    monkeypatch.setattr(
-        handlers_module, "revoke_user_sessions_by_google_id", revoke_sessions
-    )
-
     await handlers_module.apply_risc_event(
         fake_conn,
         _event(event_type=EVENT_VERIFICATION, google_id=None, state="state-1"),
     )
 
-    record.assert_awaited_once()
-    set_active.assert_not_awaited()
-    revoke_sessions.assert_not_awaited()
+    assert store.seen_jtis == {"jti-1"}
+    assert store.user["auth_session_revoked_at"] is None
+    assert store.state["risc_account_state"] is None
 
 
 @pytest.mark.parametrize(
@@ -133,10 +336,12 @@ async def test_apply_session_token_revocations_revoke_user_sessions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     record = AsyncMock(return_value=True)
-    set_active = AsyncMock()
+    set_state = AsyncMock()
     revoke_sessions = AsyncMock(return_value=None)
     monkeypatch.setattr(handlers_module, "record_risc_event", record)
-    monkeypatch.setattr(handlers_module, "set_user_active_by_google_id", set_active)
+    monkeypatch.setattr(
+        handlers_module, "set_user_risc_account_state_by_google_id", set_state
+    )
     monkeypatch.setattr(
         handlers_module, "revoke_user_sessions_by_google_id", revoke_sessions
     )
@@ -144,73 +349,48 @@ async def test_apply_session_token_revocations_revoke_user_sessions(
     await handlers_module.apply_risc_event(fake_conn, _event(event_type=event_type))
 
     record.assert_awaited_once()
-    revoke_sessions.assert_awaited_once_with(fake_conn, "google-user-1")
-    set_active.assert_not_awaited()
+    revoke_sessions.assert_awaited_once_with(fake_conn, _GOOGLE_ID)
+    set_state.assert_not_awaited()
 
 
 async def test_apply_token_revoked_is_audit_only(
     fake_conn: AsyncConnection,
-    monkeypatch: pytest.MonkeyPatch,
+    store: _FakeUserStore,
 ) -> None:
-    record = AsyncMock(return_value=True)
-    set_active = AsyncMock()
-    revoke_sessions = AsyncMock()
-    monkeypatch.setattr(handlers_module, "record_risc_event", record)
-    monkeypatch.setattr(handlers_module, "set_user_active_by_google_id", set_active)
-    monkeypatch.setattr(
-        handlers_module, "revoke_user_sessions_by_google_id", revoke_sessions
-    )
-
     await handlers_module.apply_risc_event(
         fake_conn,
         _event(event_type=EVENT_TOKEN_REVOKED, google_id=None),
     )
 
-    record.assert_awaited_once()
-    set_active.assert_not_awaited()
-    revoke_sessions.assert_not_awaited()
+    assert store.seen_jtis == {"jti-1"}
+    assert store.user["auth_session_revoked_at"] is None
+    assert store.state["risc_account_state"] is None
 
 
 async def test_apply_duplicate_jti_skips_user_mutation(
     fake_conn: AsyncConnection,
-    monkeypatch: pytest.MonkeyPatch,
+    store: _FakeUserStore,
 ) -> None:
-    record = AsyncMock(return_value=False)  # duplicate
-    set_active = AsyncMock()
-    revoke_sessions = AsyncMock()
-    monkeypatch.setattr(handlers_module, "record_risc_event", record)
-    monkeypatch.setattr(handlers_module, "set_user_active_by_google_id", set_active)
-    monkeypatch.setattr(
-        handlers_module, "revoke_user_sessions_by_google_id", revoke_sessions
-    )
+    store.seen_jtis.add("jti-1")
 
     await handlers_module.apply_risc_event(
         fake_conn, _event(event_type=EVENT_ACCOUNT_DISABLED)
     )
 
-    record.assert_awaited_once()
-    set_active.assert_not_awaited()
-    revoke_sessions.assert_not_awaited()
+    assert store.user["is_active"] is True
+    assert store.user["auth_session_revoked_at"] is None
+    assert store.state["risc_account_state"] is None
 
 
 async def test_apply_subject_less_non_verification_event_skips_user_mutation(
     fake_conn: AsyncConnection,
-    monkeypatch: pytest.MonkeyPatch,
+    store: _FakeUserStore,
 ) -> None:
-    record = AsyncMock(return_value=True)
-    set_active = AsyncMock()
-    revoke_sessions = AsyncMock()
-    monkeypatch.setattr(handlers_module, "record_risc_event", record)
-    monkeypatch.setattr(handlers_module, "set_user_active_by_google_id", set_active)
-    monkeypatch.setattr(
-        handlers_module, "revoke_user_sessions_by_google_id", revoke_sessions
-    )
-
     await handlers_module.apply_risc_event(
         fake_conn,
         _event(event_type=EVENT_ACCOUNT_DISABLED, google_id=None),
     )
 
-    record.assert_awaited_once()
-    set_active.assert_not_awaited()
-    revoke_sessions.assert_not_awaited()
+    assert store.seen_jtis == {"jti-1"}
+    assert store.user["is_active"] is True
+    assert store.state["risc_account_state"] is None

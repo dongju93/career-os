@@ -103,33 +103,69 @@ async def test_update_user_name_executes_sql_with_user_id_and_name() -> None:
 
 
 @pytest.mark.asyncio
-async def test_set_user_active_by_google_id_updates_and_returns_row() -> None:
-    row = make_user_row() | {"is_active": False}
+async def test_lock_user_risc_account_state_by_google_id_selects_for_update() -> None:
+    row = {"risc_account_state": "disabled", "risc_account_state_at": datetime.now(UTC)}
     cursor = FakeCursor(fetchone_results=[row])
     conn = FakeConnection(cursor=cursor)
 
-    result = await users_module.set_user_active_by_google_id(
+    result = await users_module.lock_user_risc_account_state_by_google_id(
         cast(AsyncConnection, conn),
         "google-user-1",
-        is_active=False,
     )
 
     assert result == row
     assert conn.cursor_row_factories == [dict_row]
     assert cursor.execute_calls == [
-        (users_module._SET_ACTIVE_BY_GOOGLE_ID_SQL, (False, "google-user-1")),
+        (users_module._LOCK_RISC_ACCOUNT_STATE_BY_GOOGLE_ID_SQL, ("google-user-1",)),
+    ]
+    assert "FOR UPDATE" in users_module._LOCK_RISC_ACCOUNT_STATE_BY_GOOGLE_ID_SQL
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("state", "expected_is_active"),
+    [
+        (users_module.RiscAccountState.ENABLED, True),
+        (users_module.RiscAccountState.DISABLED, False),
+        (users_module.RiscAccountState.PURGED, False),
+    ],
+)
+async def test_set_user_risc_account_state_derives_is_active_from_state(
+    state: users_module.RiscAccountState,
+    expected_is_active: bool,
+) -> None:
+    issued_at = datetime(2026, 10, 10, tzinfo=UTC)
+    row = make_user_row() | {"is_active": expected_is_active}
+    cursor = FakeCursor(fetchone_results=[row])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await users_module.set_user_risc_account_state_by_google_id(
+        cast(AsyncConnection, conn),
+        "google-user-1",
+        state=state,
+        issued_at=issued_at,
+    )
+
+    assert result == row
+    assert conn.cursor_row_factories == [dict_row]
+    assert cursor.execute_calls == [
+        (
+            users_module._SET_RISC_ACCOUNT_STATE_BY_GOOGLE_ID_SQL,
+            (expected_is_active, state.value, issued_at, "google-user-1"),
+        ),
     ]
 
 
 @pytest.mark.asyncio
-async def test_set_user_active_by_google_id_returns_none_when_unknown() -> None:
+async def test_set_user_risc_account_state_returns_none_when_unknown() -> None:
     cursor = FakeCursor(fetchone_results=[None])
     conn = FakeConnection(cursor=cursor)
 
-    result = await users_module.set_user_active_by_google_id(
+    result = await users_module.set_user_risc_account_state_by_google_id(
         cast(AsyncConnection, conn),
         "missing-id",
-        is_active=True,
+        state=users_module.RiscAccountState.ENABLED,
+        issued_at=datetime.now(UTC),
     )
 
     assert result is None
