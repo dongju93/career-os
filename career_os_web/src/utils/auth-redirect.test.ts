@@ -80,11 +80,9 @@ describe('buildLoginPath', () => {
 });
 
 describe('buildGoogleLoginUrl', () => {
-  it('constructs the OAuth URL with the correct callback', () => {
-    expect(
-      buildGoogleLoginUrl('https://api.example.com', 'https://app.example.com'),
-    ).toBe(
-      'https://api.example.com/v1/auth/google?callback_url=https%3A%2F%2Fapp.example.com%2Fauth%2Fcallback',
+  it('constructs the same-origin OAuth URL with the correct callback', () => {
+    expect(buildGoogleLoginUrl('https://app.example.com')).toBe(
+      'https://app.example.com/v1/auth/google?callback_url=https%3A%2F%2Fapp.example.com%2Fauth%2Fcallback',
     );
   });
 });

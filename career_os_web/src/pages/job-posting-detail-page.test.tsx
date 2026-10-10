@@ -111,7 +111,7 @@ function buildDetailFetchMock(
   artifactHandler: (init?: RequestInit) => ReturnType<typeof jsonResponse>,
 ) {
   return vi.fn(async (input: string, init?: RequestInit) => {
-    if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+    if (input === `/v1/auth/me`) {
       return jsonResponse(
         apiResponse({
           user_id: 'user-1',
@@ -122,11 +122,11 @@ function buildDetailFetchMock(
       );
     }
 
-    if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/agent/artifact`) {
+    if (input === `/v1/agent/artifact`) {
       return artifactHandler(init);
     }
 
-    if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+    if (input === `/v1/job-postings/1`) {
       return jsonResponse(apiResponse(detail));
     }
 
@@ -154,7 +154,7 @@ describe('JobPostingDetailPage', () => {
   it('loads a stored posting detail with the session cookie and renders all populated sections', async () => {
     const detail = buildJobPostingDetail();
     const fetchMock = vi.fn(async (input: string) => {
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+      if (input === `/v1/auth/me`) {
         return jsonResponse(
           apiResponse({
             user_id: 'user-1',
@@ -189,7 +189,7 @@ describe('JobPostingDetailPage', () => {
       screen.getByRole('link', { name: /career-os\.example\.com/i }),
     ).toHaveAttribute('href', 'https://career-os.example.com');
     expect(fetchMock).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`,
+      `/v1/job-postings/1`,
       expect.objectContaining({
         credentials: 'include',
         headers: { 'X-Career-OS-Client': 'web' },
@@ -201,7 +201,7 @@ describe('JobPostingDetailPage', () => {
     const user = userEvent.setup();
     const detail = buildJobPostingDetail();
     const fetchMock = vi.fn(async (input: string) => {
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+      if (input === `/v1/auth/me`) {
         return jsonResponse(
           apiResponse({
             user_id: 'user-1',
@@ -212,22 +212,15 @@ describe('JobPostingDetailPage', () => {
         );
       }
 
-      if (
-        (input as string).startsWith(
-          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups`,
-        )
-      ) {
+      if ((input as string).startsWith(`/v1/job-search-groups`)) {
         return jsonResponse(emptyGroupsResponse);
       }
 
-      if (
-        input ===
-        `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=0&limit=50`
-      ) {
+      if (input === `/v1/job-postings?offset=0&limit=50`) {
         return jsonResponse(apiResponse(buildJobPostingPage(detail)));
       }
 
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+      if (input === `/v1/job-postings/1`) {
         return jsonResponse(apiResponse(detail));
       }
 
@@ -247,7 +240,7 @@ describe('JobPostingDetailPage', () => {
       await screen.findByRole('heading', { name: 'Frontend Engineer' }),
     ).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`,
+      `/v1/job-postings/1`,
       expect.objectContaining({
         credentials: 'include',
         headers: { 'X-Career-OS-Client': 'web' },
@@ -259,7 +252,7 @@ describe('JobPostingDetailPage', () => {
     const user = userEvent.setup();
     const detail = buildJobPostingDetail();
     const fetchMock = vi.fn(async (input: string) => {
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+      if (input === `/v1/auth/me`) {
         return jsonResponse(
           apiResponse({
             user_id: 'user-1',
@@ -270,22 +263,15 @@ describe('JobPostingDetailPage', () => {
         );
       }
 
-      if (
-        (input as string).startsWith(
-          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups`,
-        )
-      ) {
+      if ((input as string).startsWith(`/v1/job-search-groups`)) {
         return jsonResponse(emptyGroupsResponse);
       }
 
-      if (
-        input ===
-        `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=0&limit=50`
-      ) {
+      if (input === `/v1/job-postings?offset=0&limit=50`) {
         return jsonResponse(apiResponse(buildJobPostingPage(detail)));
       }
 
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+      if (input === `/v1/job-postings/1`) {
         return jsonResponse(apiResponse(detail));
       }
 
@@ -311,7 +297,7 @@ describe('JobPostingDetailPage', () => {
     let patchBody: Record<string, unknown> | null = null;
 
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+      if (input === `/v1/auth/me`) {
         return jsonResponse(
           apiResponse({
             user_id: 'user-1',
@@ -322,7 +308,7 @@ describe('JobPostingDetailPage', () => {
         );
       }
 
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+      if (input === `/v1/job-postings/1`) {
         if (init?.method === 'PATCH') {
           patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
           return jsonResponse(
@@ -364,7 +350,7 @@ describe('JobPostingDetailPage', () => {
     const detail = buildJobPostingDetail();
 
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+      if (input === `/v1/auth/me`) {
         return jsonResponse(
           apiResponse({
             user_id: 'user-1',
@@ -375,7 +361,7 @@ describe('JobPostingDetailPage', () => {
         );
       }
 
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+      if (input === `/v1/job-postings/1`) {
         if (init?.method === 'PATCH') {
           return jsonResponse(
             {
@@ -416,7 +402,7 @@ describe('JobPostingDetailPage', () => {
     const detail = buildJobPostingDetail();
     let detailRequestCount = 0;
     const fetchMock = vi.fn(async (input: string) => {
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+      if (input === `/v1/auth/me`) {
         return jsonResponse(
           apiResponse({
             user_id: 'user-1',
@@ -427,7 +413,7 @@ describe('JobPostingDetailPage', () => {
         );
       }
 
-      if (input !== `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+      if (input !== `/v1/job-postings/1`) {
         throw new Error(`Unexpected fetch request: ${input}`);
       }
 
@@ -477,7 +463,7 @@ describe('JobPostingDetailPage', () => {
     let patchBody: Record<string, unknown> | null = null;
 
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+      if (input === `/v1/auth/me`) {
         return jsonResponse(
           apiResponse({
             user_id: 'user-1',
@@ -488,7 +474,7 @@ describe('JobPostingDetailPage', () => {
         );
       }
 
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+      if (input === `/v1/job-postings/1`) {
         if (init?.method === 'PATCH') {
           patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
           return jsonResponse(
@@ -524,7 +510,7 @@ describe('JobPostingDetailPage', () => {
     let patchBody: Record<string, unknown> | null = null;
 
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+      if (input === `/v1/auth/me`) {
         return jsonResponse(
           apiResponse({
             user_id: 'user-1',
@@ -535,7 +521,7 @@ describe('JobPostingDetailPage', () => {
         );
       }
 
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`) {
+      if (input === `/v1/job-postings/1`) {
         if (init?.method === 'PATCH') {
           patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
           return jsonResponse(apiResponse({ ...detail, memo: null }));

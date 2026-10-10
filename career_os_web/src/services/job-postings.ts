@@ -17,7 +17,7 @@ export async function extractJobPosting(
   signal?: AbortSignal,
 ): Promise<JobPostingExtracted> {
   const response = await fetchWithApiRetry(
-    `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/extraction?url=${encodeURIComponent(url)}`,
+    `/v1/job-postings/extraction?url=${encodeURIComponent(url)}`,
     { signal },
     '채용공고 정보를 가져오지 못했습니다.',
   );
@@ -30,7 +30,7 @@ export async function saveJobPosting(
 ): Promise<JobPostingDetail> {
   const body = groupId ? { ...data, group_id: groupId } : data;
   const response = await fetchWithApiRetry(
-    `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings`,
+    `/v1/job-postings`,
     {
       method: 'POST',
       headers: {
@@ -49,7 +49,7 @@ export async function fetchJobPosting(
   signal?: AbortSignal,
 ): Promise<JobPostingDetail> {
   const response = await fetchWithApiRetry(
-    `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/${id}`,
+    `/v1/job-postings/${id}`,
     { signal },
     '채용공고를 불러오지 못했습니다.',
   );
@@ -64,7 +64,7 @@ export async function updateJobPosting(
   patch: JobPostingUpdate,
 ): Promise<JobPostingDetail> {
   const response = await fetchWithApiRetry(
-    `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/${id}`,
+    `/v1/job-postings/${id}`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -81,7 +81,7 @@ export async function fetchJobPostings(
   groupId?: string,
   signal?: AbortSignal,
 ): Promise<JobPostingPage> {
-  let url = `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=${offset}&limit=${limit}`;
+  let url = `/v1/job-postings?offset=${offset}&limit=${limit}`;
   if (groupId) url += `&group_id=${encodeURIComponent(groupId)}`;
   const response = await fetchWithApiRetry(
     url,

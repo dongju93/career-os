@@ -52,13 +52,7 @@ pnpm install
 
 ### 환경 변수
 
-`VITE_API_BASE_URL`은 `.env` 파일이 아니라 `vite.config.ts`의 `define` 블록에 빌드 시 직접 치환됩니다. 로컬 API 서버로 전환하려면 `vite.config.ts` 상단의 주석 처리된 줄을 교체하세요.
-
-```ts
-// vite.config.ts
-const VITE_API_BASE_URL = "https://career-os.fastapicloud.dev"; // Production
-// const VITE_API_BASE_URL = 'http://localhost:8000'; // Local
-```
+API는 항상 같은 출처의 상대 경로 `/v1/*`로 호출합니다. 운영에서는 `vercel.json`의 rewrite가 `/v1/*`를 `https://career-os.fastapicloud.dev`로 프록시하고(CDN 캐시 비활성화), 로컬에서는 `vite.config.ts`의 `server.proxy`가 `API_PROXY_TARGET`(`http://localhost:8000`)으로 프록시합니다. 덕분에 세션 쿠키가 1st-party HttpOnly 쿠키로 동작합니다. 로컬 로그인은 백엔드를 `DEV=true`로 실행해야 OAuth `redirect_uri`가 `http://localhost:5173/v1/auth/google/callback`을 가리킵니다.
 
 ChatKit 임베드를 사용하려면 `career_os_web/`에 `.env.local` 파일을 생성합니다.
 
@@ -82,11 +76,11 @@ pnpm dev
 | ---------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **React 19**                 | UI 라이브러리            | 컴포넌트 기반 UI 작성 모델이 안정적이고 생태계가 가장 넓음. SPA를 시작점으로 두면서도 이후 라우팅, 테스트, 최적화 도구 선택지가 풍부함                                       |
 | **TypeScript 7**             | 정적 타입 시스템         | 화면 상태와 API 응답 계약을 컴파일 단계에서 검증할 수 있어 리팩터링 안정성이 높음. native preview는 기존 TypeScript 생태계를 유지하면서 타입 체크 성능 개선을 기대할 수 있음 |
-| **Vite 8**                   | 개발 서버·번들러         | 개발 서버 시작과 HMR이 빠르고 설정 부담이 낮음. React, StyleX, Vitest 등 현대 프론트엔드 도구와의 플러그인 생태계가 성숙함                                             |
+| **Vite 8**                   | 개발 서버·번들러         | 개발 서버 시작과 HMR이 빠르고 설정 부담이 낮음. React, StyleX, Vitest 등 현대 프론트엔드 도구와의 플러그인 생태계가 성숙함                                                   |
 | **Mantine 9**                | UI 컴포넌트 라이브러리   | 접근성, 테마, 기본 컴포넌트 품질을 빠르게 확보할 수 있음. 모든 UI를 직접 구현하는 비용을 줄이면서도 커스터마이징 여지가 충분함                                               |
 | **React Router 7**           | 클라이언트 사이드 라우팅 | React 생태계의 대표 라우터로 SPA 라우팅부터 확장된 데이터·프레임워크 모드까지 선택지가 넓음. URL 기반 화면 구조와 인증 흐름을 명확히 표현하기 좋음                           |
 | **Zustand 5**                | 전역 상태 관리           | Provider 중심 구조 없이 hook 기반으로 필요한 전역 상태만 작게 관리할 수 있음. Redux 계열보다 보일러플레이트가 적고 Context보다 렌더링 제어가 쉬움                            |
-| **StyleX**           | 컴파일 기반 스타일링      | 타입이 있는 스타일 선언과 조건부 조합으로 UI를 구성함. Vite 플러그인이 정적 CSS를 생성하며 공통 컴포넌트는 `xstyle`로 속성별 덮어쓰기를 지원함                                 |
+| **StyleX**                   | 컴파일 기반 스타일링     | 타입이 있는 스타일 선언과 조건부 조합으로 UI를 구성함. Vite 플러그인이 정적 CSS를 생성하며 공통 컴포넌트는 `xstyle`로 속성별 덮어쓰기를 지원함                               |
 | **React Compiler**           | 빌드 타임 최적화         | React 팀이 제공하는 자동 메모이제이션 경로라 수동 최적화 코드의 남용을 줄일 수 있음. React 19 기반 프로젝트에서 장기적인 최적화 방향과 잘 맞음                               |
 | **Biome**                    | 린터·포매터              | 포맷터와 린터를 한 도구로 통합해 ESLint·Prettier 조합보다 설정과 실행 흐름이 단순함. Rust 기반이라 대규모 검사에서도 피드백이 빠름                                           |
 | **Vitest + Testing Library** | 단위·컴포넌트 테스트     | Vite 기반 프로젝트와 설정·변환 파이프라인을 공유해 테스트 환경 구성이 단순함. Testing Library는 구현 세부보다 사용자 관점 검증을 유도함                                      |
@@ -239,7 +233,7 @@ pnpm build
 ```
 pages/          ← 라우트 단위 화면 (상태 조합 + 사용자 이벤트 처리)
   └─ services/  ← API 호출 (fetchWithApiRetry → Zod 검증 → ApiError 변환)
-  └─ store/     ← 인증 전역 상태 (Zustand, localStorage 영속)
+  └─ store/     ← 인증 전역 상태 (Zustand, 메모리 전용)
   └─ utils/     ← 순수 유틸 (날짜 포맷, URL 안전성 검사 등)
 components/     ← 레이아웃 + 재사용 UI 프리미티브
 ```
@@ -247,8 +241,8 @@ components/     ← 레이아웃 + 재사용 UI 프리미티브
 ### 인증
 
 - 백엔드 세션 쿠키 기반. `fetchWithApiRetry`가 모든 요청에 `X-Career-OS-Client: web` 헤더를 자동으로 추가합니다.
-- Bearer 토큰 fallback: OAuth 콜백 리다이렉트의 `login_code`를 `exchangeLoginCode()`가 `/auth/token`으로 교환해 메모리(모듈 변수)에만 보관합니다. 세션 쿠키가 크로스 사이트 차단(Safari ITP, Chrome 서드파티 쿠키 차단 등)으로 유실되는 브라우저에서도 로그인을 완료시키기 위한 용도이며, 페이지를 새로고침하면 사라집니다 (의도적으로 영속화하지 않음 — `localStorage`에 저장하지 않습니다).
-- `useAuthStore`는 현재 사용자 정보를 `localStorage`에 영속합니다. 로그아웃 시 반드시 `resetAuthStore()`를 호출해 메모리 상태와 스토리지를 함께 초기화하세요 (`clearAuth()`는 메모리만 초기화합니다).
+- 세션 쿠키는 HttpOnly라 JavaScript에서 읽을 수 없고, 앱은 어떤 인증 토큰도 보관하지 않습니다 (`Authorization` 헤더 미사용).
+- `useAuthStore`는 사용자 정보를 메모리에만 보관합니다. 새로고침 시 `ProtectedRoute`가 `/v1/auth/me`로 세션을 다시 확인합니다. 이전 릴리스가 남긴 `career-os-access-token`/`career-os-auth` `localStorage` 키는 모듈 로드 시 삭제됩니다. 로그아웃 시 `resetAuthStore()`를 호출하세요.
 
 ### API 응답 검증
 

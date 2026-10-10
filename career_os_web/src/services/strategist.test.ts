@@ -49,7 +49,7 @@ describe('generateApplicationPlan', () => {
     expect(result.summary).toBe('백엔드 직무 위주로 정리한 지원 전략입니다.');
     expect(result.items[0].fit_score).toBe(82);
     expect(fetchMock).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_API_BASE_URL}/v1/agent/plan`,
+      `/v1/agent/plan`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ group_id: null, focus: '백엔드 위주로' }),
@@ -160,7 +160,7 @@ describe('generateArtifact', () => {
     expect(result.title).toBe('백엔드 엔지니어 이력서 불릿');
     expect(result.artifact_type).toBe('resume_bullets');
     expect(fetchMock).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_API_BASE_URL}/v1/agent/artifact`,
+      `/v1/agent/artifact`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({

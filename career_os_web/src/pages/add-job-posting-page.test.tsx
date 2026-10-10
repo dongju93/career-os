@@ -120,7 +120,7 @@ describe('AddJobPostingPage', () => {
     let saveInit: RequestInit | undefined;
 
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+      if (input === `/v1/auth/me`) {
         return jsonResponse(
           apiResponse({
             user_id: 'user-1',
@@ -131,22 +131,18 @@ describe('AddJobPostingPage', () => {
         );
       }
 
-      if (
-        (input as string).startsWith(
-          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups`,
-        )
-      ) {
+      if ((input as string).startsWith(`/v1/job-search-groups`)) {
         return jsonResponse(emptyGroupsResponse);
       }
 
       if (
         input ===
-        `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/extraction?url=${encodeURIComponent(postingUrl)}`
+        `/v1/job-postings/extraction?url=${encodeURIComponent(postingUrl)}`
       ) {
         return jsonResponse(apiResponse(extractedPosting));
       }
 
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings`) {
+      if (input === `/v1/job-postings`) {
         saveInit = init;
         savedPayload = JSON.parse(String(init?.body)) as JobPostingExtracted;
         return jsonResponse(savedDetailResponse);
@@ -208,7 +204,7 @@ describe('AddJobPostingPage', () => {
     let extractionCalls = 0;
 
     const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+      if (input === `/v1/auth/me`) {
         return jsonResponse(
           apiResponse({
             user_id: 'user-1',
@@ -219,11 +215,7 @@ describe('AddJobPostingPage', () => {
         );
       }
 
-      if (
-        (input as string).startsWith(
-          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups`,
-        )
-      ) {
+      if ((input as string).startsWith(`/v1/job-search-groups`)) {
         return jsonResponse(emptyGroupsResponse);
       }
 
@@ -284,7 +276,7 @@ describe('AddJobPostingPage', () => {
     const user = userEvent.setup();
 
     const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+      if (input === `/v1/auth/me`) {
         return jsonResponse(
           apiResponse({
             user_id: 'user-1',
@@ -294,11 +286,7 @@ describe('AddJobPostingPage', () => {
           }),
         );
       }
-      if (
-        (input as string).startsWith(
-          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups`,
-        )
-      ) {
+      if ((input as string).startsWith(`/v1/job-search-groups`)) {
         return jsonResponse(emptyGroupsResponse);
       }
       if (input.includes('/v1/job-postings/extraction?url=')) {

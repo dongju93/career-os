@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('redirects unauthenticated visitors to the login page', async ({
   page,
 }) => {
-  await page.route('https://career-os.fastapicloud.dev/v1/auth/me', (route) =>
+  await page.route('**/v1/auth/me', (route) =>
     route.fulfill({
       status: 401,
       contentType: 'application/problem+json',

@@ -1,10 +1,4 @@
 import { create } from 'zustand';
-import {
-  createJSONStorage,
-  persist,
-  type StateStorage,
-} from 'zustand/middleware';
-import { setAccessToken } from '../services/api-client';
 
 export interface AuthUser {
   id: string;
@@ -31,77 +25,33 @@ function createInitialState() {
   };
 }
 
-const fallbackStorage = new Map<string, string>();
+// Earlier releases persisted a 7-day Bearer token and the user's profile
+// (email, name, picture) to localStorage. Auth now lives only in the HttpOnly
+// session cookie and the user is held in memory, re-fetched from /v1/auth/me
+// on load (ProtectedRoute), so scrub those leftovers from returning browsers.
+const LEGACY_AUTH_STORAGE_KEYS = ['career-os-access-token', 'career-os-auth'];
 
-function getAuthStorage(): StateStorage {
-  if (typeof window === 'undefined') {
-    return {
-      getItem: (name) => fallbackStorage.get(name) ?? null,
-      removeItem: (name) => {
-        fallbackStorage.delete(name);
-      },
-      setItem: (name, value) => {
-        fallbackStorage.set(name, value);
-      },
-    };
-  }
-
+function removeLegacyAuthStorage() {
+  if (typeof window === 'undefined') return;
   try {
-    const storage = window.localStorage;
-    storage.setItem('__career-os-auth-test__', '1');
-    storage.removeItem('__career-os-auth-test__');
-
-    return {
-      getItem: (name) => storage.getItem(name),
-      removeItem: (name) => {
-        storage.removeItem(name);
-      },
-      setItem: (name, value) => {
-        storage.setItem(name, value);
-      },
-    };
+    for (const key of LEGACY_AUTH_STORAGE_KEYS) {
+      window.localStorage.removeItem(key);
+    }
   } catch {
-    return {
-      getItem: (name) => fallbackStorage.get(name) ?? null,
-      removeItem: (name) => {
-        fallbackStorage.delete(name);
-      },
-      setItem: (name, value) => {
-        fallbackStorage.set(name, value);
-      },
-    };
+    // Storage unavailable (private mode, blocked): nothing was persisted.
   }
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      ...createInitialState(),
-      setAuth: (user) => set({ user, error: null, isLoading: false }),
-      clearAuth: () => set(createInitialState()),
-      setLoading: (isLoading) => set({ isLoading }),
-      setError: (error) => set({ error, isLoading: false }),
-    }),
-    {
-      name: 'career-os-auth',
-      partialize: (state) => ({ user: state.user }),
-      storage: createJSONStorage(getAuthStorage),
-      version: 1,
-      migrate: (persisted) => {
-        const state = persisted as Partial<Pick<AuthState, 'user'>>;
-        return { user: state.user ?? null };
-      },
-    },
-  ),
-);
+removeLegacyAuthStorage();
+
+export const useAuthStore = create<AuthState>()((set) => ({
+  ...createInitialState(),
+  setAuth: (user) => set({ user, error: null, isLoading: false }),
+  clearAuth: () => set(createInitialState()),
+  setLoading: (isLoading) => set({ isLoading }),
+  setError: (error) => set({ error, isLoading: false }),
+}));
 
 export function resetAuthStore() {
   useAuthStore.setState(createInitialState());
-  useAuthStore.persist.clearStorage();
-  // Drop the Bearer fallback token too — this clears both the in-memory copy
-  // and its persisted localStorage entry (see api-client.ts). Otherwise a
-  // logged-out user's next request (or a later reload) would silently
-  // re-authenticate via the still-valid token even though the session was
-  // cleared.
-  setAccessToken(null);
 }

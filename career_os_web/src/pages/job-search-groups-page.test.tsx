@@ -68,7 +68,7 @@ function makeGroupsFetchMock(
   extras?: (input: string, init?: RequestInit) => Promise<unknown> | null,
 ) {
   return vi.fn(async (input: string, init?: RequestInit) => {
-    if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+    if (input === `/v1/auth/me`) {
       return jsonResponse(authMeBody);
     }
 
@@ -143,10 +143,7 @@ describe('JobSearchGroupsPage', () => {
     };
 
     const fetchMock = makeGroupsFetchMock([activeGroup], [], (input, init) => {
-      if (
-        input === `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups` &&
-        init?.method === 'POST'
-      ) {
+      if (input === `/v1/job-search-groups` && init?.method === 'POST') {
         postBody = JSON.parse(String(init.body)) as Record<string, unknown>;
         return Promise.resolve(jsonResponse(groupDetailResponse(newGroup)));
       }
@@ -218,8 +215,7 @@ describe('JobSearchGroupsPage', () => {
 
     const fetchMock = makeGroupsFetchMock([activeGroup], [], (input, init) => {
       if (
-        input ===
-          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups/${ACTIVE_GROUP_ID}` &&
+        input === `/v1/job-search-groups/${ACTIVE_GROUP_ID}` &&
         init?.method === 'PATCH'
       ) {
         patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
@@ -277,8 +273,7 @@ describe('JobSearchGroupsPage', () => {
 
     const fetchMock = makeGroupsFetchMock([activeGroup], [], (input, init) => {
       if (
-        input ===
-          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups/${ACTIVE_GROUP_ID}` &&
+        input === `/v1/job-search-groups/${ACTIVE_GROUP_ID}` &&
         init?.method === 'DELETE'
       ) {
         deleteCallCount += 1;

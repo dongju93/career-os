@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { resetAuthStore, useAuthStore } from './auth-store';
 
 const sampleUser = {
@@ -82,5 +82,29 @@ describe('resetAuthStore', () => {
     expect(state.user).toBeNull();
     expect(state.isLoading).toBe(false);
     expect(state.error).toBeNull();
+  });
+});
+
+describe('auth storage', () => {
+  it('keeps the user out of localStorage', () => {
+    useAuthStore.getState().setAuth(sampleUser);
+
+    expect(JSON.stringify({ ...window.localStorage })).not.toContain(
+      sampleUser.email,
+    );
+  });
+
+  it('removes the token and profile left by earlier releases on load', async () => {
+    window.localStorage.setItem('career-os-access-token', 'old-jwt');
+    window.localStorage.setItem(
+      'career-os-auth',
+      JSON.stringify({ state: { user: sampleUser }, version: 1 }),
+    );
+
+    vi.resetModules();
+    await import('./auth-store');
+
+    expect(window.localStorage.getItem('career-os-access-token')).toBeNull();
+    expect(window.localStorage.getItem('career-os-auth')).toBeNull();
   });
 });

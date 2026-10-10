@@ -1,11 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  fetchWithApiRetry,
-  setAccessToken,
-  withCareerOsSessionHeaders,
-} from './api-client';
-
-const ACCESS_TOKEN_STORAGE_KEY = 'career-os-access-token';
+import { describe, expect, it, vi } from 'vitest';
+import { fetchWithApiRetry, withCareerOsSessionHeaders } from './api-client';
 
 function okResponse(body: unknown = {}) {
   return {
@@ -249,44 +243,14 @@ describe('withCareerOsSessionHeaders', () => {
   });
 });
 
-describe('access token persistence', () => {
-  afterEach(() => {
-    setAccessToken(null);
-    vi.resetModules();
-  });
-
-  it('persists the token to localStorage and attaches it as a Bearer header', async () => {
-    setAccessToken('login-token');
-    expect(window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)).toBe(
-      'login-token',
-    );
-
+describe('credentials', () => {
+  it('never sends an Authorization header (session cookie is the only credential)', async () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse());
     vi.stubGlobal('fetch', fetchMock);
     await fetchWithApiRetry('/test', undefined, 'failed');
 
-    expect(fetchMock.mock.calls[0][1].headers).toMatchObject({
-      Authorization: 'Bearer login-token',
-    });
-  });
-
-  it('clears the persisted token when set to null (logout)', () => {
-    setAccessToken('login-token');
-    setAccessToken(null);
-    expect(window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)).toBeNull();
-  });
-
-  it('rehydrates a persisted token on module load so it survives a reload', async () => {
-    window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, 'persisted-token');
-    vi.resetModules();
-    const { fetchWithApiRetry: reloadedFetch } = await import('./api-client');
-
-    const fetchMock = vi.fn().mockResolvedValue(okResponse());
-    vi.stubGlobal('fetch', fetchMock);
-    await reloadedFetch('/test', undefined, 'failed');
-
-    expect(fetchMock.mock.calls[0][1].headers).toMatchObject({
-      Authorization: 'Bearer persisted-token',
-    });
+    const headers = new Headers(fetchMock.mock.calls[0][1].headers);
+    expect(headers.has('Authorization')).toBe(false);
+    expect(headers.get('X-Career-OS-Client')).toBe('web');
   });
 });

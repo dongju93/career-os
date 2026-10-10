@@ -149,7 +149,7 @@ describe('saveJobPosting', () => {
     await saveJobPosting(extracted);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings`,
+      `/v1/job-postings`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify(extracted),
@@ -168,7 +168,7 @@ describe('saveJobPosting', () => {
     await saveJobPosting(extracted, groupId);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings`,
+      `/v1/job-postings`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ ...extracted, group_id: groupId }),
@@ -226,7 +226,7 @@ describe('updateJobPosting', () => {
 
     expect(result.application_status).toBe('interviewing');
     expect(fetchMock).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`,
+      `/v1/job-postings/1`,
       expect.objectContaining({
         method: 'PATCH',
         body: JSON.stringify({ application_status: 'interviewing' }),
@@ -247,7 +247,7 @@ describe('updateJobPosting', () => {
 
     expect(result.memo).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings/1`,
+      `/v1/job-postings/1`,
       expect.objectContaining({
         method: 'PATCH',
         body: JSON.stringify({ memo: null }),
@@ -298,7 +298,7 @@ describe('fetchJobPostings', () => {
     await fetchJobPostings(50, 50);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=50&limit=50`,
+      `/v1/job-postings?offset=50&limit=50`,
       expect.any(Object),
     );
   });

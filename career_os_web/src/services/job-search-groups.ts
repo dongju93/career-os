@@ -24,7 +24,7 @@ export async function fetchJobSearchGroups(
   const qs = query.size > 0 ? `?${query.toString()}` : '';
 
   const response = await fetchWithApiRetry(
-    `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups${qs}`,
+    `/v1/job-search-groups${qs}`,
     { signal },
     '구직 활동 그룹 목록을 불러오지 못했습니다.',
   );
@@ -38,7 +38,7 @@ export async function createJobSearchGroup(data: {
   memo?: string | null;
 }): Promise<JobSearchGroup> {
   const response = await fetchWithApiRetry(
-    `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups`,
+    `/v1/job-search-groups`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -54,7 +54,7 @@ export async function fetchJobSearchGroup(
   signal?: AbortSignal,
 ): Promise<JobSearchGroup> {
   const response = await fetchWithApiRetry(
-    `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups/${id}`,
+    `/v1/job-search-groups/${id}`,
     { signal },
     '구직 활동 그룹을 불러오지 못했습니다.',
   );
@@ -71,7 +71,7 @@ export async function updateJobSearchGroup(
   },
 ): Promise<JobSearchGroup> {
   const response = await fetchWithApiRetry(
-    `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups/${id}`,
+    `/v1/job-search-groups/${id}`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -84,7 +84,7 @@ export async function updateJobSearchGroup(
 
 export async function deleteJobSearchGroup(id: string): Promise<void> {
   await fetchWithApiRetry(
-    `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups/${id}`,
+    `/v1/job-search-groups/${id}`,
     { method: 'DELETE' },
     '구직 활동 그룹을 삭제하지 못했습니다.',
   );
