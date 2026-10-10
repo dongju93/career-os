@@ -71,6 +71,10 @@ entrypoint = "main:career_os"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+filterwarnings = [
+    # Suppress spurious import-time warnings from openai-chatkit 1.6.5 subclassing its own deprecated BoxBase.
+    'ignore:^Direct usage of named widget classes is deprecated[.]:DeprecationWarning:^abc$',
+]
 
 [tool.pyrefly]
 project-includes = ["**/*.py*", "**/*.ipynb"]
