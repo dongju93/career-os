@@ -210,7 +210,7 @@ career_os = FastAPI(
     servers=_production_servers,
 )
 
-career_os.add_middleware(
+career_os.add_middleware(  # noqa: S8414
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
