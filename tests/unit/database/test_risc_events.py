@@ -1,4 +1,3 @@
-import json
 from typing import cast
 
 import pytest
@@ -47,7 +46,6 @@ async def test_record_risc_event_inserts_and_returns_true() -> None:
         google_id="google-user-1",
         reason="hijacking",
         issued_at=1_700_000_000,
-        payload={"iss": "https://accounts.google.com"},
     )
 
     assert inserted is True
@@ -60,7 +58,6 @@ async def test_record_risc_event_inserts_and_returns_true() -> None:
         "google-user-1",
         "hijacking",
         1_700_000_000,
-        json.dumps({"iss": "https://accounts.google.com"}, ensure_ascii=False),
     )
 
 
@@ -76,7 +73,34 @@ async def test_record_risc_event_returns_false_on_duplicate() -> None:
         google_id=None,
         reason=None,
         issued_at=1_700_000_000,
-        payload={},
     )
 
     assert inserted is False
+
+
+@pytest.mark.asyncio
+async def test_anonymize_risc_events_by_google_id_unlinks_audit_rows() -> None:
+    cursor = FakeCursor()
+    conn = FakeConnection(cursor=cursor)
+
+    await risc_events_module.anonymize_risc_events_by_google_id(
+        cast(AsyncConnection, conn), "google-user-1"
+    )
+
+    assert cursor.execute_calls == [
+        (risc_events_module._ANONYMIZE_BY_GOOGLE_ID_SQL, ("google-user-1",)),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_delete_expired_risc_events_uses_retention_window() -> None:
+    cursor = FakeCursor()
+    conn = FakeConnection(cursor=cursor)
+
+    await risc_events_module.delete_expired_risc_events(
+        cast(AsyncConnection, conn), retention_days=90
+    )
+
+    assert cursor.execute_calls == [
+        (risc_events_module._DELETE_EXPIRED_SQL, (90,)),
+    ]

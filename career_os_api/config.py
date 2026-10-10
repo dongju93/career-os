@@ -52,7 +52,9 @@ class Settings(BaseSettings):
     # Google OAuth — required
     google_client_id: str
     google_client_secret: str
-    redirect_uri: str = "https://career-os.fastapicloud.dev/v1/auth/google/callback"
+    # Must go through the frontend's same-origin `/v1/*` proxy so the session
+    # cookie set during the OAuth `state` round trip is first-party.
+    redirect_uri: str = "https://career-os-sigma.vercel.app/v1/auth/google/callback"
     # Fallback destination when the session-stored callback_url is missing
     # (e.g. when the session cookie is lost across the OAuth round trip on
     # mobile browsers with strict cross-site cookie policies).
@@ -65,12 +67,12 @@ class Settings(BaseSettings):
         "http://localhost:5173",
     ]
 
-    # JWT — required
+    # Session cookie signing key — required
     secret_key: str
 
-    # JWT tunables
-    jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
+    # Signed session cookie lifetime; enforced server-side by the signature's
+    # timestamp, not only by the browser's Max-Age.
+    session_expire_minutes: int = 60 * 24 * 7  # 7 days
 
     # Google RISC (Cross-Account Protection) — Security Event Token receiver
     # The SET's `aud` claim must match this value. Google sets `aud` to the
@@ -84,6 +86,9 @@ class Settings(BaseSettings):
     # Accept SETs whose `iat` is at most this far in the future (clock skew).
     google_risc_max_iat_skew_seconds: int = 60 * 5  # 5 minutes
     google_risc_http_timeout_seconds: float = 10.0
+    # `risc_events` audit rows older than this are deleted (M-07). Must exceed
+    # Google's redelivery window, since a swept row no longer dedupes its `jti`.
+    risc_event_retention_days: int = Field(default=90, ge=1)
 
     # Redis — optional; rate limiting is silently disabled (fail-open) when unset.
     redis_url: str | None = None
@@ -135,7 +140,8 @@ class Settings(BaseSettings):
     def _apply_local_overrides(self) -> Settings:
         if self.environment == "local":
             if "redirect_uri" not in self.model_fields_set:
-                self.redirect_uri = "http://localhost:8000/v1/auth/google/callback"
+                # Vite dev server proxies /v1 to the local API (see vite.config.ts).
+                self.redirect_uri = "http://localhost:5173/v1/auth/google/callback"
             if "frontend_url" not in self.model_fields_set:
                 self.frontend_url = "http://localhost:5173"
         return self

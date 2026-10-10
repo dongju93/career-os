@@ -1,6 +1,6 @@
 """API-level tests for PATCH /v1/job-postings/{job_id} (application status).
 
-FakePool + Bearer-JWT pattern from test_router.py; update_job_posting_fields is
+FakePool + session-cookie pattern from test_router.py; update_job_posting_fields is
 monkeypatched on the router module so no real database is touched.
 """
 
@@ -16,9 +16,9 @@ from psycopg.errors import UniqueViolation
 
 import career_os_api.router as app_module
 import main as main_module
-from career_os_api.auth.jwt import create_access_token
 from career_os_api.constants import API_V1
 from career_os_api.database.job_postings import TargetGroupNotFoundError
+from tests.session_auth import make_session_auth_headers
 
 API_PREFIX = f"/{API_V1}"
 
@@ -103,8 +103,7 @@ def current_user(fake_pool: FakePool) -> dict:
 
 @pytest.fixture
 def auth_headers(current_user: dict) -> dict[str, str]:
-    token = create_access_token(data={"sub": str(current_user["id"])})
-    return {"Authorization": f"Bearer {token}"}
+    return make_session_auth_headers(current_user["id"])
 
 
 @pytest.fixture

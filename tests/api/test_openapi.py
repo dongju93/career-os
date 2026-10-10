@@ -39,9 +39,10 @@ def test_openapi_exposes_complete_api_metadata() -> None:
             )
 
 
-def test_openapi_documents_problem_detail_errors_and_auth_scheme() -> None:
+def test_openapi_documents_problem_detail_errors_without_bearer_auth() -> None:
     schema = career_os.openapi()
-    assert "BearerAuth" in schema["components"]["securitySchemes"]
+    assert "/v1/auth/token" not in schema["paths"]
+    assert "BearerAuth" not in schema.get("components", {}).get("securitySchemes", {})
     assert "ProblemDetail" in schema["components"]["schemas"]
     assert "ValidationProblemDetail" in schema["components"]["schemas"]
 

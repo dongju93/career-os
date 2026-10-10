@@ -21,8 +21,6 @@ function apiResponse<T>(data: T) {
   return { status: 200, message: 'ok', data };
 }
 
-const BASE = import.meta.env.VITE_API_BASE_URL;
-
 const authMeBody = apiResponse({
   user_id: 'user-1',
   email: 'user@example.com',
@@ -153,10 +151,10 @@ function makeFetchMock(options: {
   ) => ReturnType<typeof jsonResponse>;
 }) {
   return vi.fn(async (input: string, init?: RequestInit) => {
-    if (input === `${BASE}/v1/auth/me`) {
+    if (input === `/v1/auth/me`) {
       return jsonResponse(authMeBody);
     }
-    if (input === `${BASE}/v1/profile`) {
+    if (input === `/v1/profile`) {
       return options.profile === 'notfound'
         ? jsonResponse(profileNotFound, 404)
         : jsonResponse(apiResponse(options.profile));
@@ -171,15 +169,12 @@ function makeFetchMock(options: {
         }),
       );
     }
-    if (input === `${BASE}/v1/agent/plan` && init?.method === 'POST') {
+    if (input === `/v1/agent/plan` && init?.method === 'POST') {
       if (!options.planHandler) throw new Error('unexpected plan call');
       return options.planHandler(init);
     }
     // Confirming a proposed action issues PATCH /v1/job-postings/{id}.
-    if (
-      input.startsWith(`${BASE}/v1/job-postings/`) &&
-      init?.method === 'PATCH'
-    ) {
+    if (input.startsWith(`/v1/job-postings/`) && init?.method === 'PATCH') {
       if (!options.patchHandler) throw new Error('unexpected patch call');
       return options.patchHandler(input, init);
     }
@@ -366,7 +361,7 @@ describe('StrategistPage', () => {
     await waitFor(() => {
       expect(patchBody).toEqual({ application_status: 'applied' });
     });
-    expect(patchUrl).toBe(`${BASE}/v1/job-postings/12`);
+    expect(patchUrl).toBe(`/v1/job-postings/12`);
     // The card collapses to its applied state.
     expect(await screen.findByText('적용됨')).toBeInTheDocument();
   });

@@ -1,5 +1,7 @@
 import uuid
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from hashlib import sha256
 from typing import cast
 
 import pytest
@@ -34,9 +36,13 @@ class FakeConnection:
         self._cursor = cursor
         self.cursor_row_factories: list[object] = []
 
-    def cursor(self, *, row_factory):
+    def cursor(self, *, row_factory=None):
         self.cursor_row_factories.append(row_factory)
         return self._cursor
+
+    @asynccontextmanager
+    async def transaction(self):
+        yield
 
 
 def make_user_row(*, user_id=None) -> dict:
@@ -103,33 +109,68 @@ async def test_update_user_name_executes_sql_with_user_id_and_name() -> None:
 
 
 @pytest.mark.asyncio
-async def test_set_user_active_by_google_id_updates_and_returns_row() -> None:
-    row = make_user_row() | {"is_active": False}
+async def test_lock_user_risc_account_state_by_google_id_selects_for_update() -> None:
+    row = {"risc_account_state": "disabled", "risc_account_state_at": datetime.now(UTC)}
     cursor = FakeCursor(fetchone_results=[row])
     conn = FakeConnection(cursor=cursor)
 
-    result = await users_module.set_user_active_by_google_id(
+    result = await users_module.lock_user_risc_account_state_by_google_id(
         cast(AsyncConnection, conn),
         "google-user-1",
-        is_active=False,
     )
 
     assert result == row
     assert conn.cursor_row_factories == [dict_row]
     assert cursor.execute_calls == [
-        (users_module._SET_ACTIVE_BY_GOOGLE_ID_SQL, (False, "google-user-1")),
+        (users_module._LOCK_RISC_ACCOUNT_STATE_BY_GOOGLE_ID_SQL, ("google-user-1",)),
+    ]
+    assert "FOR UPDATE" in users_module._LOCK_RISC_ACCOUNT_STATE_BY_GOOGLE_ID_SQL
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("state", "expected_is_active"),
+    [
+        (users_module.RiscAccountState.ENABLED, True),
+        (users_module.RiscAccountState.DISABLED, False),
+    ],
+)
+async def test_set_user_risc_account_state_derives_is_active_from_state(
+    state: users_module.RiscAccountState,
+    expected_is_active: bool,
+) -> None:
+    issued_at = datetime(2026, 10, 10, tzinfo=UTC)
+    row = make_user_row() | {"is_active": expected_is_active}
+    cursor = FakeCursor(fetchone_results=[row])
+    conn = FakeConnection(cursor=cursor)
+
+    result = await users_module.set_user_risc_account_state_by_google_id(
+        cast(AsyncConnection, conn),
+        "google-user-1",
+        state=state,
+        issued_at=issued_at,
+    )
+
+    assert result == row
+    assert conn.cursor_row_factories == [dict_row]
+    assert cursor.execute_calls == [
+        (
+            users_module._SET_RISC_ACCOUNT_STATE_BY_GOOGLE_ID_SQL,
+            (expected_is_active, state.value, issued_at, "google-user-1"),
+        ),
     ]
 
 
 @pytest.mark.asyncio
-async def test_set_user_active_by_google_id_returns_none_when_unknown() -> None:
+async def test_set_user_risc_account_state_returns_none_when_unknown() -> None:
     cursor = FakeCursor(fetchone_results=[None])
     conn = FakeConnection(cursor=cursor)
 
-    result = await users_module.set_user_active_by_google_id(
+    result = await users_module.set_user_risc_account_state_by_google_id(
         cast(AsyncConnection, conn),
         "missing-id",
-        is_active=True,
+        state=users_module.RiscAccountState.ENABLED,
+        issued_at=datetime.now(UTC),
     )
 
     assert result is None
@@ -168,9 +209,39 @@ async def test_revoke_user_sessions_by_google_id_returns_none_when_unknown() -> 
 
 
 @pytest.mark.asyncio
+async def test_delete_user_by_google_id_returns_true_when_row_deleted() -> None:
+    user_id = uuid.uuid7()
+    cursor = FakeCursor(fetchone_results=[(user_id,)])
+    conn = FakeConnection(cursor=cursor)
+
+    deleted = await users_module.delete_user_by_google_id(
+        cast(AsyncConnection, conn),
+        "google-user-1",
+    )
+
+    assert deleted is True
+    assert cursor.execute_calls == [
+        (users_module._DELETE_BY_GOOGLE_ID_SQL, ("google-user-1",)),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_delete_user_by_google_id_returns_false_when_unknown() -> None:
+    cursor = FakeCursor(fetchone_results=[None])
+    conn = FakeConnection(cursor=cursor)
+
+    deleted = await users_module.delete_user_by_google_id(
+        cast(AsyncConnection, conn),
+        "missing-id",
+    )
+
+    assert deleted is False
+
+
+@pytest.mark.asyncio
 async def test_upsert_user_executes_sql_and_returns_row() -> None:
     row = make_user_row()
-    cursor = FakeCursor(fetchone_results=[row])
+    cursor = FakeCursor(fetchone_results=[None, row])
     conn = FakeConnection(cursor=cursor)
 
     result = await users_module.upsert_user(
@@ -182,9 +253,59 @@ async def test_upsert_user_executes_sql_and_returns_row() -> None:
     )
 
     assert result == row
-    assert conn.cursor_row_factories == [dict_row]
-    sql, params = cursor.execute_calls[0]
+    assert conn.cursor_row_factories == [None, dict_row]
+    assert cursor.execute_calls[0][0] == users_module._LOCK_GOOGLE_SUBJECT_SQL
+    assert cursor.execute_calls[1] == (
+        users_module._FIND_PURGED_GOOGLE_SUBJECT_SQL,
+        (sha256(b"google-user-1").hexdigest(),),
+    )
+    sql, params = cursor.execute_calls[2]
     assert sql == users_module._UPSERT_SQL
     assert params is not None
     assert isinstance(params[0], uuid.UUID)
     assert params[1:] == ("google-user-1", "user@example.com", "Career OS User", None)
+
+
+async def test_upsert_user_rejects_purged_subject_before_writing_user() -> None:
+    cursor = FakeCursor(fetchone_results=[{"exists": 1}])
+    conn = FakeConnection(cursor=cursor)
+
+    with pytest.raises(users_module.GoogleSubjectPurgedError):
+        await users_module.upsert_user(
+            cast(AsyncConnection, conn), "google-user-1", "x@example.com", None, None
+        )
+
+    assert len(cursor.execute_calls) == 2
+    assert all(sql != users_module._UPSERT_SQL for sql, _ in cursor.execute_calls)
+
+
+async def test_purge_marker_uses_same_subject_lock_and_only_stores_hash() -> None:
+    cursor = FakeCursor()
+    conn = FakeConnection(cursor=cursor)
+    digest = sha256(b"google-user-1").digest()
+
+    await users_module.record_google_subject_purge(
+        cast(AsyncConnection, conn), "google-user-1"
+    )
+
+    assert cursor.execute_calls == [
+        (
+            users_module._LOCK_GOOGLE_SUBJECT_SQL,
+            (int.from_bytes(digest[:8], signed=True),),
+        ),
+        (users_module._RECORD_PURGED_GOOGLE_SUBJECT_SQL, (digest.hex(),)),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_revoke_user_sessions_moves_boundary_for_user_id() -> None:
+    cursor = FakeCursor()
+    conn = FakeConnection(cursor=cursor)
+    user_id = uuid.uuid7()
+
+    await users_module.revoke_user_sessions(cast(AsyncConnection, conn), user_id)
+
+    assert cursor.execute_calls == [
+        (users_module._REVOKE_SESSIONS_BY_ID_SQL, (user_id,)),
+    ]
+    assert "auth_session_revoked_at = NOW()" in users_module._REVOKE_SESSIONS_BY_ID_SQL

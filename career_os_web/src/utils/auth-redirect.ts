@@ -48,8 +48,8 @@ export function buildLoginPath(
   return query ? `/login?${query}` : '/login';
 }
 
-export function buildGoogleLoginUrl(apiBaseUrl: string, appOrigin: string) {
-  const loginUrl = new URL('/v1/auth/google', apiBaseUrl);
+export function buildGoogleLoginUrl(appOrigin: string) {
+  const loginUrl = new URL('/v1/auth/google', appOrigin);
   loginUrl.searchParams.set('callback_url', `${appOrigin}/auth/callback`);
 
   return loginUrl.toString();

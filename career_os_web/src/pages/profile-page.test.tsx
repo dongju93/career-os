@@ -60,10 +60,10 @@ describe('ProfilePage', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: string) => {
-        if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        if (input === `/v1/auth/me`) {
           return jsonResponse(authMeBody);
         }
-        if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/profile`) {
+        if (input === `/v1/profile`) {
           return jsonResponse(profileNotFound, 404);
         }
         throw new Error(`Unexpected fetch: ${input}`);
@@ -82,10 +82,10 @@ describe('ProfilePage', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: string) => {
-        if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        if (input === `/v1/auth/me`) {
           return jsonResponse(authMeBody);
         }
-        if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/profile`) {
+        if (input === `/v1/profile`) {
           return jsonResponse(apiResponse(existingProfile));
         }
         throw new Error(`Unexpected fetch: ${input}`);
@@ -111,10 +111,10 @@ describe('ProfilePage', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: string, init?: RequestInit) => {
-        if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        if (input === `/v1/auth/me`) {
           return jsonResponse(authMeBody);
         }
-        if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/profile`) {
+        if (input === `/v1/profile`) {
           if (init?.method === 'PUT') {
             putBody = JSON.parse(String(init.body)) as Record<string, unknown>;
             return jsonResponse(
@@ -165,10 +165,10 @@ describe('ProfilePage', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: string, init?: RequestInit) => {
-        if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        if (input === `/v1/auth/me`) {
           return jsonResponse(authMeBody);
         }
-        if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/profile`) {
+        if (input === `/v1/profile`) {
           if (init?.method === 'PUT') {
             return jsonResponse(
               {
@@ -204,10 +204,10 @@ describe('ProfilePage', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: string, init?: RequestInit) => {
-        if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+        if (input === `/v1/auth/me`) {
           return jsonResponse(authMeBody);
         }
-        if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/profile`) {
+        if (input === `/v1/profile`) {
           if (init?.method === 'PUT') {
             putAttempted = true;
             return jsonResponse(apiResponse(existingProfile));

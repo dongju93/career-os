@@ -60,24 +60,6 @@ class UpdateCurrentUserRequest(BaseModel):
         return v.strip()
 
 
-class LoginCodeExchangeRequest(BaseModel):
-    login_code: Annotated[
-        str,
-        Field(
-            min_length=1,
-            max_length=200,
-            description="OAuth callback URL에서 받은 일회용 로그인 교환 코드",
-        ),
-    ]
-
-
-class AccessTokenResponse(BaseModel):
-    access_token: str = Field(description="API 호출에 사용할 Bearer access token")
-    token_type: Literal["bearer"] = Field(
-        default="bearer", description="인증 토큰 타입"
-    )
-
-
 # ── Job Postings ──────────────────────────────────────────────────────────────
 
 

@@ -75,7 +75,7 @@ describe('Career OS Web app shell', () => {
 
   it('redirects the root route to saved job postings and loads the page data', async () => {
     const fetchMock = vi.fn(async (input: string) => {
-      if (input === 'https://career-os.fastapicloud.dev/v1/auth/me') {
+      if (input === '/v1/auth/me') {
         return {
           ok: true,
           json: async () =>
@@ -108,7 +108,7 @@ describe('Career OS Web app shell', () => {
     ).toHaveAttribute('href', 'https://www.wanted.co.kr/wd/1');
     expect(router.state.location.pathname).toBe('/job-postings');
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://career-os.fastapicloud.dev/v1/job-postings?offset=0&limit=50',
+      '/v1/job-postings?offset=0&limit=50',
       expect.objectContaining({
         credentials: 'include',
         headers: { 'X-Career-OS-Client': 'web' },
@@ -119,7 +119,7 @@ describe('Career OS Web app shell', () => {
   it('shows the API error code page when job postings stay unavailable', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn(async (input: string) => {
-      if (input === 'https://career-os.fastapicloud.dev/v1/auth/me') {
+      if (input === '/v1/auth/me') {
         return {
           ok: true,
           json: async () =>
@@ -172,7 +172,7 @@ describe('Career OS Web app shell', () => {
 
   it('shows a meaningful rate limit code for 429 job posting responses', async () => {
     const fetchMock = vi.fn(async (input: string) => {
-      if (input === 'https://career-os.fastapicloud.dev/v1/auth/me') {
+      if (input === '/v1/auth/me') {
         return {
           ok: true,
           json: async () =>
@@ -223,7 +223,7 @@ describe('Career OS Web app shell', () => {
   it('logs the user out and returns to the login page', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === 'https://career-os.fastapicloud.dev/v1/auth/me') {
+      if (input === '/v1/auth/me') {
         return {
           ok: true,
           json: async () =>
@@ -261,14 +261,11 @@ describe('Career OS Web app shell', () => {
         name: /^Career OS$/i,
       }),
     ).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://career-os.fastapicloud.dev/v1/auth/logout',
-      {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'X-Career-OS-Client': 'web' },
-      },
-    );
+    expect(fetchMock).toHaveBeenCalledWith('/v1/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'X-Career-OS-Client': 'web' },
+    });
     expect(useAuthStore.getState().user).toBeNull();
     const meCalls = fetchMock.mock.calls.filter((args) =>
       args[0].includes('/v1/auth/me'),

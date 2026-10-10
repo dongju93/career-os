@@ -4,13 +4,19 @@ import stylex from '@stylexjs/unplugin';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-const VITE_API_BASE_URL = 'https://career-os.fastapicloud.dev'; // Production
-// const VITE_API_BASE_URL = 'http://localhost:8000'; // Local
+// The SPA calls the API same-origin at /v1/* so the HttpOnly session cookie
+// is first-party; production does this with the Vercel rewrite in vercel.json.
+// Locally, run the API with DEV=true so its OAuth redirect_uri also points at
+// this dev server (http://localhost:5173/v1/auth/google/callback).
+const API_PROXY_TARGET = 'http://localhost:8000';
 
 // https://vite.dev/config/
 export default defineConfig({
-  define: {
-    'import.meta.env.VITE_API_BASE_URL': JSON.stringify(VITE_API_BASE_URL),
+  server: {
+    proxy: {
+      // `vite preview` reuses server.proxy by default.
+      '/v1': { target: API_PROXY_TARGET, changeOrigin: true },
+    },
   },
   resolve: {
     alias: {

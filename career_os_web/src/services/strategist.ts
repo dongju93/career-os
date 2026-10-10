@@ -21,7 +21,7 @@ export async function generateApplicationPlan(
   signal?: AbortSignal,
 ): Promise<ApplicationPlan> {
   const response = await fetchWithApiRetry(
-    `${import.meta.env.VITE_API_BASE_URL}/v1/agent/plan`,
+    `/v1/agent/plan`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -48,7 +48,7 @@ export async function generateArtifact(
   signal?: AbortSignal,
 ): Promise<ApplicationArtifact> {
   const response = await fetchWithApiRetry(
-    `${import.meta.env.VITE_API_BASE_URL}/v1/agent/artifact`,
+    `/v1/agent/artifact`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

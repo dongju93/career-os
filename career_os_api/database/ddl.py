@@ -103,11 +103,17 @@ CREATE TABLE IF NOT EXISTS users (
     picture     TEXT,
     is_active   BOOLEAN  NOT NULL DEFAULT TRUE,
     auth_session_revoked_at TIMESTAMPTZ,
+    risc_account_state      TEXT,
+    risc_account_state_at   TIMESTAMPTZ,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
     CONSTRAINT uq_users_google_id UNIQUE (google_id),
-    CONSTRAINT uq_users_email     UNIQUE (email)
+    CONSTRAINT uq_users_email     UNIQUE (email),
+    CONSTRAINT chk_users_risc_account_state
+        CHECK (risc_account_state IN ('enabled', 'disabled')),
+    CONSTRAINT chk_users_risc_account_state_pair
+        CHECK ((risc_account_state IS NULL) = (risc_account_state_at IS NULL))
 );
 """
 
@@ -126,23 +132,6 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 );
 """
 
-CREATE_AUTH_EXCHANGE_CODES_TABLE = """
-CREATE TABLE IF NOT EXISTS auth_exchange_codes (
-    code        TEXT         PRIMARY KEY,
-    user_id     UUID         NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    expires_at  TIMESTAMPTZ  NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_auth_exchange_codes_expires_at
-    ON auth_exchange_codes (expires_at);
-
--- FK to users(id) ON DELETE CASCADE requires an index on user_id so
--- cascade-deletes do not scan the full table.
-CREATE INDEX IF NOT EXISTS idx_auth_exchange_codes_user_id
-    ON auth_exchange_codes (user_id);
-"""
-
 CREATE_RISC_EVENTS_TABLE = """
 CREATE TABLE IF NOT EXISTS risc_events (
     id          BIGINT  GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -151,10 +140,16 @@ CREATE TABLE IF NOT EXISTS risc_events (
     google_id   TEXT,
     reason      TEXT,
     issued_at   TIMESTAMPTZ  NOT NULL,
-    payload     JSONB        NOT NULL,
     received_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
     CONSTRAINT uq_risc_events_jti UNIQUE (jti)
+);
+"""
+
+CREATE_PURGED_GOOGLE_SUBJECTS_TABLE = """
+CREATE TABLE IF NOT EXISTS purged_google_subjects (
+    subject_hash TEXT PRIMARY KEY
+        CHECK (subject_hash ~ '^[0-9a-f]{64}$')
 );
 """
 
@@ -254,18 +249,17 @@ COMMENT ON COLUMN user_profiles.summary            IS '자유 형식 커리어 �
 COMMENT ON TABLE  users          IS 'Google OAuth로 가입한 사용자 계정';
 COMMENT ON COLUMN users.google_id IS 'Google sub claim (고유 사용자 식별자)';
 COMMENT ON COLUMN users.email     IS 'Google 계정 이메일';
-COMMENT ON COLUMN users.auth_session_revoked_at IS '이 시각 이전에 발급된 앱 세션/JWT를 거부하는 RISC 세션 폐기 경계';
+COMMENT ON COLUMN users.auth_session_revoked_at IS '이 시각 이전에 발급된 앱 세션을 거부하는 세션 폐기 경계 (RISC 이벤트 또는 로그아웃 시 갱신)';
+COMMENT ON COLUMN users.risc_account_state IS '마지막으로 적용된 RISC 계정 상태 (enabled | disabled). account-purged는 상태가 아니라 사용자 행과 소유 데이터를 삭제함';
+COMMENT ON COLUMN users.risc_account_state_at IS 'risc_account_state를 만든 RISC 이벤트의 iat — 이보다 오래된 이벤트는 상태를 바꾸지 못함';
 
-COMMENT ON TABLE  auth_exchange_codes            IS 'OAuth 콜백 직후 발급되는 1회용 단기 코드 (세션 쿠키가 차단된 브라우저를 위한 Bearer 토큰 교환용)';
-COMMENT ON COLUMN auth_exchange_codes.code       IS '무작위 생성된 1회용 교환 코드';
-COMMENT ON COLUMN auth_exchange_codes.expires_at IS '이 시각 이후 코드는 교환 불가 (기본 60초 TTL)';
-
-COMMENT ON TABLE  risc_events            IS 'Google RISC(Cross-Account Protection) Security Event Token 수신 이력';
+COMMENT ON TABLE  risc_events            IS 'Google RISC(Cross-Account Protection) Security Event Token 수신 이력 (처리에 필요한 클레임만 저장, RISC_EVENT_RETENTION_DAYS 경과 시 삭제)';
 COMMENT ON COLUMN risc_events.jti        IS 'SET JWT의 jti 클레임 (중복 전송 방지용 고유 ID)';
 COMMENT ON COLUMN risc_events.event_type IS 'RISC 이벤트 타입 URI';
-COMMENT ON COLUMN risc_events.google_id  IS '대상 Google 사용자 ID (subject.sub, verification 이벤트는 NULL)';
+COMMENT ON COLUMN risc_events.google_id  IS '대상 Google 사용자 ID (subject.sub, verification 이벤트 또는 purge로 익명화된 행은 NULL)';
 COMMENT ON COLUMN risc_events.issued_at  IS 'SET JWT의 iat (발급 시각)';
-COMMENT ON COLUMN risc_events.payload    IS '검증을 통과한 SET JWT의 원본 클레임 전체';
+
+COMMENT ON TABLE purged_google_subjects IS '영구 삭제된 Google subject의 SHA-256 지문. 사용자 삭제 및 RISC 감사 이력 보존 기간과 독립적으로 재가입을 차단함';
 
 COMMENT ON TABLE  job_search_groups          IS '사용자의 구직 활동 라운드 그룹';
 COMMENT ON COLUMN job_search_groups.ended_at IS 'NULL = 진행 중; NOT NULL = 종료된 구직 활동';
@@ -279,11 +273,11 @@ COMMENT ON COLUMN job_search_groups.memo     IS '구직 활동 관련 자유 메
 
 async def _apply_schema(conn: AsyncConnection) -> None:
     await conn.execute(CREATE_USERS_TABLE)
-    await conn.execute(CREATE_AUTH_EXCHANGE_CODES_TABLE)
     await conn.execute(CREATE_USER_PROFILES_TABLE)
     await conn.execute(CREATE_JOB_SEARCH_GROUPS_TABLE)
     await conn.execute(CREATE_JOB_POSTINGS_TABLE)
     await conn.execute(CREATE_RISC_EVENTS_TABLE)
+    await conn.execute(CREATE_PURGED_GOOGLE_SUBJECTS_TABLE)
     await conn.execute(CREATE_CHATKIT_THREADS_TABLE)
     await conn.execute(CREATE_CHATKIT_ITEMS_TABLE)
     await conn.execute(CREATE_INDEXES)

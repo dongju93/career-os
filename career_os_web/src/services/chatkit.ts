@@ -1,7 +1,4 @@
-import {
-  withAccessTokenHeader,
-  withCareerOsSessionHeaders,
-} from './api-client';
+import { withCareerOsSessionHeaders } from './api-client';
 
 /**
  * OpenAI-hosted script that registers the `<openai-chatkit>` custom element
@@ -62,12 +59,14 @@ export function loadChatKitScript(): Promise<void> {
 }
 
 /**
- * Absolute URL of the backend ChatKit endpoint. ChatKit posts its streaming
- * protocol here; the backend owns session creation, so the client never
- * requests a `client_secret`.
+ * Absolute URL of the backend ChatKit endpoint, on this app's own origin (the
+ * `/v1/*` proxy) so the HttpOnly session cookie applies. Kept absolute because
+ * the URL is handed to ChatKit's embedded component rather than resolved by
+ * this document. ChatKit posts its streaming protocol here; the backend owns
+ * session creation, so the client never requests a `client_secret`.
  */
 export function getChatKitApiUrl(): string {
-  return `${import.meta.env.VITE_API_BASE_URL}/v1/chatkit`;
+  return new URL('/v1/chatkit', window.location.origin).toString();
 }
 
 /**
@@ -81,9 +80,8 @@ export function getChatKitDomainKey(): string {
 
 /**
  * Fetch wrapper passed to ChatKit's `api.fetch`. It reuses the app's session
- * auth (cookie + `X-Career-OS-Client: web`, with the Bearer token fallback for
- * browsers that block the cross-site session cookie) but deliberately does
- * NOT go through `fetchWithApiRetry`: ChatKit responses are streamed, must not
+ * auth (same-origin HttpOnly cookie + `X-Career-OS-Client: web`) but
+ * deliberately does NOT go through `fetchWithApiRetry`: ChatKit responses are streamed, must not
  * be retried, and are not the `ApiResponse` envelope that Zod schemas validate.
  */
 export async function chatKitFetch(
@@ -93,6 +91,6 @@ export async function chatKitFetch(
   return fetch(input, {
     ...init,
     credentials: init?.credentials ?? 'include',
-    headers: withCareerOsSessionHeaders(withAccessTokenHeader(init?.headers)),
+    headers: withCareerOsSessionHeaders(init?.headers),
   });
 }

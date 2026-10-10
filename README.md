@@ -72,7 +72,7 @@ SECRET_KEY=<충분히 긴 임의 문자열>
 # 로컬 개발 시 — DEV=true 하나로 redirect_uri와 frontend_url을 함께 오버라이드
 DEV=true
 # 또는 개별 설정
-# REDIRECT_URI=http://localhost:8000/v1/auth/google/callback
+# REDIRECT_URI=http://localhost:5173/v1/auth/google/callback  # Vite dev 서버의 /v1 프록시 경유
 
 # 선택 — 미설정 시 사용량 제한 비활성화(fail-open)
 REDIS_URL=redis://localhost:6379/0
@@ -153,7 +153,7 @@ API 문서: `http://localhost:8000/v1/docs`
 
 ## 기능
 
-- **Google OAuth 로그인** — 브라우저용 세션 쿠키 인증, 서버 발급 Bearer 토큰 fallback 지원
+- **Google OAuth 로그인** — 프론트엔드 동일 출처 `/v1` 프록시를 통한 HttpOnly 세션 쿠키 인증 (토큰을 브라우저 스크립트에 노출하지 않음)
 - **Google Cross-Account Protection** — RISC Security Event Token 검증·기록, 세션/토큰 폐기 이벤트 반영
 - **구직 활동 그룹 관리** — 구직 라운드 생성·조회·수정·종료·삭제, 진행/종료 상태 필터링, 최초 로그인 시 기본 그룹 자동 생성
 - **채용 공고 추출** — 사람인·원티드 URL을 입력하면 OpenAI로 구조화된 데이터 반환
@@ -178,19 +178,18 @@ OAuth 로그인으로 저장되는 사용자 계정 정보와 Google Cross-Accou
 
 ## API 엔드포인트
 
-모든 엔드포인트는 `/v1` 접두사를 사용합니다. 보호된 엔드포인트는 브라우저 세션 쿠키와 `X-Career-OS-Client: web` 헤더 또는 `Authorization: Bearer <token>` 헤더가 필요합니다.
+모든 엔드포인트는 `/v1` 접두사를 사용합니다. 보호된 엔드포인트는 HttpOnly 세션 쿠키와 `X-Career-OS-Client: web` 헤더가 필요합니다.
 
 | 메서드   | 경로                            | 인증 | 설명                                                                                                                                            |
 | -------- | ------------------------------- | :--: | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET`    | `/`                             |      | 헬스체크                                                                                                                                        |
 | `GET`    | `/health/db`                    |      | DB 연결 확인                                                                                                                                    |
 | `GET`    | `/auth/google`                  |      | Google 로그인 시작 (`?callback_url=` 지원)                                                                                                      |
-| `GET`    | `/auth/google/callback`         |      | OAuth 콜백, 세션 발급 + 1회용 `login_code` 리다이렉트                                                                                          |
-| `POST`   | `/auth/token`                   |      | `login_code`를 Bearer 토큰으로 교환 (세션 쿠키가 차단된 브라우저용 fallback)                                                                    |
+| `GET`    | `/auth/google/callback`         |      | OAuth 콜백, HttpOnly 세션 쿠키 발급 후 프론트엔드로 리다이렉트                                                                                  |
 | `POST`   | `/auth/google/risc`             |      | Google RISC 보안 이벤트 수신                                                                                                                    |
 | `GET`    | `/auth/me`                      |  ✓   | 현재 사용자 조회                                                                                                                                |
 | `PATCH`  | `/auth/me`                      |  ✓   | 사용자 이름 수정                                                                                                                                |
-| `POST`   | `/auth/logout`                  |  ✓   | 로그아웃                                                                                                                                        |
+| `POST`   | `/auth/logout`                  |  ✓   | 로그아웃 — 해당 사용자의 기존 세션을 서버에서 모두 폐기(모든 기기 로그아웃)                                                                     |
 | `POST`   | `/chatkit`                      |  ✓   | AI 어시스턴트 채팅; 스트리밍 SSE 또는 JSON; 분당 30회·일별 500회 제한; `CHATKIT_ENABLED=false` 시 404                                           |
 | `GET`    | `/job-postings`                 |  ✓   | 저장된 공고 목록 (`offset`, `limit`, 선택 `group_id`)                                                                                           |
 | `GET`    | `/job-postings/extraction?url=` |  ✓   | URL에서 공고 추출 (저장 안 함)                                                                                                                  |

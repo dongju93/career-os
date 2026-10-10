@@ -96,12 +96,7 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
     storeRedirectPath(nextPath);
-    window.location.assign(
-      buildGoogleLoginUrl(
-        import.meta.env.VITE_API_BASE_URL,
-        window.location.origin,
-      ),
-    );
+    window.location.assign(buildGoogleLoginUrl(window.location.origin));
   }
 
   return (

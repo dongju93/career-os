@@ -12,7 +12,7 @@ export async function fetchUserProfile(
 ): Promise<UserProfile | null> {
   try {
     const response = await fetchWithApiRetry(
-      `${import.meta.env.VITE_API_BASE_URL}/v1/profile`,
+      `/v1/profile`,
       { signal },
       '프로필을 불러오지 못했습니다.',
     );
@@ -32,7 +32,7 @@ export async function saveUserProfile(
   data: UserProfileUpsert,
 ): Promise<UserProfile> {
   const response = await fetchWithApiRetry(
-    `${import.meta.env.VITE_API_BASE_URL}/v1/profile`,
+    `/v1/profile`,
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

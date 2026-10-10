@@ -100,7 +100,7 @@ describe('saveUserProfile', () => {
 
     expect(result.headline).toBe('5년 차 백엔드 엔지니어');
     expect(fetchMock).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_API_BASE_URL}/v1/profile`,
+      `/v1/profile`,
       expect.objectContaining({
         method: 'PUT',
         body: JSON.stringify(upsert),

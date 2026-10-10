@@ -73,7 +73,7 @@ describe('JobPostingsPage', () => {
     const user = userEvent.setup();
     let requestCount = 0;
     const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
-      if (input === `${import.meta.env.VITE_API_BASE_URL}/v1/auth/me`) {
+      if (input === `/v1/auth/me`) {
         return jsonResponse(
           apiResponse({
             user_id: 'user-1',
@@ -84,18 +84,11 @@ describe('JobPostingsPage', () => {
         );
       }
 
-      if (
-        (input as string).startsWith(
-          `${import.meta.env.VITE_API_BASE_URL}/v1/job-search-groups`,
-        )
-      ) {
+      if ((input as string).startsWith(`/v1/job-search-groups`)) {
         return jsonResponse(emptyGroupsResponse);
       }
 
-      if (
-        input !==
-        `${import.meta.env.VITE_API_BASE_URL}/v1/job-postings?offset=0&limit=50`
-      ) {
+      if (input !== `/v1/job-postings?offset=0&limit=50`) {
         throw new Error(`Unexpected fetch request: ${input}`);
       }
 
