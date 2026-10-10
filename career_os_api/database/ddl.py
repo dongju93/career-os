@@ -146,6 +146,13 @@ CREATE TABLE IF NOT EXISTS risc_events (
 );
 """
 
+CREATE_PURGED_GOOGLE_SUBJECTS_TABLE = """
+CREATE TABLE IF NOT EXISTS purged_google_subjects (
+    subject_hash TEXT PRIMARY KEY
+        CHECK (subject_hash ~ '^[0-9a-f]{64}$')
+);
+"""
+
 CREATE_CHATKIT_THREADS_TABLE = """
 CREATE TABLE IF NOT EXISTS chatkit_threads (
     id          TEXT        PRIMARY KEY,
@@ -252,6 +259,8 @@ COMMENT ON COLUMN risc_events.event_type IS 'RISC 이벤트 타입 URI';
 COMMENT ON COLUMN risc_events.google_id  IS '대상 Google 사용자 ID (subject.sub, verification 이벤트 또는 purge로 익명화된 행은 NULL)';
 COMMENT ON COLUMN risc_events.issued_at  IS 'SET JWT의 iat (발급 시각)';
 
+COMMENT ON TABLE purged_google_subjects IS '영구 삭제된 Google subject의 SHA-256 지문. 사용자 삭제 및 RISC 감사 이력 보존 기간과 독립적으로 재가입을 차단함';
+
 COMMENT ON TABLE  job_search_groups          IS '사용자의 구직 활동 라운드 그룹';
 COMMENT ON COLUMN job_search_groups.ended_at IS 'NULL = 진행 중; NOT NULL = 종료된 구직 활동';
 COMMENT ON COLUMN job_search_groups.memo     IS '구직 활동 관련 자유 메모';
@@ -268,6 +277,7 @@ async def _apply_schema(conn: AsyncConnection) -> None:
     await conn.execute(CREATE_JOB_SEARCH_GROUPS_TABLE)
     await conn.execute(CREATE_JOB_POSTINGS_TABLE)
     await conn.execute(CREATE_RISC_EVENTS_TABLE)
+    await conn.execute(CREATE_PURGED_GOOGLE_SUBJECTS_TABLE)
     await conn.execute(CREATE_CHATKIT_THREADS_TABLE)
     await conn.execute(CREATE_CHATKIT_ITEMS_TABLE)
     await conn.execute(CREATE_INDEXES)

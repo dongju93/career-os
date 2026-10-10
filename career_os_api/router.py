@@ -52,6 +52,7 @@ from career_os_api.database.job_search_groups import (
 from career_os_api.database.retry import run_database_operation
 from career_os_api.database.user_profiles import get_user_profile, upsert_user_profile
 from career_os_api.database.users import (
+    GoogleSubjectPurgedError,
     revoke_user_sessions,
     update_user_name,
     upsert_user,
@@ -319,7 +320,10 @@ async def google_callback(request: Request) -> RedirectResponse:
                 await create_initial_group(conn, user["id"])
             return user
 
-    user = await run_database_operation(request.app.state.pool, operation)
+    try:
+        user = await run_database_operation(request.app.state.pool, operation)
+    except GoogleSubjectPurgedError:
+        return _oauth_failure_redirect(request, target)
 
     request.session.clear()
     request.session["user_id"] = str(user["id"])

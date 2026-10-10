@@ -87,6 +87,7 @@ class _FakeUserStore:
         self.delete_calls: list[str] = []
         self.anonymized_google_ids: list[str] = []
         self.retention_days_swept: list[int] = []
+        self.purged_subjects: set[str] = set()
 
     def _has_user(self, google_id: str) -> bool:
         return google_id == _GOOGLE_ID and not self.deleted
@@ -98,11 +99,15 @@ class _FakeUserStore:
         return True
 
     async def delete_user(self, _conn, google_id: str) -> bool:
+        assert google_id in self.purged_subjects
         self.delete_calls.append(google_id)
         if not self._has_user(google_id):
             return False
         self.deleted = True
         return True
+
+    async def mark_purged(self, _conn, google_id: str) -> None:
+        self.purged_subjects.add(google_id)
 
     async def anonymize(self, _conn, google_id: str) -> None:
         self.anonymized_google_ids.append(google_id)
@@ -143,6 +148,9 @@ def store(monkeypatch: pytest.MonkeyPatch) -> _FakeUserStore:
     monkeypatch.setattr(handlers_module, "record_risc_event", fake.record)
     monkeypatch.setattr(handlers_module, "delete_expired_risc_events", fake.sweep)
     monkeypatch.setattr(handlers_module, "delete_user_by_google_id", fake.delete_user)
+    monkeypatch.setattr(
+        handlers_module, "record_google_subject_purge", fake.mark_purged
+    )
     monkeypatch.setattr(
         handlers_module, "anonymize_risc_events_by_google_id", fake.anonymize
     )
@@ -251,6 +259,7 @@ async def test_account_purged_deletes_user_and_anonymizes_audit_rows(
     assert cast(_FakeConnection, fake_conn).transactions == 1
     assert store.deleted is True
     assert store.anonymized_google_ids == [_GOOGLE_ID]
+    assert store.purged_subjects == {_GOOGLE_ID}
     assert store.seen_jtis == {"p"}
     assert store.state == {"risc_account_state": None, "risc_account_state_at": None}
 
@@ -284,6 +293,7 @@ async def test_purge_for_unknown_google_id_still_anonymizes_and_does_not_raise(
     assert cast(_FakeConnection, fake_conn).transactions == 1
     assert store.deleted is False
     assert store.delete_calls == ["someone-else"]
+    assert store.purged_subjects == {"someone-else"}
     assert store.anonymized_google_ids == ["someone-else"]
     assert store.user["is_active"] is True
 

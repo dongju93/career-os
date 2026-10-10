@@ -22,6 +22,7 @@ from career_os_api.auth.risc import (
     RiscVerificationUnavailableError,
 )
 from career_os_api.constants import API_V1
+from career_os_api.database.users import GoogleSubjectPurgedError
 from tests.session_auth import (
     SESSION_CLIENT_HEADERS,
     forge_session_cookie,
@@ -303,6 +304,36 @@ def test_google_callback_redirects_to_frontend_callback_without_login_code(
     assert "httponly" in set_cookie
     assert "samesite=lax" in set_cookie
     assert "secure" in set_cookie
+
+
+def test_google_callback_rejects_purged_subject_without_group_or_session(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        app_module.oauth.google,
+        "authorize_access_token",
+        AsyncMock(
+            return_value={"userinfo": {"sub": "purged-sub", "email": "x@example.com"}}
+        ),
+    )
+    monkeypatch.setattr(
+        app_module, "upsert_user", AsyncMock(side_effect=GoogleSubjectPurgedError)
+    )
+    has_group = AsyncMock()
+    create_group = AsyncMock()
+    monkeypatch.setattr(app_module, "has_any_group", has_group)
+    monkeypatch.setattr(app_module, "create_initial_group", create_group)
+    # An existing session must also be cleared by the failed sign-in.
+    client.cookies.set("session", forge_session_cookie(uuid.uuid7(), issued_at=1))
+
+    response = client.get(f"{API_PREFIX}/auth/google/callback", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert "error=oauth_token_exchange_failed" in response.headers["location"]
+    assert response.headers["set-cookie"].startswith("session=null;")
+    has_group.assert_not_awaited()
+    create_group.assert_not_awaited()
 
 
 def test_google_callback_logs_state_mismatch_as_warning_without_traceback(

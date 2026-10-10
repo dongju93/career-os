@@ -1,5 +1,7 @@
 import uuid
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from hashlib import sha256
 from typing import cast
 
 import pytest
@@ -37,6 +39,10 @@ class FakeConnection:
     def cursor(self, *, row_factory=None):
         self.cursor_row_factories.append(row_factory)
         return self._cursor
+
+    @asynccontextmanager
+    async def transaction(self):
+        yield
 
 
 def make_user_row(*, user_id=None) -> dict:
@@ -235,7 +241,7 @@ async def test_delete_user_by_google_id_returns_false_when_unknown() -> None:
 @pytest.mark.asyncio
 async def test_upsert_user_executes_sql_and_returns_row() -> None:
     row = make_user_row()
-    cursor = FakeCursor(fetchone_results=[row])
+    cursor = FakeCursor(fetchone_results=[None, row])
     conn = FakeConnection(cursor=cursor)
 
     result = await users_module.upsert_user(
@@ -247,12 +253,48 @@ async def test_upsert_user_executes_sql_and_returns_row() -> None:
     )
 
     assert result == row
-    assert conn.cursor_row_factories == [dict_row]
-    sql, params = cursor.execute_calls[0]
+    assert conn.cursor_row_factories == [None, dict_row]
+    assert cursor.execute_calls[0][0] == users_module._LOCK_GOOGLE_SUBJECT_SQL
+    assert cursor.execute_calls[1] == (
+        users_module._FIND_PURGED_GOOGLE_SUBJECT_SQL,
+        (sha256(b"google-user-1").hexdigest(),),
+    )
+    sql, params = cursor.execute_calls[2]
     assert sql == users_module._UPSERT_SQL
     assert params is not None
     assert isinstance(params[0], uuid.UUID)
     assert params[1:] == ("google-user-1", "user@example.com", "Career OS User", None)
+
+
+async def test_upsert_user_rejects_purged_subject_before_writing_user() -> None:
+    cursor = FakeCursor(fetchone_results=[{"exists": 1}])
+    conn = FakeConnection(cursor=cursor)
+
+    with pytest.raises(users_module.GoogleSubjectPurgedError):
+        await users_module.upsert_user(
+            cast(AsyncConnection, conn), "google-user-1", "x@example.com", None, None
+        )
+
+    assert len(cursor.execute_calls) == 2
+    assert all(sql != users_module._UPSERT_SQL for sql, _ in cursor.execute_calls)
+
+
+async def test_purge_marker_uses_same_subject_lock_and_only_stores_hash() -> None:
+    cursor = FakeCursor()
+    conn = FakeConnection(cursor=cursor)
+    digest = sha256(b"google-user-1").digest()
+
+    await users_module.record_google_subject_purge(
+        cast(AsyncConnection, conn), "google-user-1"
+    )
+
+    assert cursor.execute_calls == [
+        (
+            users_module._LOCK_GOOGLE_SUBJECT_SQL,
+            (int.from_bytes(digest[:8], signed=True),),
+        ),
+        (users_module._RECORD_PURGED_GOOGLE_SUBJECT_SQL, (digest.hex(),)),
+    ]
 
 
 @pytest.mark.asyncio

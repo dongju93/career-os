@@ -23,9 +23,19 @@
   - 테스트 중 설정 로딩이 가능하도록 placeholder `DATABASE_URL`과 `OPENAI_API_KEY` 값을 설정합니다.
   - 이 값들은 테스트 전용 기본값이며, 실제 서비스로 해석될 것을 기대하지 않습니다.
 
+## 선택적 PostgreSQL 통합 테스트
+
+`tests/integration/test_risc_purge.py`는 `CAREER_OS_TEST_POSTGRES_DSN`을 설정했을 때만 실행됩니다. 반드시 폐기 가능한 테스트 데이터베이스를 지정하세요. 각 테스트는 독립 스키마를 생성하고 종료 시 삭제합니다.
+
+이 테스트는 실제 PostgreSQL 연결 두 개로 purge와 OAuth upsert의 두 실행 순서, 사용자 없는 subject의 purge, 감사 이력 보존 기간 이후 차단 유지, 중복 이벤트, 트랜잭션 롤백을 검증합니다.
+
+```bash
+CAREER_OS_TEST_POSTGRES_DSN=postgresql://localhost/career_os_test uv run pytest tests/integration/test_risc_purge.py
+```
+
 ## 범위 밖
 
-- 실제 Postgres 연결성, connection pool 동작, 데이터베이스 마이그레이션
+- 운영 Postgres 연결성, connection pool 동작, 기존 데이터베이스 마이그레이션
 - Saramin 또는 기타 상위 채용 사이트에 대한 end-to-end 네트워크 호출
 - 실제 OpenAI API 응답, 지연 시간, quota, 모델 호환성
 - FastAPI, 데이터베이스, 상위 HTTP, OpenAI를 한 번의 실행으로 묶는 전체 통합 커버리지
@@ -36,4 +46,4 @@
 - 공개 라우트 동작에 대한 커버리지가 필요할 때만 API 수준 계약 테스트를 하나 추가합니다.
 - 공용 fixture는 `tests/conftest.py`에 둡니다.
 - 재사용 가능한 test double과 protocol helper는 `tests/support.py` 같은 모듈에 둡니다.
-- 실제 데이터베이스, 기록된 상위 트래픽, 기타 live dependency가 의도적으로 필요한 미래 사례를 위해 `tests/integration`은 비워 둡니다.
+- 선택적인 실제 데이터베이스 테스트는 `tests/integration`에 두고, 별도 테스트 DSN이 없으면 건너뜁니다.

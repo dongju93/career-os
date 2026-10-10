@@ -27,6 +27,7 @@ from career_os_api.database.users import (
     RiscAccountStateRow,
     delete_user_by_google_id,
     lock_user_risc_account_state_by_google_id,
+    record_google_subject_purge,
     revoke_user_sessions_by_google_id,
     set_user_risc_account_state_by_google_id,
 )
@@ -127,11 +128,11 @@ async def _apply_account_state_event(
 async def _purge_account(conn: AsyncConnection, google_id: str) -> None:
     """Erase local data for an account Google has permanently deleted.
 
-    Google never reissues a purged `sub`, so nothing can sign in as this user
-    again; keeping their profile, postings, and chat history would only extend
-    exposure. The audit rows stay, unlinked from the account, so `jti` dedupe
-    and event counts survive until retention removes them.
+    A permanent subject fingerprint blocks OAuth callbacks whose Google token
+    exchange already completed. The shared subject lock serializes erasure
+    with user upserts. Audit rows stay unlinked until retention removes them.
     """
+    await record_google_subject_purge(conn, google_id)
     deleted = await delete_user_by_google_id(conn, google_id)
     await anonymize_risc_events_by_google_id(conn, google_id)
     logger.info("RISC account-purged erased local account (matched=%s)", deleted)

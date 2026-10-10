@@ -1,11 +1,16 @@
 import uuid
 from datetime import datetime
 from enum import StrEnum
+from hashlib import sha256
 from typing import TypedDict, cast
 from uuid import UUID
 
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
+
+
+class GoogleSubjectPurgedError(ValueError):
+    """A permanently purged Google subject cannot sign in again."""
 
 
 class UserRow(TypedDict):
@@ -50,6 +55,17 @@ ON CONFLICT (google_id) DO UPDATE
         name    = EXCLUDED.name,
         picture = EXCLUDED.picture
 RETURNING id, google_id, email, name, picture, is_active, auth_session_revoked_at
+"""
+
+_LOCK_GOOGLE_SUBJECT_SQL = "SELECT pg_advisory_xact_lock(%s)"
+
+_FIND_PURGED_GOOGLE_SUBJECT_SQL = """
+SELECT 1 FROM purged_google_subjects WHERE subject_hash = %s
+"""
+
+_RECORD_PURGED_GOOGLE_SUBJECT_SQL = """
+INSERT INTO purged_google_subjects (subject_hash) VALUES (%s)
+ON CONFLICT (subject_hash) DO NOTHING
 """
 
 _UPDATE_NAME_SQL = """
@@ -125,11 +141,47 @@ async def upsert_user(
     name: str | None,
     picture: str | None,
 ) -> UserRow:
-    async with conn.cursor(row_factory=dict_row) as cur:
-        await cur.execute(_UPSERT_SQL, (uuid.uuid7(), google_id, email, name, picture))
-        row = await cur.fetchone()
+    async with conn.transaction():
+        subject_hash = await _lock_google_subject(conn, google_id)
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(_FIND_PURGED_GOOGLE_SUBJECT_SQL, (subject_hash,))
+            if await cur.fetchone() is not None:
+                raise GoogleSubjectPurgedError
+            await cur.execute(
+                _UPSERT_SQL, (uuid.uuid7(), google_id, email, name, picture)
+            )
+            row = await cur.fetchone()
     assert row is not None
     return cast(UserRow, row)
+
+
+async def _lock_google_subject(conn: AsyncConnection, google_id: str) -> str:
+    """Serialize purge and upsert even when no user row exists.
+
+    Call inside a transaction. At READ COMMITTED (the pool default), the
+    next statement gets a fresh snapshot after a competing purge commits.
+    Keep the lock statement separate from the tombstone lookup/write.
+    Hash collisions in the 64-bit lock key only serialize unrelated subjects;
+    tombstone matching uses the full SHA-256 digest.
+    """
+    digest = sha256(google_id.encode("utf-8")).digest()
+    async with conn.cursor() as cur:
+        await cur.execute(
+            _LOCK_GOOGLE_SUBJECT_SQL,
+            (int.from_bytes(digest[:8], signed=True),),
+        )
+    return digest.hex()
+
+
+async def record_google_subject_purge(conn: AsyncConnection, google_id: str) -> None:
+    """Retain a permanent fingerprint, independent of user/audit retention.
+
+    The caller must own the transaction spanning this marker, user deletion,
+    and audit anonymization so the subject lock lasts until erasure commits.
+    """
+    subject_hash = await _lock_google_subject(conn, google_id)
+    async with conn.cursor() as cur:
+        await cur.execute(_RECORD_PURGED_GOOGLE_SUBJECT_SQL, (subject_hash,))
 
 
 async def lock_user_risc_account_state_by_google_id(
