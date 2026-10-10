@@ -306,6 +306,40 @@ def test_google_callback_redirects_to_frontend_callback_without_login_code(
     assert "secure" in set_cookie
 
 
+def test_google_callback_preserves_subsecond_session_issuance(
+    client: TestClient,
+    current_user: dict,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    issued_at = datetime(2026, 10, 10, 12, 0, 0, 500_001, tzinfo=UTC)
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls.fromtimestamp(issued_at.timestamp(), tz)
+
+    monkeypatch.setattr(app_module, "datetime", FixedDatetime)
+    monkeypatch.setattr(
+        app_module.oauth.google,
+        "authorize_access_token",
+        AsyncMock(return_value={"userinfo": {"sub": "g-1", "email": "x@example.com"}}),
+    )
+    monkeypatch.setattr(app_module, "upsert_user", AsyncMock(return_value=current_user))
+    monkeypatch.setattr(app_module, "has_any_group", AsyncMock(return_value=True))
+    current_user["auth_session_revoked_at"] = issued_at.replace(microsecond=500_000)
+
+    response = client.get(f"{API_PREFIX}/auth/google/callback", follow_redirects=False)
+    assert response.status_code == 302
+    cookie = response.cookies["session"]
+    headers = {"Cookie": f"session={cookie}", **SESSION_CLIENT_HEADERS}
+
+    # The signed, serialized cookie must retain the microsecond separating
+    # this new login from the earlier revocation in the very same second.
+    assert client.get(f"{API_PREFIX}/auth/me", headers=headers).status_code == 200
+    current_user["auth_session_revoked_at"] = issued_at
+    assert client.get(f"{API_PREFIX}/auth/me", headers=headers).status_code == 401
+
+
 def test_google_callback_rejects_purged_subject_without_group_or_session(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -920,20 +954,25 @@ def test_logout_returns_200_with_message(
     }
 
 
+@pytest.mark.parametrize(
+    "issued_at", [1_700_000_000 - 60, 1_700_000_000, 1_700_000_000.1, 1_700_000_000.5]
+)
 def test_logout_revokes_previously_issued_session_cookie(
     client: TestClient,
     fake_pool: FakePool,
     current_user: dict,
     monkeypatch: pytest.MonkeyPatch,
+    issued_at: int | float,
 ) -> None:
     # A copy of the cookie (e.g. stolen) issued before logout must stop working
     # even though the client-side cookie clear never reaches the copy.
     async def revoke(_conn, _user_id) -> None:
-        current_user["auth_session_revoked_at"] = datetime.now(UTC)
+        current_user["auth_session_revoked_at"] = datetime.fromtimestamp(
+            1_700_000_000.5, UTC
+        )
 
     revoke_mock = AsyncMock(side_effect=revoke)
     monkeypatch.setattr(app_module, "revoke_user_sessions", revoke_mock)
-    issued_at = int(time.time()) - 60
     headers = {
         "Cookie": f"session={forge_session_cookie(current_user['id'], issued_at=issued_at)}",
         **SESSION_CLIENT_HEADERS,

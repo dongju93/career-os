@@ -18,11 +18,11 @@ SESSION_COOKIE_NAME = "session"
 SESSION_CLIENT_HEADERS = {"X-Career-OS-Client": "web"}
 
 
-def forge_session_cookie(user_id: UUID, *, issued_at: int | None = None) -> str:
+def forge_session_cookie(user_id: UUID, *, issued_at: int | float | None = None) -> str:
     """Return a signed cookie value in the same format SessionMiddleware issues."""
     payload = {
         "user_id": str(user_id),
-        "issued_at": int(time.time()) if issued_at is None else issued_at,
+        "issued_at": time.time() if issued_at is None else issued_at,
     }
     data = base64.b64encode(json.dumps(payload).encode())
     return itsdangerous.TimestampSigner(settings.secret_key).sign(data).decode()

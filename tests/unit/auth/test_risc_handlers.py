@@ -421,6 +421,26 @@ async def test_apply_verification_event_is_audit_only(
     "event_type",
     [EVENT_CREDENTIAL_CHANGE_REQUIRED, EVENT_SESSIONS_REVOKED, EVENT_TOKENS_REVOKED],
 )
+async def test_risc_revocation_rejects_same_second_sessions(
+    event_type: str,
+    fake_conn: AsyncConnection,
+    store: _FakeUserStore,
+) -> None:
+    await handlers_module.apply_risc_event(fake_conn, _event(event_type=event_type))
+
+    revoked_at = store.user["auth_session_revoked_at"]
+    assert revoked_at is not None
+    cutoff = revoked_at.timestamp()
+    assert not _is_current_user_session(store.user, int(cutoff))
+    assert not _is_current_user_session(store.user, cutoff - 0.000001)
+    assert not _is_current_user_session(store.user, cutoff)
+    assert _is_current_user_session(store.user, cutoff + 0.000001)
+
+
+@pytest.mark.parametrize(
+    "event_type",
+    [EVENT_CREDENTIAL_CHANGE_REQUIRED, EVENT_SESSIONS_REVOKED, EVENT_TOKENS_REVOKED],
+)
 async def test_apply_session_token_revocations_revoke_user_sessions(
     event_type: str,
     fake_conn: AsyncConnection,

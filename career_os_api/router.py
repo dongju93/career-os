@@ -327,7 +327,7 @@ async def google_callback(request: Request) -> RedirectResponse:
 
     request.session.clear()
     request.session["user_id"] = str(user["id"])
-    request.session["issued_at"] = int(datetime.now(UTC).timestamp())
+    request.session["issued_at"] = datetime.now(UTC).timestamp()
 
     return RedirectResponse(target, status_code=status.HTTP_302_FOUND)
 

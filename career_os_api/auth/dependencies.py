@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from datetime import UTC
+from math import isfinite
 from uuid import UUID
 
 from fastapi import HTTPException, Request, status
@@ -17,7 +18,7 @@ async def _find_current_user(request: Request, user_id: UUID):
     return await run_database_operation(request.app.state.pool, operation)
 
 
-def _issued_after_revocation(user: UserRow, issued_at: int | None) -> bool:
+def _issued_after_revocation(user: UserRow, issued_at: int | float | None) -> bool:
     revoked_at = user.get("auth_session_revoked_at")
     if revoked_at is None:
         return True
@@ -25,20 +26,26 @@ def _issued_after_revocation(user: UserRow, issued_at: int | None) -> bool:
         return False
     if revoked_at.tzinfo is None:
         revoked_at = revoked_at.replace(tzinfo=UTC)
-    # Session issued_at is second-precision (floor); truncate revoked_at to seconds so a
-    # session issued within the same second as revocation is not wrongly rejected.
-    return datetime.fromtimestamp(issued_at, UTC) >= revoked_at.replace(microsecond=0)
+    # Keep the full cutoff and reject ties. Legacy integer timestamps remain
+    # supported, but cannot prove they were issued after a same-second revocation.
+    return issued_at > revoked_at.timestamp()
 
 
-def _is_current_user_session(user: UserRow | None, issued_at: int | None) -> bool:
+def _is_current_user_session(
+    user: UserRow | None, issued_at: int | float | None
+) -> bool:
     return bool(
         user and user["is_active"] and _issued_after_revocation(user, issued_at)
     )
 
 
-def _session_issued_at(request: Request) -> int | None:
+def _session_issued_at(request: Request) -> int | float | None:
     issued_at = request.session.get("issued_at")
-    return issued_at if isinstance(issued_at, int) else None
+    if isinstance(issued_at, int) and not isinstance(issued_at, bool):
+        return issued_at
+    if isinstance(issued_at, float) and isfinite(issued_at):
+        return issued_at
+    return None
 
 
 def _has_session_client_header(request: Request) -> bool:

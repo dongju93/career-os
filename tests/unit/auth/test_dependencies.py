@@ -231,12 +231,27 @@ async def test_get_current_user_accepts_session_issued_after_revocation():
     assert user["id"] == user_id
 
 
-async def test_get_current_user_accepts_session_issued_in_same_second_as_revocation():
-    # Session issued_at is second-precision (floor). A session issued at T+0.800 after
-    # a revocation at T+0.500 gets issued_at=T. Without truncating revoked_at to
-    # seconds the comparison T.000 > T.500 is false and the valid session is rejected.
+@pytest.mark.parametrize("naive_revocation", [False, True])
+@pytest.mark.parametrize(
+    ("issued_at", "accepted"),
+    [
+        (1_700_000_000, False),  # Legacy cookie: same-second order is unknown.
+        (1_700_000_000.499999, False),
+        (1_700_000_000.5, False),  # Ties fail closed.
+        (1_700_000_000.500001, True),
+        (1_700_000_000.8, True),
+        (1_700_000_001, True),  # Legacy cookie clearly after revocation.
+        (float("inf"), False),
+        (float("nan"), False),
+    ],
+)
+async def test_get_current_user_compares_full_revocation_precision(
+    issued_at, accepted, naive_revocation
+):
     user_id = uuid.uuid7()
-    issued_at = int(datetime.now(UTC).timestamp())
+    revoked_at = datetime.fromtimestamp(1_700_000_000.5, UTC)
+    if naive_revocation:
+        revoked_at = revoked_at.replace(tzinfo=None)
     row = {
         "id": user_id,
         "google_id": "g-123",
@@ -244,19 +259,21 @@ async def test_get_current_user_accepts_session_issued_in_same_second_as_revocat
         "name": "Active User",
         "picture": None,
         "is_active": True,
-        # revoked_at has sub-second precision within the same second as issued_at
-        "auth_session_revoked_at": datetime.fromtimestamp(issued_at, UTC).replace(
-            microsecond=500_000
-        ),
+        "auth_session_revoked_at": revoked_at,
     }
     request = _make_request(
         row,
         session={"user_id": str(user_id), "issued_at": issued_at},
         headers=SESSION_CLIENT_HEADERS,
     )
-    user = await get_current_user(request)
-    assert user is not None
-    assert user["id"] == user_id
+    if accepted:
+        user = await get_current_user(request)
+        assert user is not None
+        assert user["id"] == user_id
+    else:
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user(request)
+        assert exc_info.value.status_code == 401
 
 
 async def test_get_current_user_no_auth_raises_401():
