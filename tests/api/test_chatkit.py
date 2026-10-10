@@ -1,29 +1,24 @@
 """API-level tests for the ChatKit endpoint.
 
-Reuses the FakePool + Bearer-JWT auth pattern from test_job_search_groups.py. Both
+Reuses the FakePool + session-cookie auth pattern from test_job_search_groups.py. Both
 response paths are exercised by swapping app.state.chatkit_server for stubs whose
 process() returns a real chatkit StreamingResult or NonStreamingResult, so no
 OpenAI call is made.
 """
 
-import base64
-import json
-import time
 import uuid
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
 
-import itsdangerous
 import pytest
 from chatkit.server import NonStreamingResult, StreamingResult
 from fastapi.testclient import TestClient
 
 import main as main_module
-from career_os_api.auth.jwt import create_access_token
 from career_os_api.chatkit import routes as routes_module
 from career_os_api.chatkit.store import ChatKitThreadLimitError
-from career_os_api.config import settings as app_settings
 from career_os_api.constants import API_V1
+from tests.session_auth import forge_session_cookie, make_session_auth_headers
 
 API_PREFIX = f"/{API_V1}"
 CHATKIT_URL = f"{API_PREFIX}/chatkit"
@@ -119,8 +114,7 @@ def current_user(fake_pool: FakePool) -> dict:
 
 @pytest.fixture
 def auth_headers(current_user: dict) -> dict[str, str]:
-    token = create_access_token(data={"sub": str(current_user["id"])})
-    return {"Authorization": f"Bearer {token}"}
+    return make_session_auth_headers(current_user["id"])
 
 
 @pytest.fixture
@@ -137,14 +131,6 @@ def client(
         yield test_client
 
 
-def _session_cookie(user_id: uuid.UUID) -> str:
-    """Forge a Starlette SessionMiddleware cookie (same format the app issues)."""
-    signer = itsdangerous.TimestampSigner(app_settings.secret_key)
-    payload = {"user_id": str(user_id), "issued_at": int(time.time())}
-    data = base64.b64encode(json.dumps(payload).encode())
-    return signer.sign(data).decode()
-
-
 # ── auth ──────────────────────────────────────────────────────────────────────
 
 
@@ -156,7 +142,7 @@ def test_chatkit_requires_authentication(client: TestClient) -> None:
 def test_chatkit_session_cookie_without_client_header_is_rejected(
     client: TestClient, current_user: dict
 ) -> None:
-    client.cookies.set("session", _session_cookie(current_user["id"]))
+    client.cookies.set("session", forge_session_cookie(current_user["id"]))
 
     # Session cookie present but no X-Career-OS-Client header → session path skipped.
     response = client.post(CHATKIT_URL, content=b"{}")

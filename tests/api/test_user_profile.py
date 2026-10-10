@@ -1,6 +1,6 @@
 """API-level tests for the career profile endpoints (GET/PUT /v1/profile).
 
-Reuses the FakePool + Bearer-JWT auth pattern from test_router.py. The profile DB
+Reuses the FakePool + session-cookie auth pattern from test_router.py. The profile DB
 helpers are monkeypatched on the router module, so no real database is touched —
 auth's find_user_by_id still resolves through the FakeConnection's user row.
 """
@@ -16,8 +16,8 @@ from fastapi.testclient import TestClient
 
 import career_os_api.router as app_module
 import main as main_module
-from career_os_api.auth.jwt import create_access_token
 from career_os_api.constants import API_V1
+from tests.session_auth import make_session_auth_headers
 
 API_PREFIX = f"/{API_V1}"
 PROFILE_URL = f"{API_PREFIX}/profile"
@@ -106,8 +106,7 @@ def current_user(fake_pool: FakePool) -> dict:
 
 @pytest.fixture
 def auth_headers(current_user: dict) -> dict[str, str]:
-    token = create_access_token(data={"sub": str(current_user["id"])})
-    return {"Authorization": f"Bearer {token}"}
+    return make_session_auth_headers(current_user["id"])
 
 
 @pytest.fixture

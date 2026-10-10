@@ -1,6 +1,6 @@
 """API-level tests for POST /v1/agent/artifact.
 
-Same FakePool + Bearer-JWT pattern as test_strategist_plan.py. get_job_posting,
+Same FakePool + session-cookie pattern as test_strategist_plan.py. get_job_posting,
 get_user_profile, and the run_strategist_artifact wrapper are monkeypatched on the
 strategist routes module, so neither a real database nor an OpenAI/Agents-SDK call
 is made.
@@ -17,9 +17,9 @@ from fastapi.testclient import TestClient
 
 import career_os_api.strategist.strategist_routes as routes_module
 import main as main_module
-from career_os_api.auth.jwt import create_access_token
 from career_os_api.constants import API_V1
 from career_os_api.schemas import ApplicationArtifact, ArtifactType
+from tests.session_auth import make_session_auth_headers
 
 API_PREFIX = f"/{API_V1}"
 ARTIFACT_URL = f"{API_PREFIX}/agent/artifact"
@@ -137,8 +137,7 @@ def current_user(fake_pool: FakePool) -> dict:
 
 @pytest.fixture
 def auth_headers(current_user: dict) -> dict[str, str]:
-    token = create_access_token(data={"sub": str(current_user["id"])})
-    return {"Authorization": f"Bearer {token}"}
+    return make_session_auth_headers(current_user["id"])
 
 
 @pytest.fixture

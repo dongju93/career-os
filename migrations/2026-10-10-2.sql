@@ -1,0 +1,15 @@
+-- Drop the OAuth login_code exchange table (M-01).
+--
+-- The web client now reaches the API through a same-origin `/v1/*` proxy and
+-- authenticates only with the HttpOnly session cookie. The single-use
+-- login_code → POST /v1/auth/token → Bearer JWT fallback, which existed only
+-- because the cross-site session cookie was blocked and which ended with a
+-- 7-day JWT in localStorage, has been removed, so nothing reads or writes this
+-- table any more.
+--
+-- Run AFTER the backend that no longer mints login codes is deployed: the
+-- previous release inserts into this table on every OAuth callback, so dropping
+-- it first would break login.
+--
+-- Safe to re-run: IF EXISTS guard. Its indexes are dropped with the table.
+DROP TABLE IF EXISTS auth_exchange_codes;

@@ -21,7 +21,6 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from psycopg.errors import UniqueViolation
 
 from career_os_api.auth.dependencies import get_current_user
-from career_os_api.auth.jwt import create_access_token
 from career_os_api.auth.risc import (
     SUPPORTED_EVENT_TYPES,
     RiscVerificationError,
@@ -32,10 +31,6 @@ from career_os_api.auth.risc_handlers import apply_risc_event
 from career_os_api.chatkit.routes import router as chatkit_router
 from career_os_api.config import settings
 from career_os_api.constants import API_V1
-from career_os_api.database.auth_exchange import (
-    create_exchange_code,
-    redeem_exchange_code,
-)
 from career_os_api.database.job_postings import (
     TargetGroupNotFoundError,
     get_job_posting,
@@ -72,7 +67,6 @@ from career_os_api.responses import (
     ApiResponse,
 )
 from career_os_api.schemas import (
-    AccessTokenResponse,
     CurrentUserResponse,
     JobPostingCreateRequest,
     JobPostingExtracted,
@@ -85,7 +79,6 @@ from career_os_api.schemas import (
     JobSearchGroupItem,
     JobSearchGroupPage,
     JobSearchGroupUpdate,
-    LoginCodeExchangeRequest,
     UpdateCurrentUserRequest,
     UserProfile,
     UserProfileUpsertRequest,
@@ -253,9 +246,8 @@ async def google_login(
     tags=["auth"],
     summary="Google OAuth callback 처리",
     description=(
-        "Google authorization code를 검증하고 서버 세션과 일회용 `login_code`를 발급한 뒤 "
-        "프론트엔드 callback URL로 리다이렉트합니다. 세션 쿠키를 사용할 수 없는 브라우저는 "
-        "login code를 `/v1/auth/token`으로 교환할 수 있습니다."
+        "Google authorization code를 검증하고 HttpOnly 서버 세션 쿠키를 발급한 뒤 "
+        "프론트엔드 callback URL로 리다이렉트합니다."
     ),
     operation_id="complete_google_login",
     response_class=RedirectResponse,
@@ -275,9 +267,7 @@ async def google_callback(request: Request) -> RedirectResponse:
     # browsers to download the response as `callback.txt` when the session
     # cookie carrying `callback_url` was dropped during the cross-site OAuth
     # round trip. Falls back to /auth/callback (not bare frontend_url) since
-    # that's the only route that reads `login_code`/`error` query params —
-    # landing on `/` would send login_code straight to ProtectedRoute, which
-    # never looks at it.
+    # that's the only route that completes login and reads the `error` param.
     target = (
         request.session.get("callback_url")
         or f"{settings.frontend_url.rstrip('/')}/auth/callback"
@@ -323,29 +313,22 @@ async def google_callback(request: Request) -> RedirectResponse:
             user = await upsert_user(conn, google_id, email, name, picture)
             if not await has_any_group(conn, user["id"]):
                 await create_initial_group(conn, user["id"])
-            # Minted alongside the session so browsers that drop the
-            # cross-site session cookie (Safari ITP, Chrome third-party
-            # cookie blocking) can still complete login via /auth/token.
-            login_code = await create_exchange_code(conn, user["id"])
-            return user, login_code
+            return user
 
-    user, login_code = await run_database_operation(request.app.state.pool, operation)
+    user = await run_database_operation(request.app.state.pool, operation)
 
     request.session.clear()
     request.session["user_id"] = str(user["id"])
     request.session["issued_at"] = int(datetime.now(UTC).timestamp())
 
-    return RedirectResponse(
-        _append_query_params(target, {"login_code": login_code}),
-        status_code=status.HTTP_302_FOUND,
-    )
+    return RedirectResponse(target, status_code=status.HTTP_302_FOUND)
 
 
 @v1_router.get(
     "/auth/me",
     tags=["auth"],
     summary="현재 사용자 조회",
-    description="Bearer JWT 또는 웹 세션으로 인증된 현재 사용자의 기본 계정 정보를 조회합니다.",
+    description="웹 세션으로 인증된 현재 사용자의 기본 계정 정보를 조회합니다.",
     operation_id="get_current_user",
     response_description="현재 사용자 정보",
     dependencies=[rate_limit(20, per="minute")],
@@ -362,56 +345,6 @@ async def read_current_user(
             email=current_user["email"],
             name=current_user["name"],
             picture=current_user["picture"],
-        ),
-    )
-
-
-@v1_router.post(
-    "/auth/token",
-    tags=["auth"],
-    summary="OAuth login code를 access token으로 교환",
-    description=(
-        "OAuth callback URL에 포함된 일회용 `login_code`를 검증하고 Bearer access token을 "
-        "발급합니다. login code는 한 번만 사용할 수 있고 짧은 시간 동안만 유효합니다."
-    ),
-    operation_id="exchange_oauth_login_code",
-    response_description="발급된 Bearer access token",
-    # No rate_limit() dependency: this endpoint is intentionally
-    # unauthenticated (it is how a client becomes authenticated), and
-    # rate_limit() keys its bucket on current_user, which doesn't exist yet
-    # here. The code itself (32 random bytes, 60s TTL, single-use) is the
-    # security control against guessing.
-    responses={
-        status.HTTP_400_BAD_REQUEST: {
-            **BAD_REQUEST_ERROR_RESPONSE,
-            "description": "login code가 유효하지 않거나 만료되었습니다.",
-        },
-        status.HTTP_422_UNPROCESSABLE_CONTENT: VALIDATION_ERROR_RESPONSE,
-    },
-)
-async def exchange_login_code(
-    data: LoginCodeExchangeRequest,
-    request: Request,
-) -> ApiResponse[AccessTokenResponse]:
-    async def operation(conn):
-        return await redeem_exchange_code(conn, data.login_code)
-
-    user_id = await run_database_operation(
-        request.app.state.pool,
-        operation,
-        idempotent=False,
-        label="redeem_exchange_code",
-    )
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="코드가 유효하지 않거나 만료되었습니다.",
-        )
-    return ApiResponse(
-        status=status.HTTP_200_OK,
-        message="로그인 토큰을 발급했습니다.",
-        data=AccessTokenResponse(
-            access_token=create_access_token({"sub": str(user_id)})
         ),
     )
 
@@ -460,7 +393,7 @@ async def update_current_user(
     "/auth/logout",
     tags=["auth"],
     summary="현재 세션 종료",
-    description="서버 세션을 삭제합니다. Bearer JWT를 사용하는 클라이언트는 보관 중인 토큰도 직접 삭제해야 합니다.",
+    description="서버 세션 쿠키를 삭제합니다.",
     operation_id="logout_current_user",
     response_description="세션 종료 결과",
     dependencies=[rate_limit(20, per="minute")],
@@ -472,7 +405,7 @@ async def logout_current_user(
     request.session.clear()
     return ApiResponse(
         status=status.HTTP_200_OK,
-        message="세션이 종료되었습니다. 토큰은 클라이언트에서 삭제해 주세요.",
+        message="세션이 종료되었습니다.",
     )
 
 

@@ -1,3 +1,4 @@
+import time
 import uuid
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
@@ -8,12 +9,12 @@ import fakeredis
 import pytest
 from authlib.integrations.base_client import MismatchingStateError
 from fastapi.testclient import TestClient
+from jose import jwt
 from psycopg import OperationalError
 
 import career_os_api.database.retry as retry_module
 import career_os_api.router as app_module
 import main as main_module
-from career_os_api.auth.jwt import create_access_token
 from career_os_api.auth.risc import (
     EVENT_ACCOUNT_DISABLED,
     RiscEvent,
@@ -21,6 +22,7 @@ from career_os_api.auth.risc import (
     RiscVerificationUnavailableError,
 )
 from career_os_api.constants import API_V1
+from tests.session_auth import make_session_auth_headers
 
 API_PREFIX = f"/{API_V1}"
 
@@ -153,8 +155,7 @@ def current_user(fake_pool: FakePool) -> dict:
 
 @pytest.fixture
 def auth_headers(current_user: dict) -> dict[str, str]:
-    token = create_access_token(data={"sub": str(current_user["id"])})
-    return {"Authorization": f"Bearer {token}"}
+    return make_session_auth_headers(current_user["id"])
 
 
 @pytest.fixture
@@ -247,7 +248,7 @@ def test_google_callback_does_not_include_token_in_redirect_url(
     assert "access_token" not in response.headers["location"]
 
 
-def test_google_callback_redirect_includes_login_code(
+def test_google_callback_redirects_to_frontend_callback_without_login_code(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -277,9 +278,6 @@ def test_google_callback_redirect_includes_login_code(
     )
     monkeypatch.setattr(app_module, "upsert_user", AsyncMock(return_value=fake_user))
     monkeypatch.setattr(app_module, "has_any_group", AsyncMock(return_value=True))
-    monkeypatch.setattr(
-        app_module, "create_exchange_code", AsyncMock(return_value="fake-login-code")
-    )
 
     response = client.get(
         f"{API_PREFIX}/auth/google/callback",
@@ -288,11 +286,19 @@ def test_google_callback_redirect_includes_login_code(
 
     assert response.status_code in (302, 307)
     location = response.headers["location"]
-    assert "login_code=fake-login-code" in location
+    # The session cookie is the only credential, so no code is appended to the redirect.
+    assert "login_code" not in location
     # No callback_url in session (e.g. dropped cross-site cookie) must still
-    # land on /auth/callback — the only route that reads login_code — not
-    # bare frontend_url, which ProtectedRoute would swallow silently.
+    # land on /auth/callback, not bare frontend_url, which ProtectedRoute would
+    # swallow silently.
     assert location.startswith(f"{app_module.settings.frontend_url}/auth/callback")
+    # The session cookie must stay unreadable by page scripts and first-party
+    # only (served through the frontend's same-origin /v1 proxy).
+    set_cookie = response.headers["set-cookie"].lower()
+    assert set_cookie.startswith("session=")
+    assert "httponly" in set_cookie
+    assert "samesite=lax" in set_cookie
+    assert "secure" in set_cookie
 
 
 def test_google_callback_logs_state_mismatch_as_warning_without_traceback(
@@ -349,40 +355,6 @@ def test_google_callback_logs_unexpected_exchange_failure_as_error(
     assert len(records) == 1
     assert records[0].levelname == "ERROR"
     assert records[0].exc_info is not None
-
-
-def test_exchange_login_code_returns_access_token_for_valid_code(
-    client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    user_id = uuid.uuid7()
-    monkeypatch.setattr(
-        app_module, "redeem_exchange_code", AsyncMock(return_value=user_id)
-    )
-
-    response = client.post(
-        f"{API_PREFIX}/auth/token", json={"login_code": "a-valid-code"}
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["data"]["token_type"] == "bearer"
-    assert body["data"]["access_token"]
-
-
-def test_exchange_login_code_returns_400_for_invalid_code(
-    client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        app_module, "redeem_exchange_code", AsyncMock(return_value=None)
-    )
-
-    response = client.post(
-        f"{API_PREFIX}/auth/token", json={"login_code": "not-a-real-code"}
-    )
-
-    assert response.status_code == 400
 
 
 def test_list_job_postings_endpoint_returns_paginated_results(
@@ -779,6 +751,24 @@ def test_read_current_user_requires_auth(client: TestClient) -> None:
     assert response.status_code == 401
 
 
+def test_read_current_user_rejects_legacy_bearer_token(
+    client: TestClient, current_user: dict
+) -> None:
+    # Browsers may still hold a 7-day JWT from the removed /auth/token flow; a
+    # correctly signed one must no longer authenticate.
+    legacy_token = jwt.encode(
+        {"sub": str(current_user["id"]), "iat": int(time.time())},
+        app_module.settings.secret_key,
+        algorithm="HS256",
+    )
+
+    response = client.get(
+        f"{API_PREFIX}/auth/me", headers={"Authorization": f"Bearer {legacy_token}"}
+    )
+
+    assert response.status_code == 401
+
+
 def test_update_current_user_returns_updated_name(
     client: TestClient,
     fake_pool: FakePool,
@@ -890,7 +880,7 @@ def test_logout_returns_200_with_message(
     assert response.status_code == 200
     assert response.json() == {
         "status": 200,
-        "message": "세션이 종료되었습니다. 토큰은 클라이언트에서 삭제해 주세요.",
+        "message": "세션이 종료되었습니다.",
         "data": None,
     }
 
@@ -1107,7 +1097,7 @@ def test_risc_endpoint_rejects_unsupported_event_type(
 
 
 def test_risc_endpoint_is_not_authenticated(client: TestClient) -> None:
-    # Google posts SETs without Bearer auth; absence of a token must not
+    # Google posts SETs without a session cookie; absence of one must not
     # trigger the 401 that protected endpoints return.
     response = client.post(
         f"{API_PREFIX}/auth/google/risc",

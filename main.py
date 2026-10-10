@@ -129,10 +129,9 @@ Career OS의 구직 활동 관리 및 지원 전략 생성 API입니다.
 
 ## 인증
 
-보호된 API는 `Authorization: Bearer <JWT>` 헤더 또는 웹 클라이언트용 세션 쿠키와
-`X-Career-OS-Client: web` 헤더로 인증합니다. OAuth 로그인은 `/v1/auth/google`에서
-시작하고, 쿠키를 사용할 수 없는 브라우저는 callback의 `login_code`를
-`/v1/auth/token`으로 교환할 수 있습니다.
+보호된 API는 HttpOnly 세션 쿠키와 `X-Career-OS-Client: web` 헤더로 인증합니다.
+웹 클라이언트는 프론트엔드 origin의 `/v1/*` 프록시를 통해 같은 출처로 호출하므로
+토큰을 JavaScript에 노출하지 않습니다. OAuth 로그인은 `/v1/auth/google`에서 시작합니다.
 
 ## 응답 형식
 
@@ -205,23 +204,22 @@ career_os.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# The session cookie's only load-bearing job is the OAuth `state` round-trip
-# across the top-level `/auth/google` → Google → `/auth/google/callback`
-# navigations. It must NOT carry the CHIPS `Partitioned` attribute: a
-# partitioned cookie is keyed by the top-level site at set-time, but the
-# callback request is issued while the top-level site is accounts.google.com,
-# so Chrome omits the cookie and authlib raises MismatchingStateError (login
-# fails, especially on mobile). Partitioning also can't help authenticated
-# cross-site XHR here — the SPA and API are different registrable domains, so
-# the login cookie lands in one partition while every SPA fetch reads another.
-# Cross-site auth is instead carried by the Bearer token minted via
-# login_code → POST /auth/token. Keep `SameSite=None; Secure` (unpartitioned).
+# The session cookie is the sole credential (Starlette always sets HttpOnly).
+# The SPA reaches this API through a same-origin `/v1/*` proxy on its own
+# domain (Vercel rewrite in production, Vite proxy locally), and
+# `redirect_uri` points at that proxy, so the cookie is first-party for every
+# request: OAuth start, the Google callback (a top-level GET navigation, which
+# `Lax` still carries), and all SPA fetches. That is what lets `Lax` replace
+# `None` and keeps third-party-cookie blocking (Safari ITP, Chrome) out of the
+# login path. Do not add the CHIPS `Partitioned` attribute: the callback is
+# issued while the top-level site is accounts.google.com, so a partitioned
+# cookie would be omitted and authlib would raise MismatchingStateError.
 career_os.add_middleware(
     SessionMiddleware,
     secret_key=settings.secret_key,
     https_only=True,
-    same_site="none",
-    max_age=settings.jwt_expire_minutes * 60,
+    same_site="lax",
+    max_age=settings.session_expire_minutes * 60,
 )
 career_os.add_middleware(RequestIdMiddleware)
 career_os.add_middleware(GZipMiddleware, minimum_size=1000)
