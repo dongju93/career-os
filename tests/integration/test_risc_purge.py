@@ -3,6 +3,7 @@
 import asyncio
 import os
 from hashlib import sha256
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -20,6 +21,7 @@ from career_os_api.database.risc_events import delete_expired_risc_events
 from career_os_api.database.users import GoogleSubjectPurgedError, upsert_user
 
 _SUBJECT = "purged-google-subject"
+_MIGRATIONS = Path(__file__).resolve().parents[2] / "migrations"
 
 
 @pytest.fixture
@@ -79,6 +81,36 @@ async def _wait_for_subject_lock(observer, blocked):
             if await cur.fetchone():
                 return
             await asyncio.sleep(0.01)
+
+
+@pytest.mark.parametrize("payload_state", ["required", "nullable", "fresh", "dropped"])
+async def test_guarded_risc_migration_can_be_replayed(connections, payload_state):
+    first, _, _ = connections
+    if payload_state in {"required", "nullable", "dropped"}:
+        await first.execute("ALTER TABLE risc_events ADD COLUMN payload JSONB")
+    if payload_state == "required":
+        await first.execute("ALTER TABLE risc_events ALTER COLUMN payload SET NOT NULL")
+
+    migration = (_MIGRATIONS / "2026-10-10-5.sql").read_text(encoding="utf-8")
+    if payload_state == "dropped":
+        await first.execute(
+            (_MIGRATIONS / "2026-10-10-3.sql").read_text(encoding="utf-8")
+        )
+        await first.execute(
+            (_MIGRATIONS / "2026-10-10-4.sql").read_text(encoding="utf-8")
+        )
+
+    # Execute the full transaction twice, including after the follow-up drop.
+    await first.execute(migration)
+    await first.execute(migration)
+
+    cur = await first.execute(
+        "SELECT attnotnull FROM pg_attribute "
+        "WHERE attrelid = 'risc_events'::regclass "
+        "AND attname = 'payload' AND NOT attisdropped"
+    )
+    expected = [(False,)] if payload_state in {"required", "nullable"} else []
+    assert await cur.fetchall() == expected
 
 
 @pytest.mark.parametrize("existing_user", [False, True])
