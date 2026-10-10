@@ -1,11 +1,11 @@
 # CareerOS API
 
-![FastAPI](https://img.shields.io/badge/FastAPI-0.137.1-009688?logo=fastapi&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.143.0-009688?logo=fastapi&logoColor=white)
 ![FastAPI Cloud](https://img.shields.io/badge/FastAPI%20Cloud-Deployed-009688?logo=fastapi&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)
-![OpenAI](https://img.shields.io/badge/OpenAI_SDK-2.41.0-412991?logo=openai&logoColor=white)
-![Pyrefly](https://img.shields.io/badge/Pyrefly-1.0.0-0668E1?logo=meta&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI_SDK-3.28.0-412991?logo=openai&logoColor=white)
+![Pyrefly](https://img.shields.io/badge/Pyrefly-1.3.2-0668E1?logo=meta&logoColor=white)
 ![Google OAuth](https://img.shields.io/badge/Google_OAuth-Authlib-4285F4?logo=google&logoColor=white)
 [![codecov](https://codecov.io/github/dongju93/career-os/graph/badge.svg?flag=backend&token=48VXFY8C3M)](https://codecov.io/github/dongju93/career-os)
 ![Sentry](https://img.shields.io/badge/Sentry-Monitored-362D59?logo=sentry&logoColor=white)
