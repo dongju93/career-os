@@ -3,31 +3,31 @@ name = "career-os"
 version = "0.1.0"
 description = "CareerOS backend API service"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.15"
 authors = [{ name = "dongju93" }]
 maintainers = [{ name = "dongju93" }]
 dependencies = [
-    "authlib==1.8.0",
+    "authlib==1.9.5",
     "beautifulsoup4==4.15.0",
-    "fastapi[standard]==0.143.0",
-    "httpx2==2.13.1",
+    "fastapi[standard]==0.162.0",
+    "httpx2==2.16.0",
     "itsdangerous==2.2.0",
     "openai-chatkit==1.6.5",
     "psycopg-pool==3.3.3",
-    "psycopg[binary]==3.3.6",
-    "pydantic-settings==2.15.0",
+    "psycopg[binary]==3.3.8",
+    "pydantic-settings==2.16.2",
     "python-jose[cryptography]==3.5.0",
     "redis[hiredis]==8.1.0",
-    "sentry-sdk==2.71.0",
+    "sentry-sdk==2.74.0",
 ]
 
 [dependency-groups]
 dev = [
-    "fakeredis[lua]==2.39.0",
-    "pytest==9.1.1",
-    "pytest-asyncio==1.4.0",
+    "fakeredis[lua]==2.40.0",
+    "pytest==9.2.0",
+    "pytest-asyncio==1.4.1.post1",
     "pytest-cov==7.1.0",
-    "types-authlib==1.8.0.20260911",
+    "types-authlib==1.8.0.20261103",
     "types-python-jose==3.5.0.20260408",
 ]
 
@@ -41,7 +41,7 @@ Documentation = "https://eoth999-1775281441291.atlassian.net/wiki/spaces/CareerO
 "Backend Deployment" = "https://dashboard.fastapicloud.com/spdlqj011-77893206/apps/career-os/deployments"
 
 [tool.ruff]
-target-version = "py314"
+target-version = "py315"
 line-length = 88
 
 [tool.ruff.lint]
@@ -71,6 +71,7 @@ entrypoint = "main:career_os"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
     # Suppress spurious import-time warnings from openai-chatkit 1.6.5 subclassing its own deprecated BoxBase.
     'ignore:^Direct usage of named widget classes is deprecated[.]:DeprecationWarning:^abc$',

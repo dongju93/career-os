@@ -2,7 +2,7 @@
 
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.143.0-009688?logo=fastapi&logoColor=white)
 ![FastAPI Cloud](https://img.shields.io/badge/FastAPI%20Cloud-Deployed-009688?logo=fastapi&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.15-3776AB?logo=python&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?logo=postgresql&logoColor=white)
 ![OpenAI](https://img.shields.io/badge/OpenAI_SDK-3.28.0-412991?logo=openai&logoColor=white)
 ![Pyrefly](https://img.shields.io/badge/Pyrefly-1.3.2-0668E1?logo=meta&logoColor=white)
@@ -47,7 +47,7 @@
 
 ### 사전 요구사항
 
-- Python `≥ 3.14` + [`uv`](https://docs.astral.sh/uv/)
+- Python `≥ 3.15` + [`uv`](https://docs.astral.sh/uv/)
 - PostgreSQL (로컬 또는 Neon 등 외부)
 - Google OAuth 클라이언트 ID/Secret
 - OpenAI API 키
