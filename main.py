@@ -64,7 +64,6 @@ if settings.sentry_dsn:
                 event_level=logging.ERROR,
             ),
         ],
-        send_default_pii=False,
         before_send=_before_send_sentry_event,
     )
 

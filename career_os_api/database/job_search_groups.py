@@ -135,17 +135,21 @@ _COUNT_ALL_SQL = """
 SELECT COUNT(*) AS total FROM job_search_groups WHERE user_id = %s
 """
 
-_LIST_SQL_MAP = {
-    "active": _LIST_ACTIVE_SQL,
-    "ended": _LIST_ENDED_SQL,
-    None: _LIST_ALL_SQL,
-}
+_LIST_SQL_MAP = frozendict[str | None, str](
+    {  # pyrefly: ignore[bad-argument-count]
+        "active": _LIST_ACTIVE_SQL,
+        "ended": _LIST_ENDED_SQL,
+        None: _LIST_ALL_SQL,
+    }
+)
 
-_COUNT_SQL_MAP = {
-    "active": _COUNT_ACTIVE_SQL,
-    "ended": _COUNT_ENDED_SQL,
-    None: _COUNT_ALL_SQL,
-}
+_COUNT_SQL_MAP = frozendict[str | None, str](
+    {  # pyrefly: ignore[bad-argument-count]
+        "active": _COUNT_ACTIVE_SQL,
+        "ended": _COUNT_ENDED_SQL,
+        None: _COUNT_ALL_SQL,
+    }
+)
 
 
 async def create_job_search_group(

@@ -63,11 +63,13 @@ ARTIFACT_AGENT_NAME = "career-os-artifact"
 # Human-readable labels injected into the run input so the model knows which of the
 # three artifact kinds to produce (the structured artifact_type echo is pinned by
 # the route, not trusted from the model).
-_ARTIFACT_TYPE_LABELS: dict[ArtifactType, str] = {
-    "resume_bullets": "이력서 불릿 (resume_bullets)",
-    "cover_letter": "자기소개서 핵심 포인트 (cover_letter)",
-    "interview_prep": "면접 준비 (interview_prep)",
-}
+_ARTIFACT_TYPE_LABELS = frozendict[ArtifactType, str](
+    {  # pyrefly: ignore[bad-argument-count]
+        "resume_bullets": "이력서 불릿 (resume_bullets)",
+        "cover_letter": "자기소개서 핵심 포인트 (cover_letter)",
+        "interview_prep": "면접 준비 (interview_prep)",
+    }
+)
 
 # Tuned for gpt-5.6-luna: anti-fabrication first (once), type-specific shape, hard guards.
 ARTIFACT_SYSTEM_INSTRUCTIONS = """당신은 Career OS의 지원 자료 생성 에이전트입니다.

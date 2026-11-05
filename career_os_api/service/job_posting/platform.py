@@ -75,24 +75,28 @@ def _extract_wanted_id(url: str) -> str:
         ) from exc
 
 
-PLATFORM_REGISTRY: dict[Platform, PlatformAdapter] = {
-    Platform.saramin: PlatformAdapter(
-        domain="saramin.co.kr",
-        base_url="https://www.saramin.co.kr",
-        extract_id=_extract_saramin_id,
-    ),
-    Platform.wanted: PlatformAdapter(
-        domain="wanted.co.kr",
-        base_url="https://www.wanted.co.kr",
-        extract_id=_extract_wanted_id,
-    ),
-}
+# `frozendict(...)` trips a pyrefly 1.4.1 false positive on `frozendict.__init__`;
+# remove the `bad-argument-count` ignores on these tables once it is fixed.
+PLATFORM_REGISTRY = frozendict[Platform, PlatformAdapter](
+    {  # pyrefly: ignore[bad-argument-count]
+        Platform.saramin: PlatformAdapter(
+            domain="saramin.co.kr",
+            base_url="https://www.saramin.co.kr",
+            extract_id=_extract_saramin_id,
+        ),
+        Platform.wanted: PlatformAdapter(
+            domain="wanted.co.kr",
+            base_url="https://www.wanted.co.kr",
+            extract_id=_extract_wanted_id,
+        ),
+    }
+)
 
-# Computed from the registry so consumers that reference this dict directly
+# Computed from the registry so consumers that reference this mapping directly
 # stay correct without changes when platforms are added.
-PLATFORM_BASE_URLS: dict[Platform, str] = {
-    p: a.base_url for p, a in PLATFORM_REGISTRY.items()
-}
+PLATFORM_BASE_URLS = frozendict[Platform, str](
+    {p: a.base_url for p, a in PLATFORM_REGISTRY.items()}  # pyrefly: ignore[bad-argument-count]
+)
 
 
 def detect_platform(url: str) -> Platform:
