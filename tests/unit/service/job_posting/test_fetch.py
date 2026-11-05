@@ -12,7 +12,11 @@ async def test_fetch_url_content_delegates_saramin_urls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     mock_fetch = AsyncMock(return_value=b"<html>saramin</html>")
-    monkeypatch.setitem(fetch_module._FETCH_DISPATCH, Platform.saramin, mock_fetch)
+    monkeypatch.setattr(
+        fetch_module,
+        "_FETCH_DISPATCH",
+        fetch_module._FETCH_DISPATCH | {Platform.saramin: mock_fetch},
+    )
 
     content, content_type = await fetch_module.fetch_url_content(
         "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4930",
@@ -29,7 +33,11 @@ async def test_fetch_url_content_delegates_wanted_urls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     mock_fetch = AsyncMock(return_value=b"<html>wanted</html>")
-    monkeypatch.setitem(fetch_module._FETCH_DISPATCH, Platform.wanted, mock_fetch)
+    monkeypatch.setattr(
+        fetch_module,
+        "_FETCH_DISPATCH",
+        fetch_module._FETCH_DISPATCH | {Platform.wanted: mock_fetch},
+    )
 
     content, content_type = await fetch_module.fetch_url_content(
         "https://www.wanted.co.kr/wd/349998",

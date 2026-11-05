@@ -34,10 +34,12 @@ from career_os_api.database.users import (
 
 logger = logging.getLogger(__name__)
 
-_ACCOUNT_STATE_EVENTS: dict[str, RiscAccountState] = {
-    EVENT_ACCOUNT_DISABLED: RiscAccountState.DISABLED,
-    EVENT_ACCOUNT_ENABLED: RiscAccountState.ENABLED,
-}
+_ACCOUNT_STATE_EVENTS = frozendict[str, RiscAccountState](
+    {  # pyrefly: ignore[bad-argument-count]
+        EVENT_ACCOUNT_DISABLED: RiscAccountState.DISABLED,
+        EVENT_ACCOUNT_ENABLED: RiscAccountState.ENABLED,
+    }
+)
 
 _SESSION_REVOKING_EVENTS = frozenset(
     {

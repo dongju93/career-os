@@ -8,12 +8,14 @@ from career_os_api.rate_limit.limiter import check_quota, check_rate_limit
 
 TimeUnit = Literal["minute", "hour", "day", "month"]
 
-_WINDOW_SECONDS: dict[str, int] = {
-    "minute": 60,
-    "hour": 3_600,
-    "day": 86_400,
-    "month": 2_592_000,  # 30-day approx for TTL; bucket label pins exact boundary
-}
+_WINDOW_SECONDS = frozendict[str, int](
+    {  # pyrefly: ignore[bad-argument-count]
+        "minute": 60,
+        "hour": 3_600,
+        "day": 86_400,
+        "month": 2_592_000,  # 30-day approx for TTL; bucket label pins exact boundary
+    }
+)
 
 
 def _route_key(request: Request) -> str:

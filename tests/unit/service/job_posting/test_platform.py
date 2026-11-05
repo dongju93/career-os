@@ -2,6 +2,7 @@ import pytest
 from fastapi import HTTPException
 
 from career_os_api.service.job_posting.platform import (
+    PLATFORM_REGISTRY,
     Platform,
     detect_platform,
     extract_posting_id,
@@ -137,3 +138,10 @@ def test_extract_posting_id_raises_for_wanted_non_numeric_id() -> None:
 
     assert exc_info.value.status_code == 400
     assert "/wd/" in exc_info.value.detail
+
+
+def test_platform_registry_rejects_runtime_changes() -> None:
+    # The registry feeds the outbound SSRF allowlist in http_client.py, so a runtime
+    # write must not be able to add a destination.
+    with pytest.raises(TypeError):
+        PLATFORM_REGISTRY[Platform.saramin] = PLATFORM_REGISTRY[Platform.wanted]  # pyrefly: ignore[unsupported-operation]
