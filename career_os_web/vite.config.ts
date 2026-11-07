@@ -18,6 +18,8 @@ const API_PROXY_TARGET = 'http://localhost:8000';
 // https://vite.dev/config/
 export default defineConfig({
   fmt: {
+    // Markdown is owned by a separate formatter.
+    ignorePatterns: ['**/*.md'],
     printWidth: 80,
     singleQuote: true,
     sortImports: { newlinesBetween: false },
