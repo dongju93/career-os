@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { useRequestGeneration } from '@/hooks/use-request-generation';
 import { motion } from '@/styles/motion';
 import { surfaces } from '@/styles/surfaces';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
@@ -333,14 +334,9 @@ export function JobPostingsPage() {
 
   const groupId = selectedGroup === 'all' ? undefined : selectedGroup;
 
-  // Loading is derived from the current request not having settled, so a new
-  // page, group, or retry needs no state reset inside the effect.
-  const [retryCount, setRetryCount] = useState(0);
-  const postingsRequestKey = `${page}:${groupId ?? 'all'}:${retryCount}`;
-  const [settledPostingsRequestKey, setSettledPostingsRequestKey] = useState<
-    string | null
-  >(null);
-  const isLoading = settledPostingsRequestKey !== postingsRequestKey;
+  const { generation, isLoading, markSettled, retry } = useRequestGeneration(
+    `${page}:${groupId ?? 'all'}`,
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -348,20 +344,21 @@ export function JobPostingsPage() {
 
     fetchJobPostings((page - 1) * PAGE_SIZE, PAGE_SIZE, groupId, signal)
       .then((pageData) => {
+        if (signal.aborted) return;
         setItems(pageData.items);
         setTotal(pageData.total);
         setError(null);
       })
       .catch((err: unknown) => {
-        if (err instanceof Error && err.name === 'AbortError') return;
+        if (signal.aborted) return;
         setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
       })
       .finally(() => {
-        if (!signal.aborted) setSettledPostingsRequestKey(postingsRequestKey);
+        if (!signal.aborted) markSettled(generation);
       });
 
     return () => controller.abort();
-  }, [page, groupId, postingsRequestKey]);
+  }, [page, groupId, generation, markSettled]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const hasPrev = page > 1;
@@ -451,10 +448,7 @@ export function JobPostingsPage() {
       )}
 
       {!isLoading && error && (
-        <JobPostingsErrorState
-          error={error}
-          onRetry={() => setRetryCount((count) => count + 1)}
-        />
+        <JobPostingsErrorState error={error} onRetry={retry} />
       )}
 
       {!isLoading && !error && items.length === 0 && (

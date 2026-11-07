@@ -39,6 +39,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { useRequestGeneration } from '@/hooks/use-request-generation';
 import { motion } from '@/styles/motion';
 import { surfaces } from '@/styles/surfaces';
 import {
@@ -375,14 +376,9 @@ export function JobPostingDetailPage() {
   useDocumentTitle(
     detail ? `${detail.company_name} ${detail.job_title}` : '채용공고 상세',
   );
-  // Loading is derived from the current request not having settled, so a new
-  // posting id or a retry needs no state reset inside the effect.
-  const [retryCount, setRetryCount] = useState(0);
-  const detailRequestKey = `${id}:${retryCount}`;
-  const [settledDetailRequestKey, setSettledDetailRequestKey] = useState<
-    string | null
-  >(null);
-  const isLoading = settledDetailRequestKey !== detailRequestKey;
+  const { generation, isLoading, markSettled, retry } = useRequestGeneration(
+    id ?? '',
+  );
   const [error, setError] = useState<UserFacingError | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusError, setStatusError] = useState<UserFacingError | null>(null);
@@ -399,6 +395,7 @@ export function JobPostingDetailPage() {
 
     fetchJobPosting(Number(id), signal)
       .then((loaded) => {
+        if (signal.aborted) return;
         setDetail(loaded);
         // Seed the editable draft from the server value; further edits are
         // local until the user saves.
@@ -406,15 +403,15 @@ export function JobPostingDetailPage() {
         setError(null);
       })
       .catch((err: unknown) => {
-        if (err instanceof Error && err.name === 'AbortError') return;
+        if (signal.aborted) return;
         setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
       })
       .finally(() => {
-        if (!signal.aborted) setSettledDetailRequestKey(detailRequestKey);
+        if (!signal.aborted) markSettled(generation);
       });
 
     return () => controller.abort();
-  }, [id, detailRequestKey]);
+  }, [id, generation, markSettled]);
 
   async function handleStatusChange(next: ApplicationStatus) {
     if (!detail || next === detail.application_status) return;
@@ -488,10 +485,7 @@ export function JobPostingDetailPage() {
         data-stack=""
       >
         {backLink}
-        <DetailErrorState
-          error={error}
-          onRetry={() => setRetryCount((count) => count + 1)}
-        />
+        <DetailErrorState error={error} onRetry={retry} />
       </div>
     );
   }
