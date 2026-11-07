@@ -28,7 +28,7 @@ import {
   StickyNote,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -375,7 +375,14 @@ export function JobPostingDetailPage() {
   useDocumentTitle(
     detail ? `${detail.company_name} ${detail.job_title}` : '채용공고 상세',
   );
-  const [isLoading, setIsLoading] = useState(true);
+  // Loading is derived from the current request not having settled, so a new
+  // posting id or a retry needs no state reset inside the effect.
+  const [retryCount, setRetryCount] = useState(0);
+  const detailRequestKey = `${id}:${retryCount}`;
+  const [settledDetailRequestKey, setSettledDetailRequestKey] = useState<
+    string | null
+  >(null);
+  const isLoading = settledDetailRequestKey !== detailRequestKey;
   const [error, setError] = useState<UserFacingError | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusError, setStatusError] = useState<UserFacingError | null>(null);
@@ -384,36 +391,30 @@ export function JobPostingDetailPage() {
   const [memoError, setMemoError] = useState<UserFacingError | null>(null);
   const [memoSuccess, setMemoSuccess] = useState(false);
 
-  const loadDetail = useCallback(
-    (signal?: AbortSignal) => {
-      if (!id) return;
-
-      setIsLoading(true);
-      setError(null);
-
-      fetchJobPosting(Number(id), signal)
-        .then((loaded) => {
-          setDetail(loaded);
-          // Seed the editable draft from the server value; further edits are
-          // local until the user saves.
-          setMemoDraft(loaded.memo ?? '');
-        })
-        .catch((err: unknown) => {
-          if (err instanceof Error && err.name === 'AbortError') return;
-          setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
-        })
-        .finally(() => {
-          if (!signal?.aborted) setIsLoading(false);
-        });
-    },
-    [id],
-  );
-
   useEffect(() => {
+    if (!id) return;
+
     const controller = new AbortController();
-    loadDetail(controller.signal);
+    const { signal } = controller;
+
+    fetchJobPosting(Number(id), signal)
+      .then((loaded) => {
+        setDetail(loaded);
+        // Seed the editable draft from the server value; further edits are
+        // local until the user saves.
+        setMemoDraft(loaded.memo ?? '');
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === 'AbortError') return;
+        setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
+      })
+      .finally(() => {
+        if (!signal.aborted) setSettledDetailRequestKey(detailRequestKey);
+      });
+
     return () => controller.abort();
-  }, [loadDetail]);
+  }, [id, detailRequestKey]);
 
   async function handleStatusChange(next: ApplicationStatus) {
     if (!detail || next === detail.application_status) return;
@@ -487,7 +488,10 @@ export function JobPostingDetailPage() {
         data-stack=""
       >
         {backLink}
-        <DetailErrorState error={error} onRetry={loadDetail} />
+        <DetailErrorState
+          error={error}
+          onRetry={() => setRetryCount((count) => count + 1)}
+        />
       </div>
     );
   }
@@ -499,10 +503,10 @@ export function JobPostingDetailPage() {
 
   const hasMetadata = Boolean(
     detail.location ||
-      detail.experience_req ||
-      detail.employment_type ||
-      detail.deadline ||
-      detail.salary,
+    detail.experience_req ||
+    detail.employment_type ||
+    detail.deadline ||
+    detail.salary,
   );
 
   const textSections: Array<{

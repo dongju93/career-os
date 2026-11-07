@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import type { JobPostingExtracted } from '../types/job-posting';
 import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
 import {
@@ -267,7 +267,9 @@ describe('updateJobPosting', () => {
 
     await expect(
       updateJobPosting(1, { application_status: 'applied' }),
-    ).rejects.toMatchObject({ code: CLIENT_CONTRACT_MISMATCH });
+    ).rejects.toMatchObject({
+      code: CLIENT_CONTRACT_MISMATCH,
+    });
   });
 });
 

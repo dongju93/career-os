@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { chatKitFetch, getChatKitApiUrl, getChatKitDomainKey } from './chatkit';
 
 const CHATKIT_SCRIPT_SRC =
@@ -88,8 +88,8 @@ describe('loadChatKitScript', () => {
   it('injects the ChatKit CDN script exactly once across repeated calls', async () => {
     const { loadChatKitScript } = await import('./chatkit');
 
-    loadChatKitScript();
-    loadChatKitScript();
+    void loadChatKitScript();
+    void loadChatKitScript();
 
     const scripts = chatKitScripts();
     expect(scripts.length).toBe(1);
@@ -113,7 +113,7 @@ describe('loadChatKitScript', () => {
     await expect(first).rejects.toThrow(/ChatKit/);
 
     // The failed load cleared the cache, so a retry injects a fresh script.
-    loadChatKitScript();
+    void loadChatKitScript();
     expect(chatKitScripts().length).toBe(1);
   });
 

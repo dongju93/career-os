@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
+import { parseJsonRequestBody } from '@/test/json-request-body';
 import { useAuthStore } from '../store/auth-store';
 import { renderRoute } from '../test/test-utils';
 import type { UserProfile } from '../types/user-profile';
@@ -116,7 +117,7 @@ describe('ProfilePage', () => {
         }
         if (input === `/v1/profile`) {
           if (init?.method === 'PUT') {
-            putBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+            putBody = parseJsonRequestBody(init);
             return jsonResponse(
               apiResponse({
                 ...existingProfile,

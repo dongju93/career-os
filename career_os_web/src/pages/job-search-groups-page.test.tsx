@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
+import { parseJsonRequestBody } from '@/test/json-request-body';
 import { useAuthStore } from '../store/auth-store';
 import { renderRoute } from '../test/test-utils';
 import type { JobSearchGroupItem } from '../types/job-search-group';
@@ -144,7 +145,7 @@ describe('JobSearchGroupsPage', () => {
 
     const fetchMock = makeGroupsFetchMock([activeGroup], [], (input, init) => {
       if (input === `/v1/job-search-groups` && init?.method === 'POST') {
-        postBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+        postBody = parseJsonRequestBody(init);
         return Promise.resolve(jsonResponse(groupDetailResponse(newGroup)));
       }
       return null;
@@ -218,7 +219,7 @@ describe('JobSearchGroupsPage', () => {
         input === `/v1/job-search-groups/${ACTIVE_GROUP_ID}` &&
         init?.method === 'PATCH'
       ) {
-        patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+        patchBody = parseJsonRequestBody(init);
         return Promise.resolve(
           jsonResponse(
             groupDetailResponse({ ...activeGroup, ended_at: '2026-05-16' }),

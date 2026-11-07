@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
+import { parseJsonRequestBody } from '@/test/json-request-body';
 import { useAuthStore } from '../store/auth-store';
 import { renderRoute } from '../test/test-utils';
 import type { ApplicationPlan } from '../types/application-plan';
@@ -217,7 +218,7 @@ describe('StrategistPage', () => {
         profile: existingProfile,
         groups: [activeGroup],
         planHandler: (init) => {
-          planBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+          planBody = parseJsonRequestBody(init);
           return jsonResponse(apiResponse(samplePlan));
         },
       }),
@@ -344,7 +345,7 @@ describe('StrategistPage', () => {
         planHandler: () => jsonResponse(apiResponse(planWithActions)),
         patchHandler: (input, init) => {
           patchUrl = input;
-          patchBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+          patchBody = parseJsonRequestBody(init);
           return jsonResponse(apiResponse(updatedPosting));
         },
       }),

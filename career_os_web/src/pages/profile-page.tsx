@@ -6,7 +6,7 @@ import {
   Save,
   UserCircle,
 } from 'lucide-react';
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -111,7 +111,13 @@ function ProfileLoadError({
 export function ProfilePage() {
   useDocumentTitle('프로필');
   const [form, setForm] = useState<ProfileFormState>(toProfileFormState(null));
-  const [isLoading, setIsLoading] = useState(true);
+  // Bump to refetch. Loading is derived from the latest request not having
+  // settled, so the effect never sets state synchronously.
+  const [loadRequest, setLoadRequest] = useState(0);
+  const [settledLoadRequest, setSettledLoadRequest] = useState<number | null>(
+    null,
+  );
+  const isLoading = settledLoadRequest !== loadRequest;
   const [loadError, setLoadError] = useState<UserFacingError | null>(null);
   const [isNewProfile, setIsNewProfile] = useState(false);
 
@@ -122,29 +128,26 @@ export function ProfilePage() {
   // reader describes; server failures still use the page-level saveError Alert.
   const [yearsError, setYearsError] = useState<string | null>(null);
 
-  const loadProfile = useCallback((signal?: AbortSignal) => {
-    setIsLoading(true);
-    setLoadError(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
 
     fetchUserProfile(signal)
       .then((profile) => {
         setForm(toProfileFormState(profile));
         setIsNewProfile(profile === null);
+        setLoadError(null);
       })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === 'AbortError') return;
         setLoadError(toUserFacingError(err, '프로필을 불러오지 못했습니다.'));
       })
       .finally(() => {
-        if (!signal?.aborted) setIsLoading(false);
+        if (!signal.aborted) setSettledLoadRequest(loadRequest);
       });
-  }, []);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    loadProfile(controller.signal);
     return () => controller.abort();
-  }, [loadProfile]);
+  }, [loadRequest]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -206,7 +209,10 @@ export function ProfilePage() {
         {...stylex.props([styles.profilePageStack, motion.fadeIn])}
         data-stack=""
       >
-        <ProfileLoadError error={loadError} onRetry={loadProfile} />
+        <ProfileLoadError
+          error={loadError}
+          onRetry={() => setLoadRequest((request) => request + 1)}
+        />
       </div>
     );
   }

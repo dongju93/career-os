@@ -5,14 +5,9 @@ export const RATE_LIMIT_EXCEEDED_CODE = 'RATE_LIMIT_EXCEEDED';
 export const QUOTA_EXCEEDED_CODE = 'QUOTA_EXCEEDED';
 export const CLIENT_CONTRACT_MISMATCH = 'CLIENT_CONTRACT_MISMATCH';
 
-export type ApiErrorCode =
-  | typeof DATABASE_UNAVAILABLE_CODE
-  | typeof INTERNAL_SERVER_ERROR_CODE
-  | typeof UNKNOWN_API_ERROR_CODE
-  | typeof RATE_LIMIT_EXCEEDED_CODE
-  | typeof QUOTA_EXCEEDED_CODE
-  | typeof CLIENT_CONTRACT_MISMATCH
-  | string;
+// Open by design: the server may send codes this client does not know about.
+// The constants above are only the ones the client itself emits or branches on.
+export type ApiErrorCode = string;
 
 export interface UserFacingError {
   code: ApiErrorCode;

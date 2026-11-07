@@ -1,5 +1,5 @@
 import { renderHook } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vite-plus/test';
 import { useDocumentTitle } from './use-document-title';
 
 describe('useDocumentTitle', () => {
@@ -20,7 +20,9 @@ describe('useDocumentTitle', () => {
   it('updates the title when the label changes', () => {
     const { rerender } = renderHook(
       ({ title }: { title: string }) => useDocumentTitle(title),
-      { initialProps: { title: '프로필' } },
+      {
+        initialProps: { title: '프로필' },
+      },
     );
     expect(document.title).toBe('프로필 · Career OS');
 

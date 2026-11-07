@@ -57,7 +57,7 @@
     border-radius: 0;
   }
   button,
-  input:where([type="button"], [type="reset"], [type="submit"]) {
+  input:where([type='button'], [type='reset'], [type='submit']) {
     appearance: button;
   }
   textarea {
@@ -68,8 +68,8 @@
     border-color: inherit;
     text-indent: 0;
   }
-  [hidden]:where(:not([hidden="until-found"])) {
-    /* biome-ignore lint/complexity/noImportantStyles: native hidden must override authored display styles */
+  [hidden]:where(:not([hidden='until-found'])) {
+    /* Native hidden must override authored display styles. */
     display: none !important;
   }
 }
@@ -77,7 +77,7 @@
 /* ── Semantic color tokens ── */
 :root {
   --font-sans:
-    "Inter", "IBM Plex Sans", "Segoe UI Variable", "Segoe UI", system-ui,
+    'Inter', 'IBM Plex Sans', 'Segoe UI Variable', 'Segoe UI', system-ui,
     sans-serif;
   --background: 0 0% 100%;
   --foreground: 0 0% 9%;

@@ -11,13 +11,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -459,7 +453,13 @@ function ProposedActionList({
 
 export function StrategistPage() {
   useDocumentTitle('지원 전략');
-  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  // Bump to refetch. Bootstrapping is derived from the latest request not having
+  // settled, so the effect never sets state synchronously.
+  const [bootstrapRequest, setBootstrapRequest] = useState(0);
+  const [settledBootstrapRequest, setSettledBootstrapRequest] = useState<
+    number | null
+  >(null);
+  const isBootstrapping = settledBootstrapRequest !== bootstrapRequest;
   const [bootstrapError, setBootstrapError] = useState<UserFacingError | null>(
     null,
   );
@@ -479,9 +479,9 @@ export function StrategistPage() {
 
   const planControllerRef = useRef<AbortController | null>(null);
 
-  const bootstrap = useCallback((signal?: AbortSignal) => {
-    setIsBootstrapping(true);
-    setBootstrapError(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
 
     Promise.all([
       fetchUserProfile(signal),
@@ -490,6 +490,7 @@ export function StrategistPage() {
       .then(([profile, groupsPage]) => {
         setHasProfile(profile !== null);
         setGroups(groupsPage.items);
+        setBootstrapError(null);
       })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === 'AbortError') return;
@@ -498,15 +499,11 @@ export function StrategistPage() {
         );
       })
       .finally(() => {
-        if (!signal?.aborted) setIsBootstrapping(false);
+        if (!signal.aborted) setSettledBootstrapRequest(bootstrapRequest);
       });
-  }, []);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    bootstrap(controller.signal);
     return () => controller.abort();
-  }, [bootstrap]);
+  }, [bootstrapRequest]);
 
   // Cancel an in-flight plan request when the page unmounts so a 10–60 s run
   // does not keep burning model time after the user navigates away.
@@ -559,7 +556,12 @@ export function StrategistPage() {
   if (isBootstrapping) {
     body = <BootstrapSkeleton />;
   } else if (bootstrapError) {
-    body = <StrategistErrorState error={bootstrapError} onRetry={bootstrap} />;
+    body = (
+      <StrategistErrorState
+        error={bootstrapError}
+        onRetry={() => setBootstrapRequest((request) => request + 1)}
+      />
+    );
   } else if (!hasProfile) {
     body = <NoProfileCta />;
   } else if (isFeatureUnavailable) {

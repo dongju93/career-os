@@ -8,7 +8,7 @@ import {
   RefreshCw,
   Trash2,
 } from 'lucide-react';
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -186,7 +186,13 @@ export function JobSearchGroupsPage() {
 
   const [activeGroups, setActiveGroups] = useState<JobSearchGroupItem[]>([]);
   const [endedGroups, setEndedGroups] = useState<JobSearchGroupItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Bump to refetch. Loading is derived from the latest request not having
+  // settled, so the effect never sets state synchronously.
+  const [groupsRequest, setGroupsRequest] = useState(0);
+  const [settledGroupsRequest, setSettledGroupsRequest] = useState<
+    number | null
+  >(null);
+  const isLoading = settledGroupsRequest !== groupsRequest;
   const [error, setError] = useState<UserFacingError | null>(null);
 
   const [modal, setModal] = useState<ModalState>({ type: 'closed' });
@@ -204,30 +210,34 @@ export function JobSearchGroupsPage() {
 
   const [endingGroupId, setEndingGroupId] = useState<string | null>(null);
 
-  const loadGroups = useCallback(async (signal?: AbortSignal) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const [activeData, endedData] = await Promise.all([
-        fetchJobSearchGroups({ status: 'active', limit: 100 }, signal),
-        fetchJobSearchGroups({ status: 'ended', limit: 100 }, signal),
-      ]);
-      if (signal?.aborted) return;
-      setActiveGroups(activeData.items);
-      setEndedGroups(endedData.items);
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      setError(toUserFacingError(err, '그룹 목록을 불러오지 못했습니다.'));
-    } finally {
-      if (!signal?.aborted) setIsLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     const controller = new AbortController();
-    loadGroups(controller.signal);
+    const { signal } = controller;
+
+    Promise.all([
+      fetchJobSearchGroups({ status: 'active', limit: 100 }, signal),
+      fetchJobSearchGroups({ status: 'ended', limit: 100 }, signal),
+    ])
+      .then(([activeData, endedData]) => {
+        if (signal.aborted) return;
+        setActiveGroups(activeData.items);
+        setEndedGroups(endedData.items);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === 'AbortError') return;
+        setError(toUserFacingError(err, '그룹 목록을 불러오지 못했습니다.'));
+      })
+      .finally(() => {
+        if (!signal.aborted) setSettledGroupsRequest(groupsRequest);
+      });
+
     return () => controller.abort();
-  }, [loadGroups]);
+  }, [groupsRequest]);
+
+  function reloadGroups() {
+    setGroupsRequest((request) => request + 1);
+  }
 
   function openCreateModal() {
     setFormName('');
@@ -284,7 +294,7 @@ export function JobSearchGroupsPage() {
         await updateJobSearchGroup(modal.group.id, payload);
       }
       closeModal();
-      await loadGroups();
+      reloadGroups();
     } catch (err) {
       const { message } = toUserFacingError(err, '저장에 실패했습니다.');
       setFormError({ type: 'submit', message });
@@ -299,7 +309,7 @@ export function JobSearchGroupsPage() {
       await updateJobSearchGroup(groupId, {
         ended_at: todayLocalDateInputValue(),
       });
-      await loadGroups();
+      reloadGroups();
     } catch (err) {
       const { message } = toUserFacingError(err, '종료에 실패했습니다.');
       setError({ code: 'UNKNOWN', message });
@@ -313,7 +323,7 @@ export function JobSearchGroupsPage() {
     try {
       await deleteJobSearchGroup(modal.group.id);
       closeModal();
-      await loadGroups();
+      reloadGroups();
     } catch (err) {
       const { message } = toUserFacingError(err, '삭제에 실패했습니다.');
       setDeleteError(message);
@@ -368,7 +378,7 @@ export function JobSearchGroupsPage() {
               xstyle={styles.jobSearchGroupsPageButton}
               size="sm"
               variant="outline"
-              onClick={() => loadGroups()}
+              onClick={reloadGroups}
             >
               <RefreshCw {...stylex.props(styles.groupCardBriefcase)} />
               다시 시도

@@ -32,12 +32,13 @@ export function ChatKitFloatingAssistant() {
   const user = useAuthStore((state) => state.user);
 
   const [open, setOpen] = useState(false);
-  // Mount <ChatKit> lazily on first open, then keep it alive (hidden via CSS)
+  // Mount <ChatKit> lazily on first open, then keep it alive in the closed dialog
   // so the active thread and loaded state survive close/reopen within a session
   // without eagerly loading the embed on every authenticated page.
   const [hasOpened, setHasOpened] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
+  const panelRef = useRef<HTMLDialogElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const firstActionRef = useRef<HTMLButtonElement>(null);
   const prevOpenRef = useRef(false);
@@ -81,13 +82,25 @@ export function ChatKitFloatingAssistant() {
       onThreadChange: () => setHistoryOpen(false),
     });
 
-  // Move focus into the panel on open and back to the launcher on close.
+  // Drive the native <dialog> imperatively, like AppLayout's drawer: show() keeps
+  // it non-modal and out of the top layer. jsdom (the test env) ships no
+  // show()/close(), so fall back to toggling the `open` property there. Reveal
+  // the panel before focusing, since a closed dialog's contents cannot take focus.
   useEffect(() => {
     const wasOpen = prevOpenRef.current;
     prevOpenRef.current = open;
+    const panel = panelRef.current;
     if (open) {
+      if (panel && !panel.open) {
+        if (typeof panel.show === 'function') panel.show();
+        else panel.open = true;
+      }
       firstActionRef.current?.focus();
     } else if (wasOpen) {
+      if (panel?.open) {
+        if (typeof panel.close === 'function') panel.close();
+        else panel.open = false;
+      }
       launcherRef.current?.focus();
     }
   }, [open]);
@@ -157,16 +170,15 @@ export function ChatKitFloatingAssistant() {
           no background inert. Keyboard support is ESC-to-close + focus restore
           (below); the launcher exposes aria-expanded/aria-controls. */}
       {hasOpened && (
-        <div
+        <dialog
+          ref={panelRef}
           id={panelId}
-          role="dialog"
           aria-label="AI 어시스턴트"
           {...stylex.props([
             styles.panel,
             surfaces.glassStrong,
             styles.panelMobile,
             styles.panelViewport,
-            !open && styles.hidden,
           ])}
         >
           <div {...stylex.props(styles.header)}>
@@ -203,7 +215,7 @@ export function ChatKitFloatingAssistant() {
           <div {...stylex.props(styles.body)}>
             <ChatKit control={control} {...stylex.props(styles.icon3)} />
           </div>
-        </div>
+        </dialog>
       )}
     </>
   );
@@ -312,10 +324,17 @@ const styles = stylex.create({
   panel: {
     position: 'fixed',
     zIndex: 60,
-    display: 'flex',
+    // Scoped to [open]: an unconditional display would beat the browser's
+    // dialog:not([open]) { display: none } and leave the closed panel visible.
+    display: {
+      default: null,
+      ':is([open])': 'flex',
+    },
     flexDirection: 'column',
     overflow: 'hidden',
     borderRadius: '1rem',
+    // The browser's dialog styles set CanvasText rather than inheriting.
+    color: 'inherit',
   },
   panelMobile: {
     top: '4rem',
@@ -340,17 +359,16 @@ const styles = stylex.create({
       default: '0.75rem',
       '@media (min-width: 48rem)': '1.5rem',
     },
+    // `auto` lets the insets stretch the panel on mobile; the browser's dialog
+    // default of fit-content would shrink it to its contents.
     height: {
-      default: null,
+      default: 'auto',
       '@media (min-width: 48rem)': 'min(680px, calc(100vh - 6rem))',
     },
     width: {
-      default: null,
+      default: 'auto',
       '@media (min-width: 48rem)': 'min(420px, calc(100vw - 2rem))',
     },
-  },
-  hidden: {
-    display: 'none',
   },
   header: {
     display: 'flex',

@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
+import { parseJsonRequestBody } from '@/test/json-request-body';
 import { useAuthStore } from '../store/auth-store';
 import { renderRoute } from '../test/test-utils';
 import type { JobPostingExtracted } from '../types/job-posting';
@@ -144,7 +145,7 @@ describe('AddJobPostingPage', () => {
 
       if (input === `/v1/job-postings`) {
         saveInit = init;
-        savedPayload = JSON.parse(String(init?.body)) as JobPostingExtracted;
+        savedPayload = parseJsonRequestBody<JobPostingExtracted>(init);
         return jsonResponse(savedDetailResponse);
       }
 

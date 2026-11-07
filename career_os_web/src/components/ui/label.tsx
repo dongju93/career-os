@@ -9,7 +9,7 @@ export function Label({
   ...props
 }: LabelHTMLAttributes<HTMLLabelElement> & { xstyle?: AppStyles }) {
   return (
-    // biome-ignore lint/a11y/noLabelWithoutControl: callers always pass htmlFor
+    // oxlint-disable-next-line jsx-a11y/label-has-associated-control -- callers always pass htmlFor
     <label {...withClassName([styles.label, xstyle], className)} {...props} />
   );
 }

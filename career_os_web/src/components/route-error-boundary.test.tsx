@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useRouteError } from 'react-router';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import { RouteErrorBoundary } from './route-error-boundary';
 
 vi.mock('react-router', async (importOriginal) => {

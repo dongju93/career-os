@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useAuthStore } from '../store/auth-store';
 import { renderRoute } from '../test/test-utils';
 import type { JobPostingPage } from '../types/job-posting';
@@ -123,8 +123,9 @@ describe('JobPostingsPage', () => {
     ).toBeInTheDocument();
     // calls: auth/me + groups-fetch + first-postings(rate-limited) + retry-postings
     expect(fetchMock).toHaveBeenCalledTimes(4);
-    // The manual retry (last call) must not carry a signal from the click event
+    // The manual retry (last call) must carry its own live abort signal, not the
+    // click event or the aborted signal of an earlier request.
     const lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
-    expect(lastCall?.[1]?.signal).toBeUndefined();
+    expect(lastCall?.[1]?.signal?.aborted).toBe(false);
   });
 });

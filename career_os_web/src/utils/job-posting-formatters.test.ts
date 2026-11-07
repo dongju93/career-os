@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { formatRelativeDate, platformVariant } from './job-posting-formatters';
 
 function daysAgoIso(days: number): string {

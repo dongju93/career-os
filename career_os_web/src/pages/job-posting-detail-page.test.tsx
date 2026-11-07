@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
+import { parseJsonRequestBody } from '@/test/json-request-body';
 import { useAuthStore } from '../store/auth-store';
 import { renderRoute } from '../test/test-utils';
 import type { JobPostingDetail, JobPostingPage } from '../types/job-posting';
@@ -310,7 +311,7 @@ describe('JobPostingDetailPage', () => {
 
       if (input === `/v1/job-postings/1`) {
         if (init?.method === 'PATCH') {
-          patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          patchBody = parseJsonRequestBody(init);
           return jsonResponse(
             apiResponse({
               ...detail,
@@ -476,7 +477,7 @@ describe('JobPostingDetailPage', () => {
 
       if (input === `/v1/job-postings/1`) {
         if (init?.method === 'PATCH') {
-          patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          patchBody = parseJsonRequestBody(init);
           return jsonResponse(
             apiResponse({ ...detail, memo: '관심 있는 공고' }),
           );
@@ -523,7 +524,7 @@ describe('JobPostingDetailPage', () => {
 
       if (input === `/v1/job-postings/1`) {
         if (init?.method === 'PATCH') {
-          patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          patchBody = parseJsonRequestBody(init);
           return jsonResponse(apiResponse({ ...detail, memo: null }));
         }
         return jsonResponse(apiResponse(detail));
@@ -558,7 +559,7 @@ describe('JobPostingDetailPage', () => {
     let artifactBody: Record<string, unknown> | null = null;
 
     const fetchMock = buildDetailFetchMock(detail, (init) => {
-      artifactBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      artifactBody = parseJsonRequestBody(init);
       return jsonResponse(
         apiResponse({
           artifact_type: 'cover_letter',
