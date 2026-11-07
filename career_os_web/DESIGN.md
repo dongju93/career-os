@@ -34,8 +34,9 @@ the login button includes an inline Google brand SVG.
 - `src/index.css` owns the browser reset, semantic CSS variables, document
   defaults, focus/selection/scrollbar styling, and two structural selectors:
   stack child spacing and deferred rendering of later posting cards.
-- Vitest uses the official StyleX Babel plugin without CSS injection. Component
-  tests check semantics and composition; browser checks cover the CSS cascade,
+- Vitest compiles StyleX with the Rolldown adapter of the same unplugin, and its
+  generated CSS is not loaded into jsdom. Component tests check semantics and
+  composition; browser checks cover the CSS cascade,
   responsive breakpoints, pseudo-states, and geometry.
 
 ```tsx

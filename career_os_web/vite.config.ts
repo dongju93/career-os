@@ -1,7 +1,6 @@
 import { resolve } from 'node:path';
-import babel from '@rolldown/plugin-babel';
 import stylex from '@stylexjs/unplugin';
-import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import react from '@vitejs/plugin-react';
 import { defineConfig, lazyPlugins } from 'vite-plus';
 import {
   licenseMetadataFile,
@@ -49,15 +48,10 @@ export default defineConfig({
   },
   plugins: lazyPlugins(() => [
     thirdPartyLicenses(resolve(import.meta.dirname, 'licenses')),
-    // Vitest has no HTTP server to own the unplugin's CSS/HMR lifecycle.
-    !process.env.VITEST && stylex.vite(),
-    react(),
-    babel({
-      presets: [reactCompilerPreset()],
-      plugins: process.env.VITEST
-        ? [['@stylexjs/babel-plugin', { runtimeInjection: false }]]
-        : [],
-    }),
+    // The Vite adapter's dev CSS interval stops only when an HTTP server closes.
+    // Vitest has none, so that adapter would block exit until teardownTimeout.
+    process.env.VITEST ? stylex.rolldown() : stylex.vite(),
+    react({ compiler: true }),
   ]),
   build: {
     license: { fileName: licenseMetadataFile },
