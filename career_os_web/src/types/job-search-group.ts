@@ -9,8 +9,10 @@ export interface JobSearchGroupItem {
   updated_at: string;
 }
 
-export interface JobSearchGroup
-  extends Omit<JobSearchGroupItem, 'posting_count'> {}
+export interface JobSearchGroup extends Omit<
+  JobSearchGroupItem,
+  'posting_count'
+> {}
 
 export interface JobSearchGroupPage {
   items: JobSearchGroupItem[];

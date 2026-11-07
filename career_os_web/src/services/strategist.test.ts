@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import type { ApplicationArtifact } from '../types/application-artifact';
 import type { ApplicationPlan } from '../types/application-plan';
 import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';

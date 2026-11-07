@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import { ApiError, CLIENT_CONTRACT_MISMATCH } from './api-error';
 import { fetchAuthMe, logoutUser } from './auth';
 

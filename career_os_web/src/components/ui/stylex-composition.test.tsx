@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { Alert, AlertDescription } from './alert';
 import { Button } from './button';
 import { CardContent } from './card';

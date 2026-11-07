@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import { resetAuthStore, useAuthStore } from './auth-store';
 
 const sampleUser = {
@@ -89,7 +89,7 @@ describe('auth storage', () => {
   it('keeps the user out of localStorage', () => {
     useAuthStore.getState().setAuth(sampleUser);
 
-    expect(JSON.stringify({ ...window.localStorage })).not.toContain(
+    expect(JSON.stringify(Object.entries(window.localStorage))).not.toContain(
       sampleUser.email,
     );
   });

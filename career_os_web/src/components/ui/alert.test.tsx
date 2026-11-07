@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { Alert, AlertDescription } from './alert';
 
 describe('Alert', () => {
@@ -29,6 +29,7 @@ describe('Alert', () => {
 
   it('lets callers override the derived politeness', () => {
     render(
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- Alert is a component and `role` is its override prop; it renders a <div>, so <output> does not apply.
       <Alert variant="destructive" role="status" aria-live="polite">
         <AlertDescription>덜 급한 알림</AlertDescription>
       </Alert>,

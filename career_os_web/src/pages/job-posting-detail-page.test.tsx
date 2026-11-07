@@ -1,6 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
+import { parseJsonRequestBody } from '@/test/json-request-body';
 import { useAuthStore } from '../store/auth-store';
 import { renderRoute } from '../test/test-utils';
 import type { JobPostingDetail, JobPostingPage } from '../types/job-posting';
@@ -131,6 +132,56 @@ function buildDetailFetchMock(
     }
 
     throw new Error(`Unexpected fetch request: ${input}`);
+  });
+}
+
+type PendingDetailResponse = (
+  response: ReturnType<typeof jsonResponse>,
+) => void;
+
+// Holds every detail request open, in arrival order per posting id, so a test
+// decides exactly when each one settles. Like a response already in flight when
+// the abort lands, these ignore the signal and can still resolve afterwards.
+function stubDeferredDetailFetch() {
+  const pending: Record<string, PendingDetailResponse[]> = { 1: [], 2: [] };
+
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string) => {
+      if (input === `/v1/auth/me`) {
+        return jsonResponse(
+          apiResponse({
+            user_id: 'user-1',
+            email: 'user@example.com',
+            name: 'Career OS User',
+            picture: null,
+          }),
+        );
+      }
+
+      const postingId = input.match(/^\/v1\/job-postings\/(\d+)$/)?.[1];
+      if (postingId === undefined) {
+        throw new Error(`Unexpected fetch request: ${input}`);
+      }
+
+      return new Promise<ReturnType<typeof jsonResponse>>((resolve) => {
+        pending[postingId].push(resolve);
+      });
+    }),
+  );
+
+  return pending;
+}
+
+// The trailing macrotask lets the response finish parsing and its handlers run,
+// so a test can assert on what a late response did (or did not) change.
+async function respondWithDetail(
+  request: PendingDetailResponse,
+  detail: JobPostingDetail,
+) {
+  await act(async () => {
+    request(jsonResponse(apiResponse(detail)));
+    await new Promise((resolve) => setTimeout(resolve));
   });
 }
 
@@ -310,7 +361,7 @@ describe('JobPostingDetailPage', () => {
 
       if (input === `/v1/job-postings/1`) {
         if (init?.method === 'PATCH') {
-          patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          patchBody = parseJsonRequestBody(init);
           return jsonResponse(
             apiResponse({
               ...detail,
@@ -476,7 +527,7 @@ describe('JobPostingDetailPage', () => {
 
       if (input === `/v1/job-postings/1`) {
         if (init?.method === 'PATCH') {
-          patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          patchBody = parseJsonRequestBody(init);
           return jsonResponse(
             apiResponse({ ...detail, memo: '관심 있는 공고' }),
           );
@@ -504,6 +555,68 @@ describe('JobPostingDetailPage', () => {
     expect(memoBox.value).toBe('관심 있는 공고');
   });
 
+  it('hides the memo editor while refetching a posting it returned to', async () => {
+    const user = userEvent.setup();
+    const pending = stubDeferredDetailFetch();
+
+    const { router } = renderRoute('/job-postings/1');
+
+    await waitFor(() => expect(pending[1]).toHaveLength(1));
+    await respondWithDetail(pending[1][0], buildJobPostingDetail());
+    await user.type(await screen.findByLabelText('메모'), '작성 중인 메모');
+
+    await act(() => router.navigate('/job-postings/2'));
+    await waitFor(() => expect(pending[2]).toHaveLength(1));
+    await act(() => router.navigate('/job-postings/1'));
+    await waitFor(() => expect(pending[1]).toHaveLength(2));
+
+    // No editor while the refetch is pending: nothing typed here can be
+    // overwritten when its response seeds the draft.
+    expect(screen.queryByLabelText('메모')).not.toBeInTheDocument();
+
+    await respondWithDetail(
+      pending[1][1],
+      buildJobPostingDetail({ memo: '서버 메모' }),
+    );
+
+    expect(
+      await screen.findByLabelText<HTMLTextAreaElement>('메모'),
+    ).toHaveValue('서버 메모');
+  });
+
+  it('ignores a detail response from a superseded posting that arrives late', async () => {
+    const pending = stubDeferredDetailFetch();
+
+    const { router } = renderRoute('/job-postings/1');
+
+    await waitFor(() => expect(pending[1]).toHaveLength(1));
+    await respondWithDetail(pending[1][0], buildJobPostingDetail());
+    await screen.findByRole('heading', { name: 'Frontend Engineer' });
+
+    await act(() => router.navigate('/job-postings/2'));
+    await waitFor(() => expect(pending[2]).toHaveLength(1));
+    await act(() => router.navigate('/job-postings/1'));
+    await waitFor(() => expect(pending[1]).toHaveLength(2));
+
+    await respondWithDetail(
+      pending[1][1],
+      buildJobPostingDetail({ memo: '1번 공고 메모' }),
+    );
+    await respondWithDetail(
+      pending[2][0],
+      buildJobPostingDetail({
+        id: 2,
+        job_title: 'Backend Engineer',
+        memo: '2번 공고 메모',
+      }),
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Frontend Engineer' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('메모')).toHaveValue('1번 공고 메모');
+  });
+
   it('clears a memo by saving an empty draft (memo: null)', async () => {
     const user = userEvent.setup();
     const detail = buildJobPostingDetail({ memo: '기존 메모' });
@@ -523,7 +636,7 @@ describe('JobPostingDetailPage', () => {
 
       if (input === `/v1/job-postings/1`) {
         if (init?.method === 'PATCH') {
-          patchBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          patchBody = parseJsonRequestBody(init);
           return jsonResponse(apiResponse({ ...detail, memo: null }));
         }
         return jsonResponse(apiResponse(detail));
@@ -558,7 +671,7 @@ describe('JobPostingDetailPage', () => {
     let artifactBody: Record<string, unknown> | null = null;
 
     const fetchMock = buildDetailFetchMock(detail, (init) => {
-      artifactBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      artifactBody = parseJsonRequestBody(init);
       return jsonResponse(
         apiResponse({
           artifact_type: 'cover_letter',

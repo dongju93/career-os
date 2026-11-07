@@ -299,7 +299,7 @@ export function AddJobPostingPage() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleExtract();
+                if (e.key === 'Enter') void handleExtract();
               }}
             />
             <Button

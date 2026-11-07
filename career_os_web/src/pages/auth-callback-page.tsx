@@ -38,7 +38,7 @@ export function AuthCallbackPage() {
 
     if (oauthError) {
       setError('Google 로그인에 실패했습니다. 다시 시도해주세요.');
-      navigate(buildLoginPath(nextPath, { error: 'auth_failed' }), {
+      void navigate(buildLoginPath(nextPath, { error: 'auth_failed' }), {
         replace: true,
       });
       return;
@@ -52,7 +52,7 @@ export function AuthCallbackPage() {
           name: data.name,
           picture: data.picture,
         });
-        navigate(consumeStoredRedirectPath(nextPath), { replace: true });
+        void navigate(consumeStoredRedirectPath(nextPath), { replace: true });
       })
       .catch((error: unknown) => {
         const userFacingError = toUserFacingError(
@@ -60,9 +60,10 @@ export function AuthCallbackPage() {
           '로그인 완료에 실패했습니다. 다시 시도해주세요.',
         );
         setError(`${userFacingError.message} (${userFacingError.code})`);
-        navigate(buildLoginPath(nextPath, { error: userFacingError.code }), {
-          replace: true,
-        });
+        void navigate(
+          buildLoginPath(nextPath, { error: userFacingError.code }),
+          { replace: true },
+        );
       });
   }, [navigate, searchParams, setAuth, setError, setLoading]);
 

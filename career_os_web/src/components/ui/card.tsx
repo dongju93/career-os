@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex';
-import type { HTMLAttributes } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import type { AppStyles } from '@/lib/styles';
 import { withClassName } from '@/lib/styles';
 import { surfaces } from '@/styles/surfaces';
@@ -54,10 +54,16 @@ export function CardHeader({
 export function CardTitle({
   className,
   xstyle,
+  children,
   ...props
-}: HTMLAttributes<HTMLHeadingElement> & { xstyle?: AppStyles }) {
+}: HTMLAttributes<HTMLHeadingElement> & {
+  xstyle?: AppStyles;
+  children: ReactNode;
+}) {
   return (
-    <h3 {...withClassName([styles.title, xstyle], className)} {...props} />
+    <h3 {...withClassName([styles.title, xstyle], className)} {...props}>
+      {children}
+    </h3>
   );
 }
 

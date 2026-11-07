@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useAuthStore } from '../store/auth-store';
 import { ChatKitFloatingAssistant } from './chatkit-floating-assistant';
 
@@ -158,9 +158,8 @@ describe('ChatKitFloatingAssistant', () => {
     const launcher = screen.getByRole('button', { name: LAUNCHER_LABEL });
     const controls = launcher.getAttribute('aria-controls');
     expect(controls).toBeTruthy();
-    expect(document.getElementById(controls as string)).toHaveAttribute(
-      'role',
-      'dialog',
-    );
+    const panel = document.getElementById(controls as string);
+    expect(panel).toBeInstanceOf(HTMLDialogElement);
+    expect(panel).not.toHaveAttribute('open');
   });
 });

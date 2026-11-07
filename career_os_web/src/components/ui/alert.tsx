@@ -55,10 +55,16 @@ export function Alert({
 export function AlertTitle({
   className,
   xstyle,
+  children,
   ...props
-}: HTMLAttributes<HTMLHeadingElement> & { xstyle?: AppStyles }) {
+}: HTMLAttributes<HTMLHeadingElement> & {
+  xstyle?: AppStyles;
+  children: ReactNode;
+}) {
   return (
-    <h5 {...withClassName([styles.heading, xstyle], className)} {...props} />
+    <h5 {...withClassName([styles.heading, xstyle], className)} {...props}>
+      {children}
+    </h5>
   );
 }
 

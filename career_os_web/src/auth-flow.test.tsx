@@ -1,5 +1,5 @@
 import { screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import { useAuthStore } from './store/auth-store';
 import { renderRoute } from './test/test-utils';
 import { buildGoogleLoginUrl } from './utils/auth-redirect';

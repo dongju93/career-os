@@ -64,7 +64,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   async function handleLogout() {
     await logoutUser().catch(() => {});
     resetAuthStore();
-    navigate('/login', { replace: true });
+    void navigate('/login', { replace: true });
   }
 
   return (
@@ -286,9 +286,7 @@ export function AppLayout() {
           we only add backdrop-click dismissal and body scroll lock. Rendered
           in the top layer, so it needs no z-index. Content is mounted only
           while open to avoid a second nav tree in the accessibility flow. */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop-click is a
-          mouse-only convenience; the keyboard dismiss path is the modal
-          dialog's native Esc handling from showModal(). */}
+      {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdrop-click is a mouse-only convenience; the keyboard dismiss path is the modal dialog's native Esc handling from showModal(). */}
       <dialog
         ref={drawerRef}
         aria-label="주요 메뉴"

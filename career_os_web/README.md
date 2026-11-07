@@ -72,17 +72,23 @@ pnpm dev
 
 ## 기술 스택
 
+배포 빌드는 번들에 포함된 라이브러리의 라이선스·저작권 고지를
+`dist/THIRD_PARTY_NOTICES.txt`에 자동 생성합니다. JavaScript 번들에도 이 파일의
+경로가 포함됩니다. 고지 파일을 배포물과 함께 제공해야 하며, 라이선스 원문이
+누락되면 빌드가 실패합니다. 예외 처리와 원문 출처는
+[라이선스 관리 문서](licenses/README.md)를 참고하세요.
+
 | 라이브러리                   | 용도                     | 선정 이유                                                                                                                                          |
 | ---------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **React 19**                 | UI 라이브러리            | 컴포넌트 기반 UI 작성 모델이 안정적이고 생태계가 가장 넓음. SPA를 시작점으로 두면서도 이후 라우팅, 테스트, 최적화 도구 선택지가 풍부함             |
 | **TypeScript 7**             | 정적 타입 시스템         | 화면 상태와 API 응답 계약을 컴파일 단계에서 검증할 수 있어 리팩터링 안정성이 높음. 네이티브 컴파일러로 타입 체크 성능을 개선함                     |
-| **Vite 8**                   | 개발 서버·번들러         | 개발 서버 시작과 HMR이 빠르고 설정 부담이 낮음. React, StyleX, Vitest 등 현대 프론트엔드 도구와의 플러그인 생태계가 성숙함                         |
+| **Vite+**                    | 통합 툴체인              | Vite 8 개발 서버·번들러, Vitest, Oxlint, Oxfmt를 하나의 의존성과 `vp` 명령으로 묶어 도구별 버전과 설정 파일을 따로 관리하지 않아도 됨              |
 | **Mantine 9**                | UI 컴포넌트 라이브러리   | 접근성, 테마, 기본 컴포넌트 품질을 빠르게 확보할 수 있음. 모든 UI를 직접 구현하는 비용을 줄이면서도 커스터마이징 여지가 충분함                     |
-| **React Router 7**           | 클라이언트 사이드 라우팅 | React 생태계의 대표 라우터로 SPA 라우팅부터 확장된 데이터·프레임워크 모드까지 선택지가 넓음. URL 기반 화면 구조와 인증 흐름을 명확히 표현하기 좋음 |
+| **React Router 8**           | 클라이언트 사이드 라우팅 | React 생태계의 대표 라우터로 SPA 라우팅부터 확장된 데이터·프레임워크 모드까지 선택지가 넓음. URL 기반 화면 구조와 인증 흐름을 명확히 표현하기 좋음 |
 | **Zustand 5**                | 전역 상태 관리           | Provider 중심 구조 없이 hook 기반으로 필요한 전역 상태만 작게 관리할 수 있음. Redux 계열보다 보일러플레이트가 적고 Context보다 렌더링 제어가 쉬움  |
 | **StyleX**                   | 컴파일 기반 스타일링     | 타입이 있는 스타일 선언과 조건부 조합으로 UI를 구성함. Vite 플러그인이 정적 CSS를 생성하며 공통 컴포넌트는 `xstyle`로 속성별 덮어쓰기를 지원함     |
 | **React Compiler**           | 빌드 타임 최적화         | React 팀이 제공하는 자동 메모이제이션 경로라 수동 최적화 코드의 남용을 줄일 수 있음. React 19 기반 프로젝트에서 장기적인 최적화 방향과 잘 맞음     |
-| **Biome**                    | 린터·포매터              | 포맷터와 린터를 한 도구로 통합해 ESLint·Prettier 조합보다 설정과 실행 흐름이 단순함. Rust 기반이라 대규모 검사에서도 피드백이 빠름                 |
+| **Oxlint + Oxfmt**           | 린터·포매터              | Vite+에 포함된 Rust 기반 도구로 `vp check` 한 번에 포맷·린트·타입 검사를 수행함. 설정은 `vite.config.ts` 한 곳에서 관리함                          |
 | **Vitest + Testing Library** | 단위·컴포넌트 테스트     | Vite 기반 프로젝트와 설정·변환 파이프라인을 공유해 테스트 환경 구성이 단순함. Testing Library는 구현 세부보다 사용자 관점 검증을 유도함            |
 | **Playwright**               | E2E 브라우저 테스트      | 실제 브라우저 기반 검증, auto-wait, trace, 병렬 실행 지원이 강함. 로그인·화면 전환 같은 사용자 흐름 회귀를 단위 테스트보다 현실적으로 확인 가능    |
 | **@openai/chatkit-react**    | AI 채팅 UI 임베드        | OpenAI ChatKit 프로토콜을 준수하는 React 컴포넌트. 스트리밍 SSE 응답과 대화 이력을 내장 처리해 커스텀 채팅 UI를 구현하는 비용을 줄임               |
@@ -193,10 +199,10 @@ pnpm dev
 
 ```bash
 pnpm dev           # 개발 서버 (HMR)
-pnpm build         # tsc -b && vite build
+pnpm build         # vp check --no-fmt --no-lint && vp build
 pnpm preview       # 프로덕션 빌드 미리보기
-pnpm lint          # 린트 검사
-pnpm lint:fix      # 린트 자동 수정
+pnpm lint          # 포맷·린트·타입 검사 (vp check)
+pnpm lint:fix      # 포맷·린트 자동 수정 (vp check --fix)
 pnpm format        # 코드 포매팅
 pnpm test          # 단위/컴포넌트 테스트
 pnpm test:watch    # 테스트 와치 모드
@@ -212,7 +218,7 @@ pnpm exec playwright install chromium
 단일 테스트 파일 실행:
 
 ```bash
-pnpm vitest run src/path/to/file.test.tsx
+pnpm exec vp test run src/path/to/file.test.tsx
 ```
 
 커밋 전 기본 검증:

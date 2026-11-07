@@ -12,13 +12,14 @@ import {
   RefreshCw,
   Sparkles,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDocumentTitle } from '@/hooks/use-document-title';
+import { useRequestGeneration } from '@/hooks/use-request-generation';
 import { motion } from '@/styles/motion';
 import { surfaces } from '@/styles/surfaces';
 import { toUserFacingError, type UserFacingError } from '../services/api-error';
@@ -224,14 +225,17 @@ function JobPostingsErrorState({
   );
 }
 
+/** A job-search-group id, or `'all'` when no group filter applies. */
+type GroupFilterValue = string;
+
 function GroupFilterBar({
   groups,
   selected,
   onSelect,
 }: {
   groups: JobSearchGroupItem[];
-  selected: string | 'all';
-  onSelect: (value: string | 'all') => void;
+  selected: GroupFilterValue;
+  onSelect: (value: GroupFilterValue) => void;
 }) {
   return (
     <div {...stylex.props(styles.groupFilterBarRow)}>
@@ -289,7 +293,7 @@ export function JobPostingsPage() {
   const [groupsLoaded, setGroupsLoaded] = useState(false);
 
   // Derive selected group: param takes precedence; default to first active group
-  const selectedGroup: string | 'all' =
+  const selectedGroup: GroupFilterValue =
     groupParam === 'all'
       ? 'all'
       : (groupParam ??
@@ -297,7 +301,6 @@ export function JobPostingsPage() {
 
   const [items, setItems] = useState<JobPostingListItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<UserFacingError | null>(null);
 
   // Load active groups for the filter bar
@@ -331,33 +334,31 @@ export function JobPostingsPage() {
 
   const groupId = selectedGroup === 'all' ? undefined : selectedGroup;
 
-  const loadJobPostings = useCallback(
-    (signal?: AbortSignal) => {
-      const offset = (page - 1) * PAGE_SIZE;
-      setIsLoading(true);
-      setError(null);
-
-      fetchJobPostings(offset, PAGE_SIZE, groupId, signal)
-        .then((pageData) => {
-          setItems(pageData.items);
-          setTotal(pageData.total);
-        })
-        .catch((err: unknown) => {
-          if (err instanceof Error && err.name === 'AbortError') return;
-          setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
-        })
-        .finally(() => {
-          if (!signal?.aborted) setIsLoading(false);
-        });
-    },
-    [page, groupId],
+  const { generation, isLoading, markSettled, retry } = useRequestGeneration(
+    `${page}:${groupId ?? 'all'}`,
   );
 
   useEffect(() => {
     const controller = new AbortController();
-    loadJobPostings(controller.signal);
+    const { signal } = controller;
+
+    fetchJobPostings((page - 1) * PAGE_SIZE, PAGE_SIZE, groupId, signal)
+      .then((pageData) => {
+        if (signal.aborted) return;
+        setItems(pageData.items);
+        setTotal(pageData.total);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (signal.aborted) return;
+        setError(toUserFacingError(err, '데이터를 불러오지 못했습니다.'));
+      })
+      .finally(() => {
+        if (!signal.aborted) markSettled(generation);
+      });
+
     return () => controller.abort();
-  }, [loadJobPostings]);
+  }, [page, groupId, generation, markSettled]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const hasPrev = page > 1;
@@ -372,7 +373,7 @@ export function JobPostingsPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function selectGroup(value: string | 'all') {
+  function selectGroup(value: GroupFilterValue) {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set('group', value);
@@ -447,7 +448,7 @@ export function JobPostingsPage() {
       )}
 
       {!isLoading && error && (
-        <JobPostingsErrorState error={error} onRetry={loadJobPostings} />
+        <JobPostingsErrorState error={error} onRetry={retry} />
       )}
 
       {!isLoading && !error && items.length === 0 && (
