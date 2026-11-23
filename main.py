@@ -77,9 +77,12 @@ SENTRY_DATA_COLLECTION: DataCollectionUserOptions = {
             ],
         }
     },
+    # No URL-valued params (`url`, and `callback_url` via substring match): the
+    # allowlist only sees top-level names, so a nested query inside the value
+    # (`?email=…`, `?access_token=…`) would ship verbatim.
     "url_query_params": {
         "mode": "allowlist",
-        "terms": ["group_id", "status", "limit", "offset", "url"],
+        "terms": ["group_id", "status", "limit", "offset"],
     },
     # Bodies carry profile, salary, memo, and recruiter contact fields.
     "http_bodies": [],
