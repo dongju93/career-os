@@ -10,6 +10,7 @@ Cookie header, which is how the session cookie leaked before the allowlists.
 import json
 from collections.abc import Generator
 from typing import Any
+from urllib.parse import quote, urlencode
 
 import pytest
 import sentry_sdk
@@ -32,7 +33,25 @@ _SENSITIVE_MARKERS = {
     "oauth access token": "ya29.PROBE-ACCESS-TOKEN",
     "request body": "PROBE-SALARY-9000",
     "oauth code query": "PROBE-AUTH-CODE",
+    "posting url nested email": "probe-nested-user@example.com",
+    "posting url nested token": "PROBE-NESTED-ACCESS-TOKEN",
+    "callback url nested token": "PROBE-CALLBACK-ACCESS-TOKEN",
 }
+
+# URL-valued params (`url` on extraction, `callback_url` on OAuth start) whose
+# values carry a nested query. The allowlist only checks top-level names, and
+# the SDK unquotes the whole query string before splitting it, so the first
+# nested param stays glued to the URL value: admitting the outer name would
+# ship that param verbatim. Sensitive markers therefore sit first after `?`.
+_NESTED_POSTING_URL = (
+    "https://www.saramin.co.kr/zf_user/jobs/relay/view"
+    f"?email={_SENSITIVE_MARKERS['posting url nested email']}"
+    f"&access_token={_SENSITIVE_MARKERS['posting url nested token']}"
+    "&rec_idx=1"
+)
+_NESTED_CALLBACK_URL = (
+    f"/auth/callback?access_token={_SENSITIVE_MARKERS['callback url nested token']}"
+)
 
 
 class _DiscardTransport(Transport):
@@ -89,8 +108,19 @@ def test_sentry_payload_excludes_pii_and_credentials(
     events, spans = captured_sentry_payloads
     client = TestClient(main_module.career_os, raise_server_exceptions=False)
 
+    # `urlencode` percent-encodes the nested `&`/`=`, as a browser's
+    # encodeURIComponent would, so the inner params stay inside the value
+    # instead of surfacing as top-level params the allowlist already drops.
+    query = urlencode(
+        {
+            "code": _SENSITIVE_MARKERS["oauth code query"],
+            "limit": 7,
+            "url": _NESTED_POSTING_URL,
+            "callback_url": _NESTED_CALLBACK_URL,
+        }
+    )
     response = client.post(
-        f"{_PROBE_PATH}?code={_SENSITIVE_MARKERS['oauth code query']}&limit=7",
+        f"{_PROBE_PATH}?{query}",
         json={"salary_expectation": _SENSITIVE_MARKERS["request body"]},
         headers={
             "Cookie": f"session={_SENSITIVE_MARKERS['session cookie']}",
@@ -105,7 +135,12 @@ def test_sentry_payload_excludes_pii_and_credentials(
     assert response.status_code == 500
     assert len(events) == 1
     payload = json.dumps([events, spans], default=repr)
-    leaked = [name for name, value in _SENSITIVE_MARKERS.items() if value in payload]
+    # Query values reach Sentry percent-encoded, so search both spellings.
+    leaked = [
+        name
+        for name, value in _SENSITIVE_MARKERS.items()
+        if value in payload or quote(value, safe="") in payload
+    ]
     assert leaked == []
 
     # Allowlisted, non-identifying context must still reach Sentry.
