@@ -12,7 +12,7 @@ from career_os_api.database.retry import (
 )
 
 
-def _make_pool(side_effects: list):
+def _make_pool(side_effects: list) -> MagicMock:
     """Return a mock pool whose connection() context manager raises each side_effect in order."""
     pool = MagicMock()
     call_iter = iter(side_effects)

@@ -12,7 +12,7 @@ from career_os_api.database import job_search_groups as groups_module
 
 
 class FakeCursor:
-    def __init__(self, *, rows=None, fetchone_results=None):
+    def __init__(self, *, rows=None, fetchone_results=None) -> None:
         self._rows = rows or []
         self._fetchone_results = list(fetchone_results or [])
         self.execute_calls: list[tuple] = []
@@ -37,11 +37,13 @@ class FakeCursor:
 
 
 class FakeConnection:
-    def __init__(self, *, cursor: FakeCursor | None = None, fetchone_result=None):
+    def __init__(
+        self, *, cursor: FakeCursor | None = None, fetchone_result=None
+    ) -> None:
         self._cursor = cursor
         self.cursor_row_factories: list = []
 
-    def cursor(self, *, row_factory=None):
+    def cursor(self, *, row_factory=None) -> FakeCursor | None:
         self.cursor_row_factories.append(row_factory)
         return self._cursor
 

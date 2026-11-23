@@ -10,7 +10,7 @@ from career_os_api.schemas import UserProfileUpsertRequest
 
 
 class FakeCursor:
-    def __init__(self, *, fetchone_results=None):
+    def __init__(self, *, fetchone_results=None) -> None:
         self._fetchone_results = list(fetchone_results or [])
         self.execute_calls: list[tuple[str, tuple | None]] = []
 
@@ -30,11 +30,11 @@ class FakeCursor:
 
 
 class FakeConnection:
-    def __init__(self, *, cursor: FakeCursor):
+    def __init__(self, *, cursor: FakeCursor) -> None:
         self._cursor = cursor
         self.cursor_row_factories: list[object] = []
 
-    def cursor(self, *, row_factory):
+    def cursor(self, *, row_factory) -> FakeCursor:
         self.cursor_row_factories.append(row_factory)
         return self._cursor
 

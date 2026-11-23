@@ -52,7 +52,9 @@ async def connections():
             )
 
 
-def _event(event_type=EVENT_ACCOUNT_PURGED, *, jti="purge", subject=_SUBJECT):
+def _event(
+    event_type: str = EVENT_ACCOUNT_PURGED, *, jti="purge", subject=_SUBJECT
+) -> RiscEvent:
     return RiscEvent(
         jti=jti,
         event_type=event_type,
@@ -63,7 +65,7 @@ def _event(event_type=EVENT_ACCOUNT_PURGED, *, jti="purge", subject=_SUBJECT):
     )
 
 
-async def _callback(conn, subject=_SUBJECT):
+async def _callback(conn, subject: str = _SUBJECT):
     async with conn.transaction():
         user = await upsert_user(conn, subject, "x@example.com", None, None)
         await create_initial_group(conn, user["id"])

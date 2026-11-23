@@ -3,6 +3,7 @@ import uuid
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from typing import Self
 from unittest.mock import ANY, AsyncMock
 
 import fakeredis
@@ -315,7 +316,7 @@ def test_google_callback_preserves_subsecond_session_issuance(
 
     class FixedDatetime(datetime):
         @classmethod
-        def now(cls, tz=None):
+        def now(cls, tz=None) -> Self:
             return cls.fromtimestamp(issued_at.timestamp(), tz)
 
     monkeypatch.setattr(app_module, "datetime", FixedDatetime)
