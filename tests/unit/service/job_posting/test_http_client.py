@@ -7,6 +7,7 @@ import httpx2
 import pytest
 from bs4 import BeautifulSoup
 from fastapi import HTTPException
+from httpx2._models import Response
 
 from career_os_api.service.job_posting import http_client as module
 from career_os_api.service.job_posting.extractor import _collect_images_as_base64
@@ -134,7 +135,7 @@ async def test_ipv6_and_connection_fallback_use_only_validated_addresses(network
 
 
 class TrackedStream(httpx2.AsyncByteStream):
-    def __init__(self, *, slow=False):
+    def __init__(self, *, slow=False) -> None:
         self.closed = False
         self.slow = slow
 
@@ -210,7 +211,7 @@ async def test_redirect_loop_is_bounded(network):
     _, sender = network
     bodies = []
 
-    def redirect(request):
+    def redirect(request) -> Response:
         body = TrackedStream()
         bodies.append(body)
         return httpx2.Response(302, headers={"location": "/loop"}, stream=body)
@@ -321,7 +322,7 @@ async def test_socket_boundary_receives_pinned_ip_and_separate_verified_tls(
     streams = []
 
     class WireStream(AsyncNetworkStream):
-        def __init__(self):
+        def __init__(self) -> None:
             self.closed = False
             self.writes = []
 

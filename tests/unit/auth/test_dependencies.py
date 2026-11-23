@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 import pytest
 from fastapi import HTTPException
@@ -10,7 +11,7 @@ SESSION_CLIENT_HEADERS = {"x-career-os-client": "web"}
 
 
 class _FakeCursor:
-    def __init__(self, row):
+    def __init__(self, row) -> None:
         self._row = row
 
     async def execute(self, sql, params=None):
@@ -27,10 +28,10 @@ class _FakeCursor:
 
 
 class _FakeConn:
-    def __init__(self, row):
+    def __init__(self, row) -> None:
         self._row = row
 
-    def cursor(self, **kwargs):
+    def cursor(self, **kwargs) -> _FakeCursor:
         return _FakeCursor(self._row)
 
     async def __aenter__(self):
@@ -41,19 +42,31 @@ class _FakeConn:
 
 
 class _FakePool:
-    def __init__(self, row):
+    def __init__(self, row) -> None:
         self._row = row
 
-    def connection(self):
+    def connection(self) -> _FakeConn:
         return _FakeConn(self._row)
 
 
 class _FakeApp:
-    def __init__(self, row):
+    def __init__(
+        self,
+        row: dict[str, UUID | bool | datetime | str | None]
+        | dict[str, UUID | bool | str | None]
+        | None,
+    ) -> None:
         self.state = type("State", (), {"pool": _FakePool(row)})()
 
 
-def _make_request(row, *, session=None, headers=None):
+def _make_request(
+    row: dict[str, UUID | bool | datetime | str | None]
+    | dict[str, UUID | bool | str | None]
+    | None,
+    *,
+    session=None,
+    headers=None,
+):
     return type(
         "Request",
         (),

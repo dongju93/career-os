@@ -14,7 +14,7 @@ from career_os_api.schemas import ApplicationStatus
 
 
 class FakeExecuteResult:
-    def __init__(self, row):
+    def __init__(self, row) -> None:
         self._row = row
 
     async def fetchone(self):
@@ -22,7 +22,7 @@ class FakeExecuteResult:
 
 
 class FakeCursor:
-    def __init__(self, *, rows=None, fetchone_results=None):
+    def __init__(self, *, rows=None, fetchone_results=None) -> None:
         self._rows = rows or []
         self._fetchone_results = list(fetchone_results or [])
         # Params are positional tuples for the legacy queries and dicts for the
@@ -48,7 +48,7 @@ class FakeCursor:
 
 
 class FakeConnection:
-    def __init__(self, *, execute_row=None, cursor=None):
+    def __init__(self, *, execute_row=None, cursor=None) -> None:
         self._execute_row = execute_row
         self._cursor = cursor
         self.execute_calls: list[tuple[str, tuple]] = []

@@ -116,7 +116,7 @@ async def check_quota(
     bucket_end: int,
 ) -> QuotaResult:
     try:
-        count = int(await redis.incr(key))
+        count = await redis.incr(key)
         ttl = max(1, bucket_end - int(time.time()))
         await redis.expire(key, ttl, nx=True)
         allowed = count <= limit

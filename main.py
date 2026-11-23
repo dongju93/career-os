@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from openai import AsyncOpenAI
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.types import Event, Hint
+from sentry_sdk.types import DataCollectionUserOptions, Event, Hint
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -52,6 +52,63 @@ def _before_send_sentry_event(event: Event, hint: Hint) -> Event | None:
     return event
 
 
+# SDK 3.x has no EventScrubber, and every category omitted here falls back to a
+# "collect" default. Anything that can hold PII or credentials is off, and the
+# key-value categories use allowlists (default-deny) because name denylists only
+# check top-level keys: the raw session cookie still leaked through framework
+# frame locals such as `scope`/`request`. Allowlist terms are case-insensitive
+# substrings, and the SDK's sensitive denylist still applies on top of them.
+# Plain dict, not frozendict: the SDK requires `isinstance(value, dict)`.
+SENTRY_DATA_COLLECTION: DataCollectionUserOptions = {
+    "user_info": False,
+    "cookies": {"mode": "off"},
+    "http_headers": {
+        "request": {
+            "mode": "allowlist",
+            "terms": [
+                "content-type",
+                "content-length",
+                "accept",
+                "user-agent",
+                "origin",
+                "host",
+                "x-request-id",
+                "x-career-os-client",
+            ],
+        }
+    },
+    # No URL-valued params (`url`, and `callback_url` via substring match): the
+    # allowlist only sees top-level names, so a nested query inside the value
+    # (`?email=…`, `?access_token=…`) would ship verbatim.
+    "url_query_params": {
+        "mode": "allowlist",
+        "terms": ["group_id", "status", "limit", "offset"],
+    },
+    # Bodies carry profile, salary, memo, and recruiter contact fields.
+    "http_bodies": [],
+    # Prompts/outputs are profile and posting text; model/token/latency spans stay.
+    "gen_ai": {"inputs": False, "outputs": False},
+    # Redis args are harmless today, but this would silently ship any value a
+    # future Redis use stores; the key itself is always recorded.
+    "database_query_data": False,
+    "stack_frame_variables": {
+        "mode": "allowlist",
+        "terms": [
+            "job_id",
+            "group_id",
+            "posting_id",
+            "status",
+            "limit",
+            "offset",
+            "attempt",
+            "label",
+            "platform",
+            "artifact_type",
+        ],
+    },
+}
+
+
 if settings.sentry_dsn:
     sentry_sdk.init(
         dsn=settings.sentry_dsn,
@@ -60,10 +117,13 @@ if settings.sentry_dsn:
         integrations=[
             FastApiIntegration(),
             LoggingIntegration(
-                level=logging.WARNING,
+                breadcrumb_level=logging.WARNING,
+                # `level` ships records as Sentry Logs; keep that product off.
+                level=None,
                 event_level=logging.ERROR,
             ),
         ],
+        data_collection=SENTRY_DATA_COLLECTION,
         before_send=_before_send_sentry_event,
     )
 

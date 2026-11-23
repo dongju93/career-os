@@ -30,7 +30,7 @@ class FakeConnection:
     def __init__(self, *, cursor: FakeCursor) -> None:
         self._cursor = cursor
 
-    def cursor(self):
+    def cursor(self) -> FakeCursor:
         return self._cursor
 
 
