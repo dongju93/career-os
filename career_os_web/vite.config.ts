@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import stylex from '@stylexjs/unplugin';
+import { redact } from '@tanstack/redact/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, lazyPlugins } from 'vite-plus';
 import {
@@ -52,6 +53,8 @@ export default defineConfig({
     // Vitest has none, so that adapter would block exit until teardownTimeout.
     process.env.VITEST ? stylex.rolldown() : stylex.vite(),
     react({ compiler: true }),
+    // Vitest externalizes Testing Library, whose renderer imports React directly.
+    process.env.VITEST ? [] : redact({ environments: ['client'] }),
   ]),
   build: {
     license: { fileName: licenseMetadataFile },
