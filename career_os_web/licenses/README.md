@@ -22,11 +22,13 @@ reviewed. Builds do not fetch licenses over the network.
 | Package version                 | Local file                              | Upstream license source                                                                                      |
 | ------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `@stylexjs/stylex@0.19.1`       | `stylex-0.19.1-LICENSE`                 | <https://github.com/facebook/stylex/blob/0fb4fef616c61bef0057381c7c4e1b52bf1fc512/LICENSE>                   |
+| `@stylexjs/stylex@0.19.2`       | `stylex-0.19.1-LICENSE`                 | <https://github.com/facebook/stylex/blob/d7e6174c5384c64b87bc5fde1f57eedd7c11c5aa/LICENSE>                   |
 | `react-remove-scroll-bar@2.3.8` | `react-remove-scroll-bar-2.3.8-LICENSE` | <https://github.com/theKashey/react-remove-scroll-bar/blob/7301c160fda44cb8cf2b9fdfde61efad35736196/LICENSE> |
 
-The URLs pin the upstream commits that last changed each LICENSE when reviewed,
-not the package release commits. The requested release tags were unavailable;
-these sources match the MIT declaration in the installed package metadata.
+Each URL pins an upstream commit reviewed for that package version. StyleX
+0.19.2 uses the same license text as 0.19.1, verified against the npm release's
+`gitHead` commit. These sources match the MIT declaration in the installed package
+metadata.
 
 ## Package-specific notices
 

@@ -19,6 +19,7 @@ type NoticeFile = { name: string; text: string; kind: 'license' | 'notice' };
 // These published packages omit LICENSE; each fallback is reviewed for one version.
 const licenseFallbacks = new Map([
   ['@stylexjs/stylex@0.19.1', 'stylex-0.19.1-LICENSE'],
+  ['@stylexjs/stylex@0.19.2', 'stylex-0.19.1-LICENSE'],
   ['react-remove-scroll-bar@2.3.8', 'react-remove-scroll-bar-2.3.8-LICENSE'],
 ]);
 

@@ -100,20 +100,23 @@ describe('third-party license distribution', () => {
     await expect(buildFixture(root)).rejects.toThrow('License text missing');
   });
 
-  it('includes a reviewed fallback for the exact installed version', async () => {
-    const { root } = createFixture({
-      name: '@stylexjs/stylex',
-      version: '0.19.1',
-    });
-    expect(await buildFixture(root)).toContain(
-      'Copyright (c) Meta Platforms, Inc. and affiliates.',
-    );
-  });
+  it.each(['0.19.1', '0.19.2'])(
+    'includes the reviewed fallback for StyleX %s',
+    async (version) => {
+      const { root } = createFixture({
+        name: '@stylexjs/stylex',
+        version,
+      });
+      expect(await buildFixture(root)).toContain(
+        'Copyright (c) Meta Platforms, Inc. and affiliates.',
+      );
+    },
+  );
 
   it('does not reuse an old fallback after a dependency upgrade', async () => {
     const { root } = createFixture({
       name: '@stylexjs/stylex',
-      version: '0.19.2',
+      version: '0.19.3',
     });
     await expect(buildFixture(root)).rejects.toThrow('License text missing');
   });
